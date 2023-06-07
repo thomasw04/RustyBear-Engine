@@ -1,0 +1,14 @@
+[package]
+name = "RustyBear-Engine"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.10.0"
+gilrs = "0.10.2"
+log = "0.4.18"
+simplelog = "0.12.1"
+wgpu = "0.16.1"
+winit = "0.28.6"
