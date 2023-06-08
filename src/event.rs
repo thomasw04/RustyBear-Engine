@@ -35,6 +35,7 @@ pub enum Event {
     CursorEntered,
     CursorLeft,
     MouseWheel { delta_x: f64, delta_y: f64, state: TouchState },
+    MouseScroll { delta_x: f32, delta_y: f32, state: TouchState },
     MouseInput { scancode: u32, state: KeyState }
 
     //gilrs Events todo

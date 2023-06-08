@@ -11,26 +11,22 @@ pub trait Module {
     fn quit(&mut self);
 }
 
-pub trait Windowable {
-    fn create_window(&mut self, name: String) -> Window;
-} 
-
 pub trait Application {
-    fn init(&mut self, config_json: String, stack: &mut ApplicationStack);
+    fn init(&mut self, config_json: String, stack: &mut ModuleStack) -> Window;
     fn update(&mut self, delta: &Timestep);
     fn quit(&mut self);
 }
 
-pub struct ApplicationStack<'a> {
+pub struct ModuleStack<'a> {
     events: EventStack<'a>,
     modules: Vec<Box<dyn Module + 'a>>,
 }
 
-impl<'a> ApplicationStack<'a> {
+impl<'a> ModuleStack<'a> {
 
-    pub fn new() -> ApplicationStack<'a>
+    pub fn new() -> ModuleStack<'a>
     {
-        ApplicationStack { events: EventStack::new(), modules: Vec::new() }
+        ModuleStack { events: EventStack::new(), modules: Vec::new() }
     }
 
     pub fn push(&mut self, module: impl Module + 'a)

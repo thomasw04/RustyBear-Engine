@@ -1,6 +1,6 @@
 use std::{ops::ControlFlow, time::Instant};
 
-use crate::core::{Application, Module, Windowable};
+use crate::core::{Application, Module};
 
 use event::EventSubscriber;
 use log::{info, debug};
@@ -8,7 +8,7 @@ use utils::Timestep;
 use window::Window;
 use winit::{event_loop::{EventLoop}, window::WindowBuilder, event::{Event, WindowEvent}};
 
-use crate::core::ApplicationStack;
+use crate::core::ModuleStack;
 
 pub mod utils;
 pub mod core;
@@ -23,7 +23,7 @@ struct MyHandler{
 impl EventSubscriber for MyHandler {
     fn on_event(&mut self, event: &event::Event) -> bool
     {
-        info!("Window closing.");
+        info!("Event received.");
         return false;
     }
 }
@@ -40,23 +40,16 @@ struct MyApp {
 }
 
 impl Application for MyApp { 
-    fn init(&mut self, config_json: String, stack: &mut ApplicationStack)
+    fn init(&mut self, config_json: String, stack: &mut ModuleStack) -> Window
     {
         info!("Init Application");
         stack.subscribe(true, MyHandler::new());
+
+        Window::new(config_json)
     }
 
     fn update(&mut self, delta: &utils::Timestep) {}
     fn quit(&mut self) {}
-}
-
-impl Windowable for MyApp {
-    fn create_window(&mut self, name: String) -> window::Window
-    {
-        let event_loop = EventLoop::new();
-        let window = WindowBuilder::new().with_title(name).build(&event_loop).unwrap();
-        Window::new(window, event_loop)
-    }
 }
 
 impl MyApp {
@@ -71,12 +64,10 @@ fn main() {
 
     println!();
 
-    let mut apps = ApplicationStack::new();
+    let mut apps = ModuleStack::new();
 
     let mut myapp = MyApp::new();
-    myapp.init("{}".to_string(), &mut apps);
-
-    let window = myapp.create_window("RustyBear".to_string());
+    let window = myapp.init("{}".to_string(), &mut apps);
 
     let mut last = Instant::now().elapsed().as_nanos();
 
@@ -92,13 +83,7 @@ fn main() {
         {
             Event::WindowEvent { window_id, ref event }
 
-            if window_id == window.native.id() => match event {
-                WindowEvent::CloseRequested => {
-                    apps.dispatch_event(true, &event::Event::CloseRequested);
-                    control_flow.set_exit();
-                },
-                _ => {}
-            },
+            if window_id == window.native.id() => Window::dispatch_event(&mut apps, event, control_flow),
             _ => {}
         }
     });
