@@ -1,12 +1,20 @@
 
 use std::path::PathBuf;
 
+use gilrs::GamepadId;
 use winit::event::ModifiersState;
 
 #[derive(Clone)]
 pub enum KeyState {
     Pressed,
     Released
+}
+
+#[derive(Clone)]
+pub enum GamepadButtonState {
+    Pressed,
+    Released,
+    Repeated
 }
 
 #[derive(Clone)]
@@ -36,9 +44,15 @@ pub enum Event {
     CursorLeft,
     MouseWheel { delta_x: f64, delta_y: f64, state: TouchState },
     MouseScroll { delta_x: f32, delta_y: f32, state: TouchState },
-    MouseInput { scancode: u32, state: KeyState }
+    MouseInput { scancode: u32, state: KeyState },
 
     //gilrs Events todo
+    GamepadInput {id: GamepadId, scancode: u32, state: GamepadButtonState},
+    GamepadInputChanged {id: GamepadId, scancode: u32, value: f32},
+    GamepadAxis {id: GamepadId, scancode: u32, value: f32},
+    GamepadConnected {id: GamepadId},
+    GamepadDisconnected {id: GamepadId},
+    GamepadDropped {id: GamepadId}
 }
 
 
@@ -108,5 +122,4 @@ impl<'a> EventStack<'a> {
     {
         let _dying_closure = self.app_stack.remove(index);
     }
-
 }

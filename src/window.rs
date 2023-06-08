@@ -1,3 +1,4 @@
+use gilrs::EventType;
 use serde::{Serialize, Deserialize};
 use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder}, dpi::{PhysicalSize, LogicalPosition}, event::{Event, WindowEvent, ElementState, MouseScrollDelta, TouchPhase, MouseButton}};
 use winit_fullscreen::WindowFullScreen;
@@ -52,6 +53,34 @@ impl Window {
         }
 
         Window { native: window, event_loop: event_loop }
+    }
+
+    pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow)
+    {
+        match event.event {
+            EventType::Connected => {
+                apps.dispatch_event(true, &event::Event::GamepadConnected { id: event.id })
+            },
+            EventType::Disconnected => {
+                apps.dispatch_event(true, &event::Event::GamepadDisconnected { id: event.id })
+            },
+            EventType::ButtonPressed(button, code) => {
+                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Pressed })
+            },
+            EventType::ButtonReleased(button, code) => {
+                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Released })
+            },
+            EventType::ButtonRepeated(button, code) => {
+                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Repeated })
+            },
+            EventType::ButtonChanged(button, value, code) => {
+                apps.dispatch_event(true, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value: value })
+            },
+            EventType::AxisChanged(axis, value, code) => {
+                apps.dispatch_event(true, &event::Event::GamepadAxis { id: event.id, scancode: axis as u32, value: value })
+            },
+            _ => {}
+        }
     }
 
     pub fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow)

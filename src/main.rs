@@ -3,6 +3,7 @@ use std::{ops::ControlFlow, time::Instant};
 use crate::core::{Application, Module};
 
 use event::EventSubscriber;
+use gilrs::{Gilrs};
 use log::{info, debug};
 use utils::Timestep;
 use window::Window;
@@ -15,6 +16,7 @@ pub mod core;
 pub mod event;
 pub mod window;
 pub mod logging;
+pub mod entry;
 
 
 struct MyHandler{
@@ -65,6 +67,7 @@ fn main() {
     println!();
 
     let mut apps = ModuleStack::new();
+    let mut gilrs = Gilrs::new().unwrap();
 
     let mut myapp = MyApp::new();
     let window = myapp.init("{}".to_string(), &mut apps);
@@ -85,6 +88,13 @@ fn main() {
 
             if window_id == window.native.id() => Window::dispatch_event(&mut apps, event, control_flow),
             _ => {}
+        }
+
+        let gilrs_event_option = gilrs.next_event();
+
+        if gilrs_event_option.is_some() {
+            let gilrs_event = gilrs_event_option.unwrap();
+            Window::dispatch_gamepad_event(&mut apps, &gilrs_event, control_flow);
         }
     });
 }
