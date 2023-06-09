@@ -1,22 +1,23 @@
-use std::{ops::ControlFlow, time::Instant};
+use rccell::RcCell;
 
-use crate::core::{Application, Module};
+use crate::{core::{Application}, input::InputState};
 
 use event::EventSubscriber;
 use gilrs::{Gilrs};
 use log::{info, debug};
 use utils::Timestep;
 use window::Window;
-use winit::{event_loop::{EventLoop}, window::WindowBuilder, event::{Event, WindowEvent}};
+use winit::{event::{Event, VirtualKeyCode, ElementState}};
 
 use crate::core::ModuleStack;
 
 pub mod utils;
-pub mod core;
+#[macro_use] pub mod core;
 pub mod event;
 pub mod window;
 pub mod logging;
 pub mod entry;
+pub mod input;
 
 
 struct MyHandler{
@@ -25,7 +26,22 @@ struct MyHandler{
 impl EventSubscriber for MyHandler {
     fn on_event(&mut self, event: &event::Event) -> bool
     {
-        info!("Event received.");
+        match event {
+            event::Event::KeyboardInput { keycode, state } =>
+            {
+                match keycode 
+                {
+                    VirtualKeyCode::D => match state
+                    {
+                        ElementState::Pressed => info!("Pressed the d"),
+                        _ => {}
+                    },
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+
         return false;
     }
 }
@@ -42,15 +58,19 @@ struct MyApp {
 }
 
 impl Application for MyApp { 
+
     fn init(&mut self, config_json: String, stack: &mut ModuleStack) -> Window
     {
         info!("Init Application");
-        stack.subscribe(true, MyHandler::new());
+
+        let handler = RcCell::new(MyHandler::new());
+        stack.subscribe(event::EventType::Layer, handler);
 
         Window::new(config_json)
     }
 
     fn update(&mut self, delta: &utils::Timestep) {}
+
     fn quit(&mut self) {}
 }
 
@@ -63,32 +83,41 @@ impl MyApp {
 
 fn main() {
     logging::init();
+    let mut gilrs = Gilrs::new().unwrap();
 
     println!();
 
+    //Init the module stack.
     let mut apps = ModuleStack::new();
-    let mut gilrs = Gilrs::new().unwrap();
 
+    //Register an EventSubscriber which maintains a list of current KeyStates.
+    let input_state = rccell::RcCell::new(InputState::new());
+    apps.subscribe(event::EventType::App, input_state.clone());
+
+    //Create the application
     let mut myapp = MyApp::new();
+
+    //Init the application and create the window
     let window = myapp.init("{}".to_string(), &mut apps);
 
-    let mut last = Instant::now().elapsed().as_nanos();
+    //Time since last frame
+    let mut ts = Timestep::new();
 
-    window.event_loop.run(move |event, _, control_flow|
+    window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
     {
-        let now = Instant::now().elapsed().as_nanos();
-        let ts: Timestep = (now.saturating_sub(last) as f64 / 1000.0).into();
-        last = now;
+        myapp.update(ts.step_fwd());
 
-        myapp.update(&ts);
+        if input_state.borrow().is_key_down(&VirtualKeyCode::A) {
+            info!("The A is down.");
+        }
 
-        match event
+        let _handled = match event
         {
             Event::WindowEvent { window_id, ref event }
 
             if window_id == window.native.id() => Window::dispatch_event(&mut apps, event, control_flow),
-            _ => {}
-        }
+            _ => {false}
+        };
 
         let gilrs_event_option = gilrs.next_event();
 
@@ -96,5 +125,5 @@ fn main() {
             let gilrs_event = gilrs_event_option.unwrap();
             Window::dispatch_gamepad_event(&mut apps, &gilrs_event, control_flow);
         }
-    });
+    }});
 }

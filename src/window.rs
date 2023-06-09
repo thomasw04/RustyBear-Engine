@@ -1,9 +1,9 @@
 use gilrs::EventType;
 use serde::{Serialize, Deserialize};
-use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder}, dpi::{PhysicalSize, LogicalPosition}, event::{Event, WindowEvent, ElementState, MouseScrollDelta, TouchPhase, MouseButton}};
+use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder}, dpi::{PhysicalSize, LogicalPosition}, event::{WindowEvent, MouseScrollDelta}};
 use winit_fullscreen::WindowFullScreen;
 
-use crate::{core::ModuleStack, event::{self, KeyState, TouchState}};
+use crate::{core::ModuleStack, event};
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {
@@ -55,123 +55,102 @@ impl Window {
         Window { native: window, event_loop: event_loop }
     }
 
-    pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow)
+    pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow) -> bool
     {
         match event.event {
             EventType::Connected => {
-                apps.dispatch_event(true, &event::Event::GamepadConnected { id: event.id })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadConnected { id: event.id })
             },
             EventType::Disconnected => {
-                apps.dispatch_event(true, &event::Event::GamepadDisconnected { id: event.id })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadDisconnected { id: event.id })
             },
             EventType::ButtonPressed(button, code) => {
-                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Pressed })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Pressed })
             },
             EventType::ButtonReleased(button, code) => {
-                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Released })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Released })
             },
             EventType::ButtonRepeated(button, code) => {
-                apps.dispatch_event(true, &event::Event::GamepadInput { id: event.id, scancode: button as u32, state: event::GamepadButtonState::Repeated })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Repeated })
             },
             EventType::ButtonChanged(button, value, code) => {
-                apps.dispatch_event(true, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value: value })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value: value })
             },
             EventType::AxisChanged(axis, value, code) => {
-                apps.dispatch_event(true, &event::Event::GamepadAxis { id: event.id, scancode: axis as u32, value: value })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadAxis { id: event.id, axiscode: axis, value: value })
             },
-            _ => {}
+            _ => {false}
         }
     }
 
-    pub fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow)
+    pub fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow) -> bool
     {
         match event {
             WindowEvent::Resized(size) => {
-                apps.dispatch_event(true, &event::Event::Resized { width: size.width, height: size.height })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::Resized { width: size.width, height: size.height })
             },
             WindowEvent::Moved(pos) => {
-                apps.dispatch_event(true, &event::Event::Moved { x: pos.x, y: pos.y })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::Moved { x: pos.x, y: pos.y })
             },
             WindowEvent::CloseRequested => {
-                apps.dispatch_event(true, &event::Event::CloseRequested);
+                let return_value = apps.dispatch_event(event::EventType::Layer, &event::Event::CloseRequested);
                 control_flow.set_exit();
+                return return_value;
             },
             WindowEvent::Destroyed => {
-                apps.dispatch_event(true, &event::Event::Destroyed);
+                let return_value = apps.dispatch_event(event::EventType::Layer, &event::Event::Destroyed);
                 control_flow.set_exit();
+                return return_value;
             },
             WindowEvent::DroppedFile(path) => {
-                apps.dispatch_event(true, &event::Event::DroppedFile(path.clone()))
+                apps.dispatch_event(event::EventType::Layer, &event::Event::DroppedFile(path.clone()))
             },
             WindowEvent::HoveredFile(path) => {
-                apps.dispatch_event(true, &event::Event::HoveredFile(path.clone()))
+                apps.dispatch_event(event::EventType::Layer, &event::Event::HoveredFile(path.clone()))
             },
             WindowEvent::HoveredFileCancelled => {
-                apps.dispatch_event(true, &event::Event::HoveredFileCancelled)
+                apps.dispatch_event(event::EventType::Layer, &event::Event::HoveredFileCancelled)
             },
             WindowEvent::ReceivedCharacter(ch) => {
-                apps.dispatch_event(true, &event::Event::ReceivedCharacter(*ch))
+                apps.dispatch_event(event::EventType::Layer, &event::Event::ReceivedCharacter(*ch))
             },
             WindowEvent::Focused( focused) => {
-                apps.dispatch_event(true, &event::Event::Focused(*focused))
+                apps.dispatch_event(event::EventType::Layer, &event::Event::Focused(*focused))
             },
             WindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
-                
-                let key_state = match input.state {
-                    ElementState::Pressed => KeyState::Pressed,
-                    ElementState::Released => KeyState::Released,
-                };
-
-                apps.dispatch_event(true, &event::Event::KeyboardInput { scancode: input.scancode, state: key_state })
+                if input.virtual_keycode.is_some() {
+                    apps.dispatch_event(event::EventType::Layer, &event::Event::KeyboardInput { keycode: input.virtual_keycode.unwrap(), state: input.state })
+                } else {
+                    return false;
+                }
             },
             WindowEvent::ModifiersChanged( state ) => {
-                apps.dispatch_event(true, &event::Event::ModifiersChanged(*state))
+                apps.dispatch_event(event::EventType::Layer, &event::Event::ModifiersChanged(*state))
             },
             WindowEvent::CursorMoved { device_id, position, modifiers } => {
-                apps.dispatch_event(true, &event::Event::CursorMoved { x: position.x, y: position.y })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::CursorMoved { x: position.x, y: position.y })
             },
             WindowEvent::CursorEntered { device_id } => {
-                apps.dispatch_event(true, &event::Event::CursorEntered)
+                apps.dispatch_event(event::EventType::Layer, &event::Event::CursorEntered)
             },
             WindowEvent::CursorLeft { device_id } => {
-                apps.dispatch_event(true, &event::Event::CursorLeft)
+                apps.dispatch_event(event::EventType::Layer, &event::Event::CursorLeft)
             },
             WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => {
-
-                let touch_state = match phase {
-                    TouchPhase::Started => TouchState::Started,
-                    TouchPhase::Moved => TouchState::Moved,
-                    TouchPhase::Ended => TouchState::Ended,
-                    TouchPhase::Cancelled => TouchState::Cancelled,
-                };
-                
                 match delta {
                     MouseScrollDelta::PixelDelta( d) => {
-                        apps.dispatch_event(true, &event::Event::MouseWheel { delta_x: d.x, delta_y: d.y, state: touch_state})
+                        apps.dispatch_event(event::EventType::Layer, &event::Event::MouseWheel { delta_x: d.x, delta_y: d.y, state: *phase})
                     },
                     MouseScrollDelta::LineDelta(x, y) => {
-                        apps.dispatch_event(true, &event::Event::MouseScroll { delta_x: *x, delta_y: *y, state: touch_state})
+                        apps.dispatch_event(event::EventType::Layer, &event::Event::MouseScroll { delta_x: *x, delta_y: *y, state: *phase})
                     }
                 }  
             },
             WindowEvent::MouseInput { device_id, state, button, modifiers } => {
-                
-                let key_state = match state {
-                    ElementState::Pressed => KeyState::Pressed,
-                    ElementState::Released => KeyState::Released,
-                };
-
-                let button_code: u32 = match button {
-                    MouseButton::Left => 1,
-                    MouseButton::Middle => 2,
-                    MouseButton::Right => 3,
-                    _ => 0,
-                };
-
-                apps.dispatch_event(true, &&event::Event::MouseInput { scancode: button_code, state: key_state })
+                apps.dispatch_event(event::EventType::Layer, &event::Event::MouseInput { mousecode: *button, state: *state })
             }
 
-            _ => {}
+            _ => {false}
         }
     }
 }

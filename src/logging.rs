@@ -10,5 +10,5 @@ pub fn init()
         .set_level_color(Level::Error, Some(Color::Red))
         .build();
 
-    let _ = TermLogger::init(LevelFilter::Trace, config, TerminalMode::Mixed, ColorChoice::Auto);
+    let _ = TermLogger::init(LevelFilter::Info, config, TerminalMode::Mixed, ColorChoice::Auto);
 }

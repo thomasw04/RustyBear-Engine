@@ -1,9 +1,19 @@
 
 use crate::utils::Timestep;
 use crate::window::Window;
-use crate::event::{EventSubscriber, EventStack, Event};
+use crate::event::{EventSubscriber, EventStack, Event, EventType};
 
+use rccell::RcCell;
 use std::string::String;
+
+macro_rules! enclose {
+    ( ($( $x:ident ),*) $y:expr ) => {
+        {
+            $(let $x = $x.clone();)*
+            $y
+        }
+    };
+}
 
 pub trait Module {
     fn init(&mut self);
@@ -42,14 +52,21 @@ impl<'a> ModuleStack<'a> {
         }
     } 
 
-    pub fn dispatch_event(&mut self, input_stack: bool, event: &Event)
+    pub fn dispatch_event(&mut self, event_type: EventType, event: &Event) -> bool
     {
-        self.events.propagate_event(input_stack, event);
+        match event_type {
+            EventType::App => {
+                self.events.propagate_app_event(event)
+            },
+            EventType::Layer => {
+                self.events.propagate_event(event)
+            }
+        }
     }
 
-    pub fn subscribe(&mut self, input_stack: bool, mut subscriber: impl EventSubscriber + 'a) 
+    pub fn subscribe(&mut self, event_type: EventType, subscriber: RcCell<impl EventSubscriber + 'a>)
     {
-        self.events.push(input_stack, move |event: &Event| { subscriber.on_event(event) });
+        self.events.push(event_type, enclose! { (subscriber) move |event: &Event| { subscriber.borrow_mut().on_event(event) }});
     }
 }
 

@@ -1,14 +1,8 @@
 
 use std::path::PathBuf;
 
-use gilrs::GamepadId;
-use winit::event::ModifiersState;
-
-#[derive(Clone)]
-pub enum KeyState {
-    Pressed,
-    Released
-}
+use gilrs::{GamepadId, Button};
+use winit::event::{ModifiersState, VirtualKeyCode, MouseButton};
 
 #[derive(Clone)]
 pub enum GamepadButtonState {
@@ -17,13 +11,6 @@ pub enum GamepadButtonState {
     Repeated
 }
 
-#[derive(Clone)]
-pub enum TouchState {
-    Started,
-    Moved,
-    Ended,
-    Cancelled,
-}
 
 #[derive(Clone)]
 pub enum Event {
@@ -37,28 +24,35 @@ pub enum Event {
     HoveredFileCancelled,
     ReceivedCharacter (char),
     Focused (bool),
-    KeyboardInput {scancode: u32, state: KeyState },
-    ModifiersChanged (ModifiersState),
+    KeyboardInput {keycode: winit::event::VirtualKeyCode, state: winit::event::ElementState },
+    ModifiersChanged (winit::event::ModifiersState),
     CursorMoved { x: f64, y: f64 },
     CursorEntered,
     CursorLeft,
-    MouseWheel { delta_x: f64, delta_y: f64, state: TouchState },
-    MouseScroll { delta_x: f32, delta_y: f32, state: TouchState },
-    MouseInput { scancode: u32, state: KeyState },
+    MouseWheel { delta_x: f64, delta_y: f64, state: winit::event::TouchPhase },
+    MouseScroll { delta_x: f32, delta_y: f32, state: winit::event::TouchPhase },
+    MouseInput { mousecode: winit::event::MouseButton, state: winit::event::ElementState },
 
     //gilrs Events todo
-    GamepadInput {id: GamepadId, scancode: u32, state: GamepadButtonState},
+    GamepadInput {id: GamepadId, buttoncode: gilrs::Button, state: GamepadButtonState},
     GamepadInputChanged {id: GamepadId, scancode: u32, value: f32},
-    GamepadAxis {id: GamepadId, scancode: u32, value: f32},
+    GamepadAxis {id: GamepadId, axiscode: gilrs::Axis, value: f32},
     GamepadConnected {id: GamepadId},
     GamepadDisconnected {id: GamepadId},
     GamepadDropped {id: GamepadId}
+}
+
+#[derive(Clone)]
+pub enum EventType {
+    App,
+    Layer,
 }
 
 
 pub trait EventSubscriber {
     fn on_event(&mut self, event: &Event) -> bool;
 }
+
 pub struct EventStack<'a> {
     input_stack: Vec<Box<dyn FnMut(&Event) -> bool + 'a>>,
     app_stack: Vec<Box<dyn FnMut(&Event) -> bool + 'a>>,
@@ -71,16 +65,19 @@ impl<'a> EventStack<'a> {
         EventStack { input_stack: Vec::new(), app_stack: Vec::new() }
     }
 
-    pub fn push(&mut self, input_stack: bool, callback: impl FnMut(&Event) -> bool + 'a) -> usize
+    pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event) -> bool + 'a) -> usize
     {
-        if input_stack {
-            self.input_stack.push(Box::new(callback));
-            return self.input_stack.len()-1;
+        match event_type {
+            EventType::App => {
+                self.app_stack.push(Box::new(callback));
+                return self.app_stack.len()-1;
+            },
+
+            EventType::Layer => {
+                self.input_stack.push(Box::new(callback));
+                return self.input_stack.len()-1;
+            }
         }
-        else {
-            self.app_stack.push(Box::new(callback));
-            return self.app_stack.len()-1;
-        } 
     }
 
     pub fn swap(&mut self, lhs: usize, rhs: usize)
@@ -88,28 +85,33 @@ impl<'a> EventStack<'a> {
         self.input_stack.swap(lhs, rhs);
     }
 
-    pub fn propagate_event(&mut self, input_stack: bool, event: &Event) -> bool
+    pub fn propagate_event(&mut self, event: &Event) -> bool
     {
-        if input_stack {
-            for callback in self.input_stack.iter_mut().rev()
+        self.propagate_app_event(event);
+
+        for callback in self.input_stack.iter_mut().rev()
+        {
+            if (callback)(event)
             {
-                if (callback)(event)
-                {
-                    return true;
-                }
-            }
-        }
-        else {
-            for callback in self.input_stack.iter_mut()
-            {
-                if !(callback)(event)
-                {
-                    log::error!("Error while processing event. Application layer returned false.");
-                }
+                return true;
             }
         }
 
         return false;
+    }
+
+    pub fn propagate_app_event(&mut self, event: &Event) -> bool
+    {
+        for callback in self.app_stack.iter_mut()
+        {
+            if !(callback)(event)
+            {
+                log::error!("Error while processing event. Application layer returned false.");
+                return false;
+            }
+        }
+
+        return true;
     }
 
     pub fn pop(&mut self) -> usize
