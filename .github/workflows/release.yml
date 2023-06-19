@@ -64,21 +64,18 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: windows-latest
-        path: RustyBear-Engine.exe
       if: env.TAG
 
     - name: Download Linux executable
       uses: actions/download-artifact@v2
       with:
         name: ubuntu-latest
-        path: RustyBear-Engine-linux
       if: env.TAG
       
     - name: Download macOS executable
       uses: actions/download-artifact@v2
       with:
         name: macos-latest
-        path: RustyBear-Engine-macOS
       if: env.TAG
     
     - name: GitHub Release
@@ -88,7 +85,7 @@ jobs:
           RustyBear-Engine.exe
           RustyBear-Engine-linux
           RustyBear-Engine-macOS
-        tag_name: v${{ env.TAG }}
+        tag_name: ${{ env.TAG }}
         draft: true
         fail_on_unmatched_files: true
         generate_release_notes: true
