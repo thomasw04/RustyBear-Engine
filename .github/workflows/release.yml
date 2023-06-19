@@ -15,11 +15,11 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - platform: ubuntu-latest
-            bin_path: ./target/release/RustyBear-Engine
+            bin_path: target/release/RustyBear-Engine
           - platform: macos-latest
-            bin_path: ./target/release/RustyBear-Engine
+            bin_path: target/release/RustyBear-Engine
           - platform: windows-latest
-            bin_path: ./target/release/RustyBear-Engine.exe
+            bin_path: target/release/RustyBear-Engine.exe
         
     runs-on: ${{ matrix.platform }}
     steps:
@@ -29,13 +29,9 @@ jobs:
       run: sudo apt install -y libudev-dev
       if: runner.os == 'Linux' 
     - name: Build engine
-      run: cargo build --verbose
+      run: cargo build --release --verbose
     - name: Run tests
-      run: cargo test --verbose
-
-    - name: List files
-      run: find target -type f
-      if: runner.os != 'Windows' 
+      run: cargo test --release --verbose
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
