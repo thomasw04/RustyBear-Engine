@@ -28,6 +28,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: lukka/get-cmake@latest
+    - name: Install libudev
+      run: sudo apt install -y libudev-dev
     - name: Build engine
       run: cargo build --verbose
     - name: Run tests
