@@ -1,5 +1,6 @@
 use gilrs::Gilrs;
 use log::info;
+use wgpu::{TextureDescriptor, Extent3d, TextureViewDescriptor};
 use winit::{event::{WindowEvent, Event, VirtualKeyCode}, event_loop::ControlFlow, dpi::PhysicalSize};
 
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
@@ -9,6 +10,7 @@ pub struct Context {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl<'a> Context {
@@ -61,7 +63,58 @@ impl<'a> Context {
 
         surface.configure(&device, &config);
 
-        Context { surface: surface, device: device, queue: queue, config: config }
+        // TODO abstraction
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor
+        { 
+            label: Some("Default Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("default.wgsl").into()),
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor
+        {
+            label: Some("Pipeline Layout"),
+            bind_group_layouts: &[], 
+            push_constant_ranges: &[],
+        });
+
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor 
+        {
+            label: Some("Pipeline"), 
+            layout: Some(&pipeline_layout), 
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            }, 
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            }, 
+            depth_stencil: None, 
+            multisample: wgpu::MultisampleState {
+                count: 4,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            }, 
+            fragment: Some(wgpu::FragmentState {
+                module: &shader, 
+                entry_point: "fs_main", 
+                targets: &[Some(wgpu::ColorTargetState { 
+                    format: config.format, 
+                    blend: Some(wgpu::BlendState::REPLACE), 
+                    write_mask: wgpu::ColorWrites::ALL 
+                })], 
+            }), 
+            multiview: None, 
+        });
+
+        Context { surface: surface, device: device, queue: queue, config: config, render_pipeline: pipeline }
     }
 
     pub fn run(mut self, mut app: impl Application<'a> + 'static, window: Window)
@@ -138,6 +191,20 @@ impl<'a> Context {
     {
         let output = self.surface.get_current_texture()?;
 
+        let texture = self.device.create_texture(&TextureDescriptor
+        { 
+            label: Some("Texture"), 
+            size: Extent3d {width: self.config.width, height: self.config.height, depth_or_array_layers: 1}, 
+            mip_level_count: 1, 
+            sample_count: 4, 
+            dimension: wgpu::TextureDimension::D2, 
+            format: self.config.format, 
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT, 
+            view_formats: &self.config.view_formats,
+        });
+
+        let msaa_view = texture.create_view(&TextureViewDescriptor::default());
+
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor 
@@ -146,11 +213,11 @@ impl<'a> Context {
         });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
+                    view: &msaa_view,
+                    resolve_target: Some(&view),
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.3,
@@ -163,6 +230,9 @@ impl<'a> Context {
                 })],
                 depth_stencil_attachment: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
