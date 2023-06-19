@@ -30,7 +30,7 @@ jobs:
     - uses: lukka/get-cmake@latest
     - name: Install libudev
       run: sudo apt install -y libudev-dev
-      if: runner.os == "Linux" 
+      if: runner.os == 'Linux' 
     - name: Build engine
       run: cargo build --verbose
     - name: Run tests
