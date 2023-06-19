@@ -15,10 +15,10 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - platform: ubuntu-latest
-            bin_path: target/release/RustyBear-Engine
+            bin_path: target/release/RustyBear-Engine-linux
             rename_cmd: mv target/release/RustyBear-Engine target/release/RustyBear-Engine-linux
           - platform: macos-latest
-            bin_path: target/release/RustyBear-Engine
+            bin_path: target/release/RustyBear-Engine-macOS
             rename_cmd: mv target/release/RustyBear-Engine target/release/RustyBear-Engine-macOS
           - platform: windows-latest
             bin_path: target/release/RustyBear-Engine.exe
