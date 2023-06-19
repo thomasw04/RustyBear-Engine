@@ -1,13 +1,13 @@
+#![allow(non_snake_case)]
+
 use rccell::RcCell;
 
-use crate::{core::{Application}, input::InputState};
+use crate::{core::{Application}, context::Context};
 
 use event::EventSubscriber;
-use gilrs::{Gilrs};
-use log::{info, debug};
-use utils::Timestep;
+use log::{info};
 use window::Window;
-use winit::{event::{Event, VirtualKeyCode, ElementState}};
+use winit::{event::{VirtualKeyCode, ElementState}};
 
 use crate::core::ModuleStack;
 
@@ -18,6 +18,7 @@ pub mod window;
 pub mod logging;
 pub mod entry;
 pub mod input;
+pub mod context;
 
 
 struct MyHandler{
@@ -53,77 +54,50 @@ impl MyHandler {
     }
 }
 
-struct MyApp {
-
+struct MyApp<'a> {
+    stack: ModuleStack<'a>
 }
 
-impl Application for MyApp { 
+impl<'a> Application<'a> for MyApp<'a> { 
 
-    fn init(&mut self, config_json: String, stack: &mut ModuleStack) -> Window
+    fn init(&mut self, config_json: String) -> Window
     {
         info!("Init Application");
 
         let handler = RcCell::new(MyHandler::new());
-        stack.subscribe(event::EventType::Layer, handler);
+        self.stack.subscribe(event::EventType::Layer, handler);
 
         Window::new(config_json)
     }
 
-    fn update(&mut self, delta: &utils::Timestep) {}
+    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
+        return &mut self.stack;
+    }
+
+    fn update(&mut self, _delta: &utils::Timestep) {}
 
     fn quit(&mut self) {}
 }
 
-impl MyApp {
-    pub fn new() -> MyApp
+impl<'a> MyApp<'a> {
+    pub fn new() -> MyApp<'a>
     {
-        MyApp {  }
+        MyApp { stack: ModuleStack::new() }
     }
 }
 
 fn main() {
     logging::init();
-    let mut gilrs = Gilrs::new().unwrap();
 
     println!();
-
-    //Init the module stack.
-    let mut apps = ModuleStack::new();
-
-    //Register an EventSubscriber which maintains a list of current KeyStates.
-    let input_state = rccell::RcCell::new(InputState::new());
-    apps.subscribe(event::EventType::App, input_state.clone());
 
     //Create the application
     let mut myapp = MyApp::new();
 
     //Init the application and create the window
-    let window = myapp.init("{}".to_string(), &mut apps);
+    let mut window = myapp.init("{}".to_string());
+    let context = pollster::block_on(Context::new(&mut window));
 
-    //Time since last frame
-    let mut ts = Timestep::new();
-
-    window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
-    {
-        myapp.update(ts.step_fwd());
-
-        if input_state.borrow().is_key_down(&VirtualKeyCode::A) {
-            info!("The A is down.");
-        }
-
-        let _handled = match event
-        {
-            Event::WindowEvent { window_id, ref event }
-
-            if window_id == window.native.id() => Window::dispatch_event(&mut apps, event, control_flow),
-            _ => {false}
-        };
-
-        let gilrs_event_option = gilrs.next_event();
-
-        if gilrs_event_option.is_some() {
-            let gilrs_event = gilrs_event_option.unwrap();
-            Window::dispatch_gamepad_event(&mut apps, &gilrs_event, control_flow);
-        }
-    }});
+    //Move my app and window into the context. And run the app.
+    context.run(myapp, window);
 }

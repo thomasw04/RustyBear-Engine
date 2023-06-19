@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use log::info;
 use winit::event::ElementState;
 
 use crate::event::{EventSubscriber, Event};
 
+#[allow(dead_code)] //TODO
 pub struct InputState {
     keyboard: HashMap<winit::event::VirtualKeyCode, bool>,
     mouse_button: HashMap<winit::event::MouseButton, bool>,

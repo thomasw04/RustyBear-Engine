@@ -1,8 +1,7 @@
 
 use std::path::PathBuf;
 
-use gilrs::{GamepadId, Button};
-use winit::event::{ModifiersState, VirtualKeyCode, MouseButton};
+use gilrs::{GamepadId};
 
 #[derive(Clone)]
 pub enum GamepadButtonState {

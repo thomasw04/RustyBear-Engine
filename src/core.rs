@@ -21,8 +21,9 @@ pub trait Module {
     fn quit(&mut self);
 }
 
-pub trait Application {
-    fn init(&mut self, config_json: String, stack: &mut ModuleStack) -> Window;
+pub trait Application<'a> {
+    fn init(&mut self, config_json: String) -> Window;
+    fn get_stack(&mut self) -> & mut ModuleStack<'a>;
     fn update(&mut self, delta: &Timestep);
     fn quit(&mut self);
 }
@@ -44,6 +45,7 @@ impl<'a> ModuleStack<'a> {
         self.modules.push(Box::new(module));
     }
 
+    #[allow(dead_code)]
     fn update(&mut self, ts: &Timestep)
     {
         for mods in &mut self.modules

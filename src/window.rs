@@ -7,13 +7,13 @@ use crate::{core::ModuleStack, event};
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {
-    title: String,
-    size: (u32, u32),
-    position: (f64, f64),
-    resizeable: bool,
-    fullscreen: bool,
-    visible: bool,
-    border: bool,
+    pub size: (u32, u32),
+    pub title: String,
+    pub position: (f64, f64),
+    pub resizeable: bool,
+    pub fullscreen: bool,
+    pub visible: bool,
+    pub border: bool,
 }
 
 impl Default for WindowConfig {
@@ -25,7 +25,7 @@ impl Default for WindowConfig {
 
 pub struct Window {
     pub native: winit::window::Window,
-    pub event_loop: winit::event_loop::EventLoop<()>
+    pub event_loop: winit::event_loop::EventLoop<()>,
 }
 
 impl Window {
@@ -55,7 +55,7 @@ impl Window {
         Window { native: window, event_loop: event_loop }
     }
 
-    pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow) -> bool
+    pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow) -> bool
     {
         match event.event {
             EventType::Connected => {
@@ -64,19 +64,19 @@ impl Window {
             EventType::Disconnected => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadDisconnected { id: event.id })
             },
-            EventType::ButtonPressed(button, code) => {
+            EventType::ButtonPressed(button, ..) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Pressed })
             },
-            EventType::ButtonReleased(button, code) => {
+            EventType::ButtonReleased(button, ..) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Released })
             },
-            EventType::ButtonRepeated(button, code) => {
+            EventType::ButtonRepeated(button, ..) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Repeated })
             },
-            EventType::ButtonChanged(button, value, code) => {
+            EventType::ButtonChanged(button, value, ..) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value: value })
             },
-            EventType::AxisChanged(axis, value, code) => {
+            EventType::AxisChanged(axis, value, ..) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadAxis { id: event.id, axiscode: axis, value: value })
             },
             _ => {false}
@@ -117,7 +117,7 @@ impl Window {
             WindowEvent::Focused( focused) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::Focused(*focused))
             },
-            WindowEvent::KeyboardInput { device_id, input, is_synthetic } => {
+            WindowEvent::KeyboardInput { input, .. } => {
                 if input.virtual_keycode.is_some() {
                     apps.dispatch_event(event::EventType::Layer, &event::Event::KeyboardInput { keycode: input.virtual_keycode.unwrap(), state: input.state })
                 } else {
@@ -127,16 +127,16 @@ impl Window {
             WindowEvent::ModifiersChanged( state ) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::ModifiersChanged(*state))
             },
-            WindowEvent::CursorMoved { device_id, position, modifiers } => {
+            WindowEvent::CursorMoved { position, .. } => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::CursorMoved { x: position.x, y: position.y })
             },
-            WindowEvent::CursorEntered { device_id } => {
+            WindowEvent::CursorEntered { .. } => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::CursorEntered)
             },
-            WindowEvent::CursorLeft { device_id } => {
+            WindowEvent::CursorLeft { .. } => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::CursorLeft)
             },
-            WindowEvent::MouseWheel { device_id, delta, phase, modifiers } => {
+            WindowEvent::MouseWheel { delta, phase, .. } => {
                 match delta {
                     MouseScrollDelta::PixelDelta( d) => {
                         apps.dispatch_event(event::EventType::Layer, &event::Event::MouseWheel { delta_x: d.x, delta_y: d.y, state: *phase})
@@ -146,7 +146,7 @@ impl Window {
                     }
                 }  
             },
-            WindowEvent::MouseInput { device_id, state, button, modifiers } => {
+            WindowEvent::MouseInput { state, button, .. } => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::MouseInput { mousecode: *button, state: *state })
             }
 
