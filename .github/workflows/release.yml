@@ -33,6 +33,10 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
+    - name: List files
+      run: find target -type f
+      if: runner.os != 'Windows' 
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
       with:
