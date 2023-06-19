@@ -16,10 +16,13 @@ jobs:
         include:
           - platform: ubuntu-latest
             bin_path: target/release/RustyBear-Engine
+            rename_cmd: mv target/release/RustyBear-Engine target/release/RustyBear-Engine-linux
           - platform: macos-latest
             bin_path: target/release/RustyBear-Engine
+            rename_cmd: mv target/release/RustyBear-Engine target/release/RustyBear-Engine-macOS
           - platform: windows-latest
             bin_path: target/release/RustyBear-Engine.exe
+            rename_cmd: mv target/release/RustyBear-Engine.exe target/release/RustyBear-Engine.exe
         
     runs-on: ${{ matrix.platform }}
     steps:
@@ -32,6 +35,9 @@ jobs:
       run: cargo build --release --verbose
     - name: Run tests
       run: cargo test --release --verbose
+
+    - name: Rename files
+      run: ${{ matrix.rename_cmd }}
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v2
