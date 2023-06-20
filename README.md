@@ -1,6 +1,12 @@
 # RustyBear-Engine
+
+[![Verify and Tests](https://github.com/thomasw04/RustyBear-Engine/actions/workflows/verify.yml/badge.svg)](https://github.com/thomasw04/RustyBear-Engine/actions)
+[![Release](https://github.com/thomasw04/RustyBear-Engine/actions/workflows/release.yml/badge.svg)](https://github.com/thomasw04/RustyBear-Engine/actions)
+
 My very first Game-Engine written in Rust + wgpu. The plan is to use it at Ludum Dare 54.
 It is more or less an eductational project. I just like building Game-Engines.
+
+
 
 ## Featues (Current)
 - Native Metal (macOS), Vulkan (Linux + Windows) and DirectX 12 (Windows) support. Thanks to wgpu.
