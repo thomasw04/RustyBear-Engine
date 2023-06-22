@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use winit::event::ElementState;
 
-use crate::event::{EventSubscriber, Event};
+use crate::{event::{EventSubscriber, Event}, context::{Context}};
 
 #[allow(dead_code)] //TODO
 pub struct InputState {
@@ -26,7 +26,7 @@ impl InputState {
 }
 
 impl EventSubscriber for InputState {
-    fn on_event(&mut self, event: &Event) -> bool
+    fn on_event(&mut self, event: &Event, _context: &Context) -> bool
     {
         match event {
             Event::KeyboardInput { keycode, state } =>

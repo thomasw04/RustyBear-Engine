@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use gilrs::{GamepadId};
 
+use crate::context::{Context};
+
 #[derive(Clone)]
 pub enum GamepadButtonState {
     Pressed,
@@ -49,12 +51,12 @@ pub enum EventType {
 
 
 pub trait EventSubscriber {
-    fn on_event(&mut self, event: &Event) -> bool;
+    fn on_event(&mut self, event: &Event, context: &Context) -> bool;
 }
 
 pub struct EventStack<'a> {
-    input_stack: Vec<Box<dyn FnMut(&Event) -> bool + 'a>>,
-    app_stack: Vec<Box<dyn FnMut(&Event) -> bool + 'a>>,
+    input_stack: Vec<Box<dyn FnMut(&Event, &Context) -> bool + 'a>>,
+    app_stack: Vec<Box<dyn FnMut(&Event, &Context) -> bool + 'a>>,
 }
 
 impl<'a> EventStack<'a> {
@@ -64,8 +66,10 @@ impl<'a> EventStack<'a> {
         EventStack { input_stack: Vec::new(), app_stack: Vec::new() }
     }
 
-    pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event) -> bool + 'a) -> usize
+    pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event, &Context) -> bool + 'a) -> usize
     {
+        log::warn!("PUSHED!");
+
         match event_type {
             EventType::App => {
                 self.app_stack.push(Box::new(callback));
@@ -84,26 +88,25 @@ impl<'a> EventStack<'a> {
         self.input_stack.swap(lhs, rhs);
     }
 
-    pub fn propagate_event(&mut self, event: &Event) -> bool
+    pub fn propagate_event(&mut self, event: &Event, context: &Context) -> bool
     {
-        self.propagate_app_event(event);
+        self.propagate_app_event(event, context);
 
         for callback in self.input_stack.iter_mut().rev()
         {
-            if (callback)(event)
+            if (callback)(event, context)
             {
                 return true;
             }
         }
-
         return false;
     }
 
-    pub fn propagate_app_event(&mut self, event: &Event) -> bool
+    pub fn propagate_app_event(&mut self, event: &Event, context: &Context) -> bool
     {
         for callback in self.app_stack.iter_mut()
         {
-            if !(callback)(event)
+            if !(callback)(event, context)
             {
                 log::error!("Error while processing event. Application layer returned false.");
                 return false;
