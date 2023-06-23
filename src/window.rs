@@ -52,7 +52,7 @@ impl Window {
             window.toggle_fullscreen();
         }
 
-        Window { native: window, event_loop: event_loop }
+        Window { native: window, event_loop }
     }
 
     pub fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow, context: &Context) -> bool
@@ -74,10 +74,10 @@ impl Window {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInput { id: event.id, buttoncode: button, state: event::GamepadButtonState::Repeated }, context)
             },
             EventType::ButtonChanged(button, value, ..) => {
-                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value: value }, context)
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadInputChanged { id: event.id, scancode: button as u32, value }, context)
             },
             EventType::AxisChanged(axis, value, ..) => {
-                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadAxis { id: event.id, axiscode: axis, value: value }, context)
+                apps.dispatch_event(event::EventType::Layer, &event::Event::GamepadAxis { id: event.id, axiscode: axis, value }, context)
             },
             _ => {false}
         }
@@ -95,12 +95,14 @@ impl Window {
             WindowEvent::CloseRequested => {
                 let return_value = apps.dispatch_event(event::EventType::Layer, &event::Event::CloseRequested, context);
                 control_flow.set_exit();
-                return return_value;
+
+                return_value
             },
             WindowEvent::Destroyed => {
                 let return_value = apps.dispatch_event(event::EventType::Layer, &event::Event::Destroyed, context);
                 control_flow.set_exit();
-                return return_value;
+
+                return_value
             },
             WindowEvent::DroppedFile(path) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::DroppedFile(path.clone()), context)
@@ -121,7 +123,7 @@ impl Window {
                 if input.virtual_keycode.is_some() {
                     apps.dispatch_event(event::EventType::Layer, &event::Event::KeyboardInput { keycode: input.virtual_keycode.unwrap(), state: input.state }, context)
                 } else {
-                    return false;
+                    false
                 }
             },
             WindowEvent::ModifiersChanged( state ) => {

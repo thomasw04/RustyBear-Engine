@@ -15,7 +15,7 @@ impl EventSubscriber for Renderer2D {
         match event {
             event::Event::Resized {width, height} => {
                 self.framebuffer.resize(context, *width, *height);
-                return false;
+                false
             },
             event::Event::KeyboardInput { keycode, state } => {
                 match keycode {
@@ -23,7 +23,7 @@ impl EventSubscriber for Renderer2D {
                         if *state == ElementState::Pressed {
                             self.enable_msaa(context, self.framebuffer.sample_count() * 2);
                         }
-                        return false;
+                        false
                     },
                     VirtualKeyCode::Right => {
                         if *state == ElementState::Pressed {
@@ -33,7 +33,7 @@ impl EventSubscriber for Renderer2D {
                                 self.enable_msaa(context, new_count);
                             }
                         }
-                        return false;
+                        false
                     },
                     _ => {false}
                 }
@@ -49,7 +49,7 @@ impl Renderer2D {
         let framebuffer = Framebuffer::new(context, 4);
         let render_pipeline = Renderer2D::recreate_pipeline(context, framebuffer.sample_count());
 
-        Renderer2D { framebuffer: framebuffer, render_pipeline }
+        Renderer2D { framebuffer, render_pipeline }
     }
 
     fn recreate_pipeline(context: &Context, sample_count: u32) -> RenderPipeline
@@ -110,7 +110,7 @@ impl Renderer2D {
             self.render_pipeline = Renderer2D::recreate_pipeline(context, sample_count);
             return true;
         }
-        return false;
+        false
     }
 
     pub fn render(&mut self, context: &mut Context, view: TextureView)

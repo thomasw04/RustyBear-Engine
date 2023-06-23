@@ -13,14 +13,14 @@ impl Framebuffer {
             label: Some("Texture"), 
             size: wgpu::Extent3d {width: context.config.width, height: context.config.height, depth_or_array_layers: 1}, 
             mip_level_count: 1, 
-            sample_count: sample_count, 
+            sample_count, 
             dimension: wgpu::TextureDimension::D2, 
             format: context.config.format, 
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT, 
             view_formats: &context.config.view_formats,
         });
 
-        Framebuffer { texture: texture, sample_count }
+        Framebuffer { texture, sample_count }
     } 
 
     pub fn resize(&mut self, context: &Context, width: u32, height: u32)
@@ -43,7 +43,7 @@ impl Framebuffer {
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn sample_count(&self) -> u32
@@ -56,9 +56,9 @@ impl Framebuffer {
         self.texture = context.device.create_texture(&wgpu::TextureDescriptor
         { 
             label: Some("Texture"), 
-            size: wgpu::Extent3d {width: width, height: height, depth_or_array_layers: 1}, 
+            size: wgpu::Extent3d {width, height, depth_or_array_layers: 1}, 
             mip_level_count: 1, 
-            sample_count: sample_count, 
+            sample_count, 
             dimension: wgpu::TextureDimension::D2, 
             format: context.config.format, 
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT, 

@@ -29,23 +29,14 @@ struct MyHandler{
 impl EventSubscriber for MyHandler {
     fn on_event(&mut self, event: &event::Event, _context: &Context) -> bool
     {
-        match event {
-            event::Event::KeyboardInput { keycode, state } =>
-            {
-                match keycode 
-                {
-                    VirtualKeyCode::D => match state
-                    {
-                        ElementState::Pressed => log::info!("Pressed the d"),
-                        _ => {}
-                    },
-                    _ => {}
-                }
+        if let event::Event::KeyboardInput { keycode, state } = event {
+            match keycode {
+                VirtualKeyCode::D => if state == &ElementState::Pressed { log::info!("Pressed the d") },
+                VirtualKeyCode::E => if state == &ElementState::Pressed { log::info!("Pressed the e") },
+                _ => {}
             }
-            _ => {}
         }
-
-        return false;
+        false
     }
 }
 
@@ -71,8 +62,9 @@ impl<'a> Application<'a> for MyApp<'a> {
         }
     } 
 
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
-        return &mut self.stack;
+    fn get_stack(&mut self) -> &mut ModuleStack<'a>
+    {
+        &mut self.stack
     }
 
     fn update(&mut self, _delta: &utils::Timestep) {}

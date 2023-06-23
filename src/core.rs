@@ -28,6 +28,7 @@ pub trait Application<'a> {
     fn get_stack(&mut self) -> & mut ModuleStack<'a>;
 }
 
+#[derive(Default)]
 pub struct ModuleStack<'a> {
     events: EventStack<'a>,
     modules: Vec<Box<dyn Module + 'a>>,
@@ -37,7 +38,7 @@ impl<'a> ModuleStack<'a> {
 
     pub fn new() -> ModuleStack<'a>
     {
-        ModuleStack { events: EventStack::new(), modules: Vec::new() }
+        ModuleStack::default()
     }
 
     pub fn push(&mut self, module: impl Module + 'a)

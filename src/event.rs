@@ -54,9 +54,13 @@ pub trait EventSubscriber {
     fn on_event(&mut self, event: &Event, context: &Context) -> bool;
 }
 
+type EventCallback<'a> = Box<dyn FnMut(&Event, &Context) -> bool + 'a>;
+
+#[derive(Default)]
 pub struct EventStack<'a> {
-    input_stack: Vec<Box<dyn FnMut(&Event, &Context) -> bool + 'a>>,
-    app_stack: Vec<Box<dyn FnMut(&Event, &Context) -> bool + 'a>>,
+    
+    input_stack: Vec<EventCallback<'a>>,
+    app_stack: Vec<EventCallback<'a>>,
 }
 
 impl<'a> EventStack<'a> {
@@ -68,17 +72,17 @@ impl<'a> EventStack<'a> {
 
     pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event, &Context) -> bool + 'a) -> usize
     {
-        log::warn!("PUSHED!");
-
         match event_type {
             EventType::App => {
                 self.app_stack.push(Box::new(callback));
-                return self.app_stack.len()-1;
+
+                self.app_stack.len()-1
             },
 
             EventType::Layer => {
                 self.input_stack.push(Box::new(callback));
-                return self.input_stack.len()-1;
+
+                self.input_stack.len()-1
             }
         }
     }
@@ -99,7 +103,8 @@ impl<'a> EventStack<'a> {
                 return true;
             }
         }
-        return false;
+
+        false
     }
 
     pub fn propagate_app_event(&mut self, event: &Event, context: &Context) -> bool
@@ -113,13 +118,14 @@ impl<'a> EventStack<'a> {
             }
         }
 
-        return true;
+        true
     }
 
     pub fn pop(&mut self) -> usize
     {
         self.input_stack.pop();
-        return self.input_stack.len()-1;
+
+        self.input_stack.len()-1
     }
 
     pub fn remove(&mut self, index: usize)

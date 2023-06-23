@@ -1,4 +1,4 @@
-use gilrs::Gilrs;
+use gilrs::{Gilrs};
 use log::info;
 use wgpu::TextureFormatFeatureFlags;
 use winit::{event::{WindowEvent, Event, VirtualKeyCode}, event_loop::ControlFlow, dpi::PhysicalSize};
@@ -45,7 +45,7 @@ impl<'a> Context {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: format,
+            format,
             width: window.native.inner_size().width,
             height: window.native.inner_size().height,
             present_mode: capabilities.present_modes[0],
@@ -70,7 +70,7 @@ impl<'a> Context {
 
         surface.configure(&device, &config);
 
-        Context { surface: surface, device: device, queue: queue, config: config, features }
+        Context { surface, device, queue, config, features }
     }
 
     fn activated_features() -> wgpu::Features
@@ -137,8 +137,7 @@ impl<'a> Context {
 
             let gilrs_event_option = gilrs.next_event();
 
-            if gilrs_event_option.is_some() {
-                let gilrs_event = gilrs_event_option.unwrap();
+            if let Some(gilrs_event) = gilrs_event_option {
                 Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, control_flow, &self);
             }
         }});

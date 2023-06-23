@@ -5,6 +5,7 @@ use winit::event::ElementState;
 use crate::{event::{EventSubscriber, Event}, context::{Context}};
 
 #[allow(dead_code)] //TODO
+#[derive(Default)]
 pub struct InputState {
     keyboard: HashMap<winit::event::VirtualKeyCode, bool>,
     mouse_button: HashMap<winit::event::MouseButton, bool>,
@@ -17,7 +18,7 @@ impl InputState {
 
     pub fn new() -> InputState
     {
-        InputState { keyboard: HashMap::new(), mouse_button: HashMap::new(), gamepad_button: HashMap::new(), gamepad_axis: HashMap::new(), mouse_position: (0.0, 0.0) }
+        InputState::default()
     }
 
     pub fn is_key_down(&self, keycode: &winit::event::VirtualKeyCode) -> bool {
@@ -40,9 +41,20 @@ impl EventSubscriber for InputState {
                     self.keyboard.insert(*keycode, false);
                 }
             },
+            Event::MouseInput { mousecode, state } =>
+            {
+                if *state == ElementState::Pressed
+                {
+                    self.mouse_button.insert(*mousecode, true);
+                }
+                else 
+                {
+                    self.mouse_button.insert(*mousecode, false);
+                }
+            },
             _ => {}
         }
 
-        return true;
+        true
     }
 }
