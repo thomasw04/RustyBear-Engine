@@ -52,6 +52,23 @@ impl Window {
             window.toggle_fullscreen();
         }
 
+        #[cfg(target_arch = "wasm32")]
+        {
+    
+            window.set_inner_size(PhysicalSize{width: window_config.size.0, height: window_config.size.1});
+    
+            use winit::platform::web::WindowExtWebSys;
+            web_sys::window()
+                .and_then(|win| win.document())
+                .and_then(|doc| {
+                    let dst = doc.get_element_by_id("rusty-bear-engine")?;
+                    let canvas = web_sys::Element::from(window.canvas());
+                    dst.append_child(&canvas).ok()?;
+                    Some(())
+                })
+                .expect("Couldn't append canvas to the document body.");
+        }
+
         Window { native: window, event_loop }
     }
 

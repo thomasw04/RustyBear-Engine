@@ -1,4 +1,5 @@
-use std::{ops, time::Instant};
+use std::ops;
+use instant::Instant;
 
 
 #[derive(Default)]
