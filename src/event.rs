@@ -6,6 +6,7 @@ use gilrs::{GamepadId};
 use crate::context::{Context};
 
 #[derive(Clone)]
+#[derive(PartialEq)]
 pub enum GamepadButtonState {
     Pressed,
     Released,
