@@ -1,12 +1,8 @@
-use gilrs::{Gilrs};
-use log::info;
-use wgpu::TextureFormatFeatureFlags;
 use winit::{event::{WindowEvent, Event, VirtualKeyCode}, event_loop::ControlFlow, dpi::PhysicalSize};
-
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
 
 pub struct Features {
-    pub texture_features: TextureFormatFeatureFlags
+    pub texture_features: wgpu::TextureFormatFeatureFlags
 } 
 
 pub struct Context {
@@ -80,7 +76,7 @@ impl<'a> Context {
 
     pub fn run(mut self, mut app: impl Application<'a> + 'static, window: Window)
     {
-        let mut gilrs = Gilrs::new().unwrap();
+        let mut gilrs = gilrs::Gilrs::new().unwrap();
 
         //Register an EventSubscriber which maintains a list of current KeyStates.
         let input_state = rccell::RcCell::new(InputState::new());
@@ -92,7 +88,7 @@ impl<'a> Context {
         window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
         {
             if input_state.borrow().is_key_down(&VirtualKeyCode::A) {
-                info!("The A is down.");
+                log::info!("The A is down.");
             }
 
             let _handled = match event
@@ -124,7 +120,11 @@ impl<'a> Context {
                         Ok(_) => {true}
                         Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.config.width, height: self.config.height }); false},
                         Err(wgpu::SurfaceError::OutOfMemory) => { *control_flow = ControlFlow::Exit; true},
-                        Err(e) => { log::error!("{:?}", e); true},
+                        Err(e) => 
+                        { 
+                            log::error!("{:?}", e);
+                            true
+                        },
                     }
                 },
 

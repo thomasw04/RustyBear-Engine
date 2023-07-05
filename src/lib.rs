@@ -8,24 +8,26 @@ pub mod logging;
 pub mod entry;
 pub mod input;
 pub mod context;
-pub mod buffer;
-pub mod renderer;
+pub mod render;
+pub mod sound;
+pub mod config;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 use rccell::RcCell;
-use renderer::Renderer2D;
+use render::renderer::Renderer;
 
-use crate::{core::{Application}, context::Context};
+use crate::{core::{Application}, context::Context, config::load_themes, sound::AudioEngine};
 
 use event::EventSubscriber;
 use window::Window;
-use winit::{event::{VirtualKeyCode, ElementState}};
+use winit::{event::{VirtualKeyCode, ElementState, MouseButton}};
 
 use crate::core::ModuleStack;
 
 struct MyHandler{
+    audio: AudioEngine
 }
 
 impl EventSubscriber for MyHandler {
@@ -38,6 +40,14 @@ impl EventSubscriber for MyHandler {
                 _ => {}
             }
         }
+
+        if let event::Event::MouseInput { mousecode, state } = event {
+            match mousecode {
+                MouseButton::Left => if state == &ElementState::Pressed { self.audio.play_click() },
+                MouseButton::Right => if state == &ElementState::Pressed { self.audio.play_click() },
+                _ => {}
+            }
+        }
         false
     }
 }
@@ -45,13 +55,18 @@ impl EventSubscriber for MyHandler {
 impl MyHandler {
     pub fn new() -> MyHandler
     {
-        MyHandler {  }
+        let theme_conf = load_themes();
+
+        let mut audio = AudioEngine::new(&theme_conf);
+        audio.play_background();
+
+        MyHandler { audio }
     }
 }
 
 struct MyApp<'a> {
     stack: ModuleStack<'a>,
-    renderer: RcCell<Renderer2D>,
+    renderer: RcCell<Renderer>,
 }
 
 impl<'a> Application<'a> for MyApp<'a> { 
@@ -84,7 +99,7 @@ impl<'a> MyApp<'a> {
         let handler = RcCell::new(MyHandler::new());
         stack.subscribe(event::EventType::Layer, handler);
 
-        let renderer = RcCell::new(Renderer2D::new(context));
+        let renderer = RcCell::new(Renderer::new(context));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
         MyApp { stack, renderer }

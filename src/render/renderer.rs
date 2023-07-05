@@ -1,14 +1,20 @@
-use wgpu::{TextureView, RenderPipeline};
+use wgpu::{TextureView, RenderPipeline, util::DeviceExt};
 use winit::event::{VirtualKeyCode, ElementState};
 
-use crate::{buffer::Framebuffer, context::Context, event::{EventSubscriber, self}};
+use crate::{context::Context, event::{EventSubscriber, self}};
 
-pub struct Renderer2D {
+use super::types::Framebuffer;
+use super::types::Vertex2D;
+
+pub struct Renderer {
     framebuffer: Framebuffer,
     render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    indices: u32,
 }
 
-impl EventSubscriber for Renderer2D {
+impl EventSubscriber for Renderer {
 
     fn on_event(&mut self, event: &crate::event::Event, context: &Context) -> bool
     {
@@ -43,13 +49,41 @@ impl EventSubscriber for Renderer2D {
     }
 }
 
-impl Renderer2D {
+impl Renderer {
     pub fn new(context: &Context) -> Self
     {
         let framebuffer = Framebuffer::new(context, 4);
-        let render_pipeline = Renderer2D::recreate_pipeline(context, framebuffer.sample_count());
+        let render_pipeline = Renderer::recreate_pipeline(context, framebuffer.sample_count());
 
-        Renderer2D { framebuffer, render_pipeline }
+        const VERTICES: &[Vertex2D] = &[
+            Vertex2D { position: [-1.0, -1.0, -0.0], color: [1.0, 0.0, 0.0] },
+            Vertex2D { position: [1.0, 1.0, -0.0], color: [0.0, 1.0, 0.0] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], color: [0.0, 0.0, 1.0] },
+            Vertex2D { position: [1.0, -1.0, -0.0], color: [0.5, 0.0, 0.5] },
+        ];
+
+        const INDICES: &[u16] = &[
+            0, 1, 2,
+            0, 3, 1,
+        ];
+
+        let vertex_buffer = context.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Default VertexBuffer"),
+                contents: bytemuck::cast_slice(VERTICES),
+                usage: wgpu::BufferUsages::VERTEX, 
+            }
+        );
+
+        let index_buffer = context.device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Default IndexBuffer"),
+                contents: bytemuck::cast_slice(INDICES),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
+        Renderer { framebuffer, render_pipeline, vertex_buffer, index_buffer, indices: INDICES.len() as u32}
     }
 
     fn recreate_pipeline(context: &Context, sample_count: u32) -> RenderPipeline
@@ -67,14 +101,16 @@ impl Renderer2D {
             push_constant_ranges: &[],
         });
 
-       context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor 
+        context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor 
         {
             label: Some("Pipeline"), 
             layout: Some(&pipeline_layout), 
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[
+                    Vertex2D::LAYOUT,
+                ],
             }, 
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -107,7 +143,7 @@ impl Renderer2D {
     pub fn enable_msaa(&mut self, context: &Context, sample_count: u32) -> bool
     {
         if self.framebuffer.change_sample_count(context, sample_count) {
-            self.render_pipeline = Renderer2D::recreate_pipeline(context, sample_count);
+            self.render_pipeline = Renderer::recreate_pipeline(context, sample_count);
             return true;
         }
         false
@@ -140,7 +176,7 @@ impl Renderer2D {
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.3,
-                            g: 0.7,
+                            g: 0.4,
                             b: 0.3,
                             a: 1.0,
                         }),
@@ -151,7 +187,9 @@ impl Renderer2D {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.draw(0..3, 0..1);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..self.indices, 0, 0..1);
         }
 
         context.queue.submit(std::iter::once(encoder.finish()));

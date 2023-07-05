@@ -23,6 +23,12 @@ wgpu = "0.16.1"
 winit = "0.28.6"
 winit-fullscreen = "1.0.1"
 instant = "0.1"
+kira = "0.8.4"
+bytemuck = { version = "1.13.1", features = ["derive"] }
+wgpu_macros = "0.1.0"
+image = "0.24.6"
+rayon = "1.7.0"
+clap = { version = "4.3.10", features = ["derive"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
