@@ -11,6 +11,7 @@ pub mod context;
 pub mod render;
 pub mod sound;
 pub mod config;
+pub mod assets;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;

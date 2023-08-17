@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder}, dpi::{PhysicalSize, LogicalPosition}, event::{WindowEvent, MouseScrollDelta}};
 use winit_fullscreen::WindowFullScreen;
 
-use crate::{core::ModuleStack, event, context::{Context}};
+use crate::{core::ModuleStack, event::{self, Event}, context::{Context}};
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {
@@ -105,6 +105,9 @@ impl Window {
         match event {
             WindowEvent::Resized(size) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::Resized { width: size.width, height: size.height }, context)
+            },
+            WindowEvent::ScaleFactorChanged {new_inner_size, .. } => {
+                apps.dispatch_event(event::EventType::Layer, &event::Event::Resized { width: (**new_inner_size).width, height: (**new_inner_size).height }, context)
             },
             WindowEvent::Moved(pos) => {
                 apps.dispatch_event(event::EventType::Layer, &event::Event::Moved { x: pos.x, y: pos.y }, context)

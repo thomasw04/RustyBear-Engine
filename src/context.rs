@@ -155,6 +155,7 @@ impl<'a> Context {
     fn render(&mut self, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
     {
         let output = self.surface.get_current_texture()?;
+
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         app.render(view, self);

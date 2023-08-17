@@ -1,9 +1,9 @@
-use wgpu::{TextureView, RenderPipeline, util::DeviceExt};
+use wgpu::{TextureView, RenderPipeline, util::DeviceExt, BindGroupLayout};
 use winit::event::{VirtualKeyCode, ElementState};
 
-use crate::{context::Context, event::{EventSubscriber, self}};
+use crate::{context::Context, event::{EventSubscriber, self}, render::types::Texture2D};
 
-use super::types::Framebuffer;
+use super::types::{Framebuffer, Material};
 use super::types::Vertex2D;
 
 pub struct Renderer {
@@ -11,6 +11,7 @@ pub struct Renderer {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
+    material: Material,
     indices: u32,
 }
 
@@ -53,13 +54,17 @@ impl Renderer {
     pub fn new(context: &Context) -> Self
     {
         let framebuffer = Framebuffer::new(context, 4);
-        let render_pipeline = Renderer::recreate_pipeline(context, framebuffer.sample_count());
+
+        let texture = Texture2D::new_error(context, 1);
+        let material = Material::new(context, vec![texture.view()], texture.sampler(), 1, "Quad");
+
+        let render_pipeline = Renderer::recreate_pipeline(context, framebuffer.sample_count(), vec![material.layout()]);
 
         const VERTICES: &[Vertex2D] = &[
-            Vertex2D { position: [-1.0, -1.0, -0.0], color: [1.0, 0.0, 0.0] },
-            Vertex2D { position: [1.0, 1.0, -0.0], color: [0.0, 1.0, 0.0] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], color: [0.0, 0.0, 1.0] },
-            Vertex2D { position: [1.0, -1.0, -0.0], color: [0.5, 0.0, 0.5] },
+            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 0.0] },
+            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 1.0] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 1.0] },
+            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 0.0] },
         ];
 
         const INDICES: &[u16] = &[
@@ -83,10 +88,12 @@ impl Renderer {
             }
         );
 
-        Renderer { framebuffer, render_pipeline, vertex_buffer, index_buffer, indices: INDICES.len() as u32}
+        
+
+        Renderer { framebuffer, render_pipeline, vertex_buffer, index_buffer, material, indices: INDICES.len() as u32}
     }
 
-    fn recreate_pipeline(context: &Context, sample_count: u32) -> RenderPipeline
+    fn recreate_pipeline(context: &Context, sample_count: u32, bind_group_layouts: Vec<&BindGroupLayout>) -> RenderPipeline
     {
         let shader = context.device.create_shader_module(wgpu::ShaderModuleDescriptor
         { 
@@ -97,7 +104,7 @@ impl Renderer {
         let pipeline_layout = context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor
         {
             label: Some("Pipeline Layout"),
-            bind_group_layouts: &[], 
+            bind_group_layouts: &bind_group_layouts, 
             push_constant_ranges: &[],
         });
 
@@ -143,7 +150,7 @@ impl Renderer {
     pub fn enable_msaa(&mut self, context: &Context, sample_count: u32) -> bool
     {
         if self.framebuffer.change_sample_count(context, sample_count) {
-            self.render_pipeline = Renderer::recreate_pipeline(context, sample_count);
+            self.render_pipeline = Renderer::recreate_pipeline(context, sample_count, vec![self.material.layout()]);
             return true;
         }
         false
@@ -187,6 +194,7 @@ impl Renderer {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.material.bind_group(), &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.indices, 0, 0..1);
