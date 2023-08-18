@@ -1,5 +1,5 @@
 use wgpu::TextureFormatFeatureFlags;
-use winit::{event::{WindowEvent, Event, VirtualKeyCode}, event_loop::ControlFlow, dpi::PhysicalSize};
+use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
 
 pub struct Features {

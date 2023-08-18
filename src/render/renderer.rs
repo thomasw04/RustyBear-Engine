@@ -1,8 +1,7 @@
-use glam::Vec3;
 use wgpu::{TextureView, RenderPipeline, util::DeviceExt, BindGroupLayout};
 use winit::event::{VirtualKeyCode, ElementState};
 
-use crate::{context::Context, event::{EventSubscriber, self}, render::{texture::Texture2D, camera::PerspectiveCamera}};
+use crate::{context::Context, event::{EventSubscriber, self}, render::texture::Texture2D};
 
 use super::{framebuffer::Framebuffer, camera::CameraBuffer};
 use super::material::Material;
@@ -62,7 +61,7 @@ impl Renderer {
         let texture = Texture2D::error_texture(context);
         let material = Material::new(context, vec![texture.view()], texture.sampler(), "Quad");
 
-        let mut camera_buffer = CameraBuffer::new(context, "Default Camera");
+        let camera_buffer = CameraBuffer::new(context, "Default Camera");
 
         //Pipeline creation
 
@@ -196,7 +195,7 @@ impl Renderer {
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
                             r: 0.3,
-                            g: 0.4,
+                            g: 0.7,
                             b: 0.3,
                             a: 1.0,
                         }),

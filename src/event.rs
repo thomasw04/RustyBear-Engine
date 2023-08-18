@@ -1,9 +1,9 @@
 
 use std::path::PathBuf;
 
-use gilrs::{GamepadId};
+use gilrs::GamepadId;
 
-use crate::context::{Context};
+use crate::context::Context;
 
 #[derive(Clone)]
 #[derive(PartialEq)]

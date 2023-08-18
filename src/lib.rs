@@ -21,11 +21,11 @@ use wasm_bindgen::prelude::*;
 use rccell::RcCell;
 use render::{renderer::Renderer, camera::PerspectiveCamera};
 
-use crate::{core::{Application}, context::Context, config::load_themes, sound::AudioEngine};
+use crate::{core::Application, context::Context, config::load_themes, sound::AudioEngine};
 
 use event::EventSubscriber;
 use window::Window;
-use winit::{event::{VirtualKeyCode, ElementState, MouseButton}};
+use winit::event::{VirtualKeyCode, ElementState, MouseButton};
 
 use crate::core::ModuleStack;
 
@@ -144,7 +144,7 @@ impl<'a> MyApp<'a> {
         stack.subscribe(event::EventType::Layer, camera.clone());
 
         camera.borrow_mut().set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
-        camera.borrow_mut().set_position(glam::Vec3 { x: 0.0, y: 1.0, z: -2.0 });
+        camera.borrow_mut().set_position(glam::Vec3::new(0.0, 1.0, -2.0));
 
         MyApp { stack, renderer, camera }
     }

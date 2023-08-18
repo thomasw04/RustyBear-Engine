@@ -1,9 +1,9 @@
 use gilrs::EventType;
 use serde::{Serialize, Deserialize};
-use winit::{event_loop::{EventLoop, ControlFlow}, window::{WindowBuilder}, dpi::{PhysicalSize, LogicalPosition}, event::{WindowEvent, MouseScrollDelta}};
+use winit::{event_loop::{EventLoop, ControlFlow}, window::WindowBuilder, dpi::{PhysicalSize, LogicalPosition}, event::{WindowEvent, MouseScrollDelta}};
 use winit_fullscreen::WindowFullScreen;
 
-use crate::{core::ModuleStack, event::{self, Event}, context::{Context}};
+use crate::{core::ModuleStack, context::Context, event};
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {

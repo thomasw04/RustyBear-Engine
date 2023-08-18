@@ -1,5 +1,3 @@
-use image::GenericImageView;
-
 use crate::context::Context;
 
 pub struct Material {

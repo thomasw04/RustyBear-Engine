@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use winit::event::ElementState;
 
-use crate::{event::{EventSubscriber, Event, GamepadButtonState}, context::{Context}};
+use crate::{event::{EventSubscriber, Event, GamepadButtonState}, context::Context};
 
 #[derive(Default)]
 pub struct InputState {

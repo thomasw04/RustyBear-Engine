@@ -1,7 +1,7 @@
 
 use std::cell::Ref;
 
-use crate::context::{Context};
+use crate::context::Context;
 use crate::input::InputState;
 use crate::utils::Timestep;
 use crate::event::{EventSubscriber, EventStack, Event, EventType};

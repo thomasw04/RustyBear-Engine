@@ -37,10 +37,10 @@ impl EventSubscriber for PerspectiveCamera {
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU: glam::Mat4 = glam::mat4
 (
-    Vec4 { x: 1.0, y: 0.0, z: 0.0, w: 0.0 },
-    Vec4 { x: 0.0, y: 1.0, z: 0.0, w: 0.0 },
-    Vec4 { x: 0.0, y: 0.0, z: 0.5, w: 0.5 },
-    Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.5 }
+    Vec4::new(1.0, 0.0, 0.0, 0.0),
+    Vec4::new(0.0, 1.0, 0.0, 0.0),
+    Vec4::new(0.0, 0.0, 0.5, 0.5),
+    Vec4::new(0.0, 0.0, 0.0, 1.5),
 );
 
 impl PerspectiveCamera {
@@ -49,8 +49,8 @@ impl PerspectiveCamera {
     {
         PerspectiveCamera
         { 
-            position: Vec3 { x: 0.0, y: 0.0, z: 0.0 },
-            rotation: Vec3 { x: 0.0, y: 0.0, z: 0.0 }, 
+            position: Vec3::new(0.0, 0.0, 0.0),
+            rotation: Vec3::new(0.0, 0.0, 0.0), 
             fovy: 45.0, 
             aspect_ratio: 1280.0/720.0, 
             near: 0.1, 
@@ -79,15 +79,15 @@ impl PerspectiveCamera {
 
     pub fn set_projection(&mut self, fovy: f32, aspect_ratio: f32, near: f32, far: f32)
     {
-        self.projection = glam::Mat4::perspective_rh(self.fovy * 180.0 / PI, self.aspect_ratio, self.near, self.far)
+        self.projection = glam::Mat4::perspective_rh(fovy * 180.0 / PI, aspect_ratio, near, far)
     }
 
     pub fn set_view(&mut self, position: Vec3, rotation: Vec3)
     { 
-        self.view = glam::Mat4::from_translation(self.position) * 
-        glam::Mat4::from_rotation_x(self.rotation.x * PI / 180.0) *
-        glam::Mat4::from_rotation_y(self.rotation.y * PI / 180.0) *
-        glam::Mat4::from_rotation_z(self.rotation.z * PI / 180.0)
+        self.view = glam::Mat4::from_translation(position) * 
+        glam::Mat4::from_rotation_x(rotation.x * PI / 180.0) *
+        glam::Mat4::from_rotation_y(rotation.y * PI / 180.0) *
+        glam::Mat4::from_rotation_z(rotation.z * PI / 180.0)
     }
 
     pub fn position(&self) -> Vec3
