@@ -15,8 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Install libudev
-        run: sudo apt install -y libudev-dev
+      - name: Install libudev and alsa
+        run: sudo apt install -y libudev-dev libasound2-dev
       - name: lint
         uses: actions-rs/clippy-check@v1
         with:
@@ -30,8 +30,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - uses: lukka/get-cmake@latest
-    - name: Install libudev
-      run: sudo apt install -y libudev-dev
+    - name: Install libudev and alsa
+      run: sudo apt install -y libudev-dev libasound2-dev
       if: runner.os == 'Linux' 
     - name: Build engine
       run: cargo build --verbose
