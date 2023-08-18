@@ -157,7 +157,7 @@ impl Renderer {
     pub fn enable_msaa(&mut self, context: &Context, sample_count: u32) -> bool
     {
         if self.framebuffer.change_sample_count(context, sample_count) {
-            self.render_pipeline = Renderer::recreate_pipeline(context, sample_count, vec![self.material.layout()]);
+            self.render_pipeline = Renderer::recreate_pipeline(context, sample_count, vec![self.material.layout(), self.camera_buffer.layout()]);
             return true;
         }
         false
