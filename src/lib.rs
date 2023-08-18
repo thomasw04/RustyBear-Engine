@@ -23,7 +23,7 @@ use render::{renderer::Renderer, camera::PerspectiveCamera};
 
 use crate::{core::Application, context::Context, config::load_themes, sound::AudioEngine};
 
-use event::EventSubscriber;
+use event::{EventSubscriber, Event};
 use window::Window;
 use winit::event::{VirtualKeyCode, ElementState, MouseButton};
 
@@ -67,6 +67,11 @@ struct MyApp<'a> {
 
 impl<'a> Application<'a> for MyApp<'a> { 
 
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool
+    {
+        false
+    }
+
     fn render(&mut self, view: wgpu::TextureView, context: &mut Context)
     {
         {
@@ -83,43 +88,44 @@ impl<'a> Application<'a> for MyApp<'a> {
         &mut self.stack
     }
 
-    fn update(&mut self, _delta: &utils::Timestep, input_state: Ref<InputState>) 
+    fn update(&mut self, delta: &utils::Timestep, input_state: Ref<InputState>, context: &mut Context) 
     {
         let mut cam = self.camera.borrow_mut();
 
         if input_state.is_key_down(&VirtualKeyCode::W) {
             let mut newPos = cam.position();
-            newPos.z += 0.1;
+            newPos.z += 0.1 * delta.norm();
+            log::info!("{}", delta.millis());
             cam.set_position(newPos);
         }
 
         if input_state.is_key_down(&VirtualKeyCode::S) {
             let mut newPos = cam.position();
-            newPos.z -= 0.1;
+            newPos.z -= 0.1 * delta.norm();
             cam.set_position(newPos);
         }
 
         if input_state.is_key_down(&VirtualKeyCode::A) {
             let mut newPos = cam.position();
-            newPos.x += 0.1;
+            newPos.x += 0.1 * delta.norm();
             cam.set_position(newPos);
         }
 
         if input_state.is_key_down(&VirtualKeyCode::D) {
             let mut newPos = cam.position();
-            newPos.x -= 0.1;
+            newPos.x -= 0.1 * delta.norm();
             cam.set_position(newPos);
         }
 
         if input_state.is_key_down(&VirtualKeyCode::Space) {
             let mut newPos = cam.position();
-            newPos.y -= 0.1;
+            newPos.y -= 0.1 * delta.norm();
             cam.set_position(newPos);
         }
 
         if input_state.is_key_down(&VirtualKeyCode::LShift) {
             let mut newPos = cam.position();
-            newPos.y += 0.1;
+            newPos.y += 0.1 * delta.norm();
             cam.set_position(newPos);
         }
     }
@@ -148,6 +154,7 @@ impl<'a> MyApp<'a> {
 
         MyApp { stack, renderer, camera }
     }
+
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]

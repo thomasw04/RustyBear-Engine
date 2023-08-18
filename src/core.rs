@@ -24,8 +24,10 @@ pub trait Module {
 }
 
 pub trait Application<'a> {
+
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool;
     fn render(&mut self, view: wgpu::TextureView, context: &mut Context);
-    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>);
+    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
     fn quit(&mut self);
 
     fn get_stack(&mut self) -> & mut ModuleStack<'a>;

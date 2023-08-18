@@ -2,26 +2,31 @@ use std::ops;
 use instant::Instant;
 
 
-#[derive(Default)]
 pub struct Timestep {
     delta: f64,
-    last: u128,
+    last: Instant,
 }
 
 impl Timestep {
 
     pub fn new() -> Timestep
     {
-        Timestep { delta: 0.0, last: Instant::now().elapsed().as_nanos() }
+        Timestep { delta: 0.0, last: Instant::now() }
     }
 
     pub fn step_fwd(&mut self) -> &mut Self
     {
-        self.delta = Instant::now().elapsed().as_nanos().saturating_sub(self.last) as f64 / 1000.0;
+        self.delta = self.last.elapsed().as_nanos() as f64 / 1000000.0;
+        self.last = Instant::now();
         self
     } 
 
-    pub fn nanos(&self) -> i64
+    pub fn norm(&self) -> f32
+    {
+        (self.delta / 10.0) as f32
+    }
+
+    pub fn micros(&self) -> i64
     {
         (self.delta * 1000.0) as i64
     }
@@ -41,7 +46,7 @@ impl From<f64> for Timestep {
 
     fn from(delta: f64) -> Timestep 
     {
-        Timestep { delta, last: Instant::now().elapsed().as_nanos() }
+        Timestep { delta, last: Instant::now() }
     }
 }
 

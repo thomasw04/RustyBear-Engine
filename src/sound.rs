@@ -1,13 +1,19 @@
+#[cfg(not(target_arch = "wasm32"))]
 use kira::{manager::{backend::DefaultBackend, AudioManagerSettings, AudioManager}, sound::{streaming::{StreamingSoundData, StreamingSoundSettings}, static_sound::{StaticSoundData, StaticSoundSettings}}};
 
 use crate::config::ThemeConfiguration;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub struct AudioEngine {
-    manager: AudioManager,
+    manager: kira::manager::AudioManager,
     background_music: String,
     //click_sound: StaticSoundData,
 }
 
+#[cfg(target_arch = "wasm32")]
+pub struct AudioEngine {}
+
+#[cfg(not(target_arch = "wasm32"))]
 impl AudioEngine {
 
     pub fn new(theme_conf: &ThemeConfiguration) -> Self
@@ -35,6 +41,18 @@ impl AudioEngine {
             log::error!("Could not load background music {}. Silence.", self.background_music);
         }
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl AudioEngine {
+    pub fn new(theme_conf: &ThemeConfiguration) -> Self
+    {
+        AudioEngine {}
+    }
+
+    pub fn play_click(&mut self) {}
+
+    pub fn play_background(&mut self) {}
 }
 
 impl Default for AudioEngine {

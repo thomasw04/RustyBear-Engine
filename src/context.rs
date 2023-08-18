@@ -1,4 +1,4 @@
-use wgpu::TextureFormatFeatureFlags;
+use wgpu::{TextureFormatFeatureFlags, PresentMode};
 use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
 
@@ -45,7 +45,7 @@ impl<'a> Context {
             format,
             width: window.native.inner_size().width,
             height: window.native.inner_size().height,
-            present_mode: capabilities.present_modes[0],
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: capabilities.alpha_modes[0],
             view_formats: vec![],
         };
@@ -116,14 +116,15 @@ impl<'a> Context {
                         _ => {}
                     }
 
-                    Context::dispatch_event(app.get_stack(), event, control_flow, &self)
+                    Context::dispatch_event(app.get_stack(), event, control_flow, &self);
+                    app.on_event(&event::to_event(event), &mut self)
                 },
 
                 Event::RedrawRequested(window_id)
 
                 if window_id == window.native.id() =>
                 {
-                    app.update(ts.step_fwd(), input_state.borrow());
+                    app.update(ts.step_fwd(), input_state.borrow(), &mut self);
 
                     match self.render(&mut app) {
                         Ok(_) => {true}
@@ -172,14 +173,30 @@ impl<'a> Context {
         Ok(())
     }
 
+    fn set_vsync(&mut self, vsync: bool)
+    {
+        match vsync {
+            true => self.config.present_mode = PresentMode::AutoVsync,
+            false => self.config.present_mode = PresentMode::AutoNoVsync,
+        }
+       
+       self.surface.configure(&self.device, &self.config);
+    }
+
     //These wrapper are just making the code structure more logical in my opinion.
     fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow, context: &Context) -> bool
     {
-        Window::dispatch_event(apps, event, control_flow, context)
+        let return_value = apps.dispatch_event(event::EventType::Layer, &event::to_event(event), context);
+
+        if *event == WindowEvent::CloseRequested || *event == WindowEvent::Destroyed {
+            control_flow.set_exit();
+        }
+
+        return_value
     }
 
     fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow, context: &Context) -> bool
     {
-        Window::dispatch_gamepad_event(apps, event, control_flow, context)
+        apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
     }
 }

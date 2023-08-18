@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 use gilrs::GamepadId;
+use winit::event::{WindowEvent, MouseScrollDelta};
 
 use crate::context::Context;
 
@@ -34,6 +35,7 @@ pub enum Event {
     MouseWheel { delta_x: f64, delta_y: f64, state: winit::event::TouchPhase },
     MouseScroll { delta_x: f32, delta_y: f32, state: winit::event::TouchPhase },
     MouseInput { mousecode: winit::event::MouseButton, state: winit::event::ElementState },
+    Unknown,
 
     //gilrs Events todo
     GamepadInput {id: GamepadId, buttoncode: gilrs::Button, state: GamepadButtonState},
@@ -134,3 +136,101 @@ impl<'a> EventStack<'a> {
         let _dying_closure = self.app_stack.remove(index);
     }
 }
+
+pub fn to_gamepad_event(event: &gilrs::Event) -> Event
+{
+    match event.event {
+        gilrs::EventType::Connected => {
+            Event::GamepadConnected { id: event.id }
+        },
+        gilrs::EventType::Disconnected => {
+            Event::GamepadDisconnected { id: event.id }
+        },
+        gilrs::EventType::ButtonPressed(button, ..) => {
+            Event::GamepadInput { id: event.id, buttoncode: button, state: GamepadButtonState::Pressed }
+        },
+        gilrs::EventType::ButtonReleased(button, ..) => {
+            Event::GamepadInput { id: event.id, buttoncode: button, state: GamepadButtonState::Released }
+        },
+        gilrs::EventType::ButtonRepeated(button, ..) => {
+            Event::GamepadInput { id: event.id, buttoncode: button, state: GamepadButtonState::Repeated }
+        },
+        gilrs::EventType::ButtonChanged(button, value, ..) => {
+            Event::GamepadInputChanged { id: event.id, scancode: button as u32, value }
+        },
+        gilrs::EventType::AxisChanged(axis, value, ..) => {
+            Event::GamepadAxis { id: event.id, axiscode: axis, value }
+        },
+        _ => { Event::Unknown }
+    }
+}
+
+pub fn to_event(event: &WindowEvent) -> Event
+{
+    match event {
+        WindowEvent::Resized(size) => {
+            Event::Resized { width: size.width, height: size.height }
+        },
+        WindowEvent::ScaleFactorChanged {new_inner_size, .. } => {
+            Event::Resized { width: (**new_inner_size).width, height: (**new_inner_size).height }
+        },
+        WindowEvent::Moved(pos) => {
+            Event::Moved { x: pos.x, y: pos.y }
+        },
+        WindowEvent::CloseRequested => {
+            Event::CloseRequested
+        },
+        WindowEvent::Destroyed => {
+            Event::Destroyed
+        },
+        WindowEvent::DroppedFile(path) => {
+            Event::DroppedFile(path.clone())
+        },
+        WindowEvent::HoveredFile(path) => {
+            Event::HoveredFile(path.clone())
+        },
+        WindowEvent::HoveredFileCancelled => {
+            Event::HoveredFileCancelled
+        },
+        WindowEvent::ReceivedCharacter(ch) => {
+            Event::ReceivedCharacter(*ch)
+        },
+        WindowEvent::Focused( focused) => {
+            Event::Focused(*focused)
+        },
+        WindowEvent::KeyboardInput { input, .. } => {
+            if input.virtual_keycode.is_some() {
+                Event::KeyboardInput { keycode: input.virtual_keycode.unwrap(), state: input.state }
+            } else {
+                Event::Unknown
+            }
+        },
+        WindowEvent::ModifiersChanged( state ) => {
+            Event::ModifiersChanged(*state)
+        },
+        WindowEvent::CursorMoved { position, .. } => {
+            Event::CursorMoved { x: position.x, y: position.y }
+        },
+        WindowEvent::CursorEntered { .. } => {
+            Event::CursorEntered
+        },
+        WindowEvent::CursorLeft { .. } => {
+            Event::CursorLeft
+        },
+        WindowEvent::MouseWheel { delta, phase, .. } => {
+            match delta {
+                MouseScrollDelta::PixelDelta( d) => {
+                    Event::MouseWheel { delta_x: d.x, delta_y: d.y, state: *phase}
+                },
+                MouseScrollDelta::LineDelta(x, y) => {
+                    Event::MouseScroll { delta_x: *x, delta_y: *y, state: *phase}
+                }
+            }  
+        },
+        WindowEvent::MouseInput { state, button, .. } => {
+            Event::MouseInput { mousecode: *button, state: *state }
+        }
+
+        _ => {Event::Unknown}
+    }
+ }
