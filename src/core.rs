@@ -1,5 +1,8 @@
 
+use std::cell::Ref;
+
 use crate::context::{Context};
+use crate::input::InputState;
 use crate::utils::Timestep;
 use crate::event::{EventSubscriber, EventStack, Event, EventType};
 
@@ -22,7 +25,7 @@ pub trait Module {
 
 pub trait Application<'a> {
     fn render(&mut self, view: wgpu::TextureView, context: &mut Context);
-    fn update(&mut self, delta: &Timestep);
+    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>);
     fn quit(&mut self);
 
     fn get_stack(&mut self) -> & mut ModuleStack<'a>;

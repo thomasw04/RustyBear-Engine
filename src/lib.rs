@@ -11,13 +11,15 @@ pub mod context;
 pub mod render;
 pub mod sound;
 pub mod config;
-pub mod assets;
 
+use std::cell::Ref;
+
+use input::InputState;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
 use rccell::RcCell;
-use render::renderer::Renderer;
+use render::{renderer::Renderer, camera::PerspectiveCamera};
 
 use crate::{core::{Application}, context::Context, config::load_themes, sound::AudioEngine};
 
@@ -34,14 +36,6 @@ struct MyHandler{
 impl EventSubscriber for MyHandler {
     fn on_event(&mut self, event: &event::Event, _context: &Context) -> bool
     {
-        if let event::Event::KeyboardInput { keycode, state } = event {
-            match keycode {
-                VirtualKeyCode::D => if state == &ElementState::Pressed { log::info!("Pressed the d") },
-                VirtualKeyCode::E => if state == &ElementState::Pressed { log::info!("Pressed the e") },
-                _ => {}
-            }
-        }
-
         if let event::Event::MouseInput { mousecode, state } = event {
             match mousecode {
                 MouseButton::Left => if state == &ElementState::Pressed { self.audio.play_click() },
@@ -68,6 +62,7 @@ impl MyHandler {
 struct MyApp<'a> {
     stack: ModuleStack<'a>,
     renderer: RcCell<Renderer>,
+    camera: RcCell<PerspectiveCamera>,
 }
 
 impl<'a> Application<'a> for MyApp<'a> { 
@@ -76,6 +71,9 @@ impl<'a> Application<'a> for MyApp<'a> {
     {
         {
             let mut renderer = self.renderer.borrow_mut();
+
+            renderer.update_camera_buffer(context, self.camera.borrow_mut().view_projection().to_cols_array_2d());
+
             renderer.render(context, view);
         }
     } 
@@ -85,7 +83,46 @@ impl<'a> Application<'a> for MyApp<'a> {
         &mut self.stack
     }
 
-    fn update(&mut self, _delta: &utils::Timestep) {}
+    fn update(&mut self, _delta: &utils::Timestep, input_state: Ref<InputState>) 
+    {
+        let mut cam = self.camera.borrow_mut();
+
+        if input_state.is_key_down(&VirtualKeyCode::W) {
+            let mut newPos = cam.position();
+            newPos.z += 0.1;
+            cam.set_position(newPos);
+        }
+
+        if input_state.is_key_down(&VirtualKeyCode::S) {
+            let mut newPos = cam.position();
+            newPos.z -= 0.1;
+            cam.set_position(newPos);
+        }
+
+        if input_state.is_key_down(&VirtualKeyCode::A) {
+            let mut newPos = cam.position();
+            newPos.x += 0.1;
+            cam.set_position(newPos);
+        }
+
+        if input_state.is_key_down(&VirtualKeyCode::D) {
+            let mut newPos = cam.position();
+            newPos.x -= 0.1;
+            cam.set_position(newPos);
+        }
+
+        if input_state.is_key_down(&VirtualKeyCode::Space) {
+            let mut newPos = cam.position();
+            newPos.y -= 0.1;
+            cam.set_position(newPos);
+        }
+
+        if input_state.is_key_down(&VirtualKeyCode::LShift) {
+            let mut newPos = cam.position();
+            newPos.y += 0.1;
+            cam.set_position(newPos);
+        }
+    }
 
     fn quit(&mut self) {}
 }
@@ -103,7 +140,13 @@ impl<'a> MyApp<'a> {
         let renderer = RcCell::new(Renderer::new(context));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
-        MyApp { stack, renderer }
+        let camera = RcCell::new(PerspectiveCamera::new());
+        stack.subscribe(event::EventType::Layer, camera.clone());
+
+        camera.borrow_mut().set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
+        camera.borrow_mut().set_position(glam::Vec3 { x: 0.0, y: 1.0, z: -2.0 });
+
+        MyApp { stack, renderer, camera }
     }
 }
 

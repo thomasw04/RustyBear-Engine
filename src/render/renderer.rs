@@ -1,9 +1,11 @@
+use glam::Vec3;
 use wgpu::{TextureView, RenderPipeline, util::DeviceExt, BindGroupLayout};
 use winit::event::{VirtualKeyCode, ElementState};
 
-use crate::{context::Context, event::{EventSubscriber, self}, render::types::Texture2D};
+use crate::{context::Context, event::{EventSubscriber, self}, render::{texture::Texture2D, camera::PerspectiveCamera}};
 
-use super::types::{Framebuffer, Material};
+use super::{framebuffer::Framebuffer, camera::CameraBuffer};
+use super::material::Material;
 use super::types::Vertex2D;
 
 pub struct Renderer {
@@ -12,6 +14,7 @@ pub struct Renderer {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     material: Material,
+    camera_buffer: CameraBuffer,
     indices: u32,
 }
 
@@ -53,18 +56,23 @@ impl EventSubscriber for Renderer {
 impl Renderer {
     pub fn new(context: &Context) -> Self
     {
+        //Renderable setup
         let framebuffer = Framebuffer::new(context, 4);
 
-        let texture = Texture2D::new_error(context, 1);
-        let material = Material::new(context, vec![texture.view()], texture.sampler(), 1, "Quad");
+        let texture = Texture2D::error_texture(context);
+        let material = Material::new(context, vec![texture.view()], texture.sampler(), "Quad");
 
-        let render_pipeline = Renderer::recreate_pipeline(context, framebuffer.sample_count(), vec![material.layout()]);
+        let mut camera_buffer = CameraBuffer::new(context, "Default Camera");
+
+        //Pipeline creation
+
+        let render_pipeline = Renderer::recreate_pipeline(context, framebuffer.sample_count(), vec![material.layout(), camera_buffer.layout()]);
 
         const VERTICES: &[Vertex2D] = &[
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 0.0] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 1.0] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 1.0] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 0.0] },
+            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
+            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
+            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
         ];
 
         const INDICES: &[u16] = &[
@@ -90,7 +98,7 @@ impl Renderer {
 
         
 
-        Renderer { framebuffer, render_pipeline, vertex_buffer, index_buffer, material, indices: INDICES.len() as u32}
+        Renderer { framebuffer, render_pipeline, vertex_buffer, index_buffer, material, camera_buffer, indices: INDICES.len() as u32}
     }
 
     fn recreate_pipeline(context: &Context, sample_count: u32, bind_group_layouts: Vec<&BindGroupLayout>) -> RenderPipeline
@@ -156,6 +164,11 @@ impl Renderer {
         false
     }
 
+    pub fn update_camera_buffer(&mut self, context: &Context, camera: [[f32; 4]; 4])
+    {
+        self.camera_buffer.update_buffer(context, camera);
+    }
+
     pub fn render(&mut self, context: &mut Context, view: TextureView)
     {
         let framebuffer_view: TextureView = (&self.framebuffer).into();
@@ -195,6 +208,7 @@ impl Renderer {
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.material.bind_group(), &[]);
+            render_pass.set_bind_group(1, &self.camera_buffer.bind_group(), &[]);
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.indices, 0, 0..1);

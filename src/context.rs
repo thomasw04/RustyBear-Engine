@@ -1,3 +1,4 @@
+use wgpu::TextureFormatFeatureFlags;
 use winit::{event::{WindowEvent, Event, VirtualKeyCode}, event_loop::ControlFlow, dpi::PhysicalSize};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
 
@@ -50,11 +51,11 @@ impl<'a> Context {
         };
 
         let texture_features = adapter.get_texture_format_features(format).flags;
-        let features = Features { texture_features };
+        let mut features = Features { texture_features };
 
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: Context::activated_features(),
+                features: Context::activated_features(adapter.features()),
                 limits: if cfg!(target_arch = "wasm32") {
                     wgpu::Limits::downlevel_webgl2_defaults()
                 } else {
@@ -64,14 +65,26 @@ impl<'a> Context {
             }, None,
         ).await.unwrap();
 
+        if !device.features().contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES) {
+            features.texture_features.set(TextureFormatFeatureFlags::MULTISAMPLE_X2, false);
+            features.texture_features.set(TextureFormatFeatureFlags::MULTISAMPLE_X8, false);
+            features.texture_features.set(TextureFormatFeatureFlags::MULTISAMPLE_X16, false);
+        }
+
         surface.configure(&device, &config);
 
         Context { surface, device, queue, config, features }
     }
 
-    fn activated_features() -> wgpu::Features
+    fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
     {
-        wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES
+        let mut activated_features: wgpu::Features = wgpu::Features::empty();
+
+        if supported_features.contains(wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES) {
+            activated_features |= wgpu::Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+        }
+        
+        activated_features
     }
 
     pub fn run(mut self, mut app: impl Application<'a> + 'static, window: Window)
@@ -87,10 +100,6 @@ impl<'a> Context {
 
         window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
         {
-            if input_state.borrow().is_key_down(&VirtualKeyCode::A) {
-                log::info!("The A is down.");
-            }
-
             let _handled = match event
             {
                 Event::WindowEvent { window_id, ref event }
@@ -114,7 +123,7 @@ impl<'a> Context {
 
                 if window_id == window.native.id() =>
                 {
-                    app.update(ts.step_fwd());
+                    app.update(ts.step_fwd(), input_state.borrow());
 
                     match self.render(&mut app) {
                         Ok(_) => {true}
