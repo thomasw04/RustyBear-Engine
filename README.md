@@ -13,6 +13,7 @@ It is more or less an eductational project. I just like building Game-Engines.
 - Thus runs out of the box on all three platforms.
 - Easy to use event/input handling system + game controller support.
 - First triangle.
+- Camera controller, Textures, Quad.
 
 ## Main Features (Planned: Sorted from highest priority)
 - 2D/3D renderer.
