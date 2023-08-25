@@ -26,7 +26,7 @@ It is more or less an eductational project. I just like building Game-Engines.
 ## Build from source
 
 1. Clone the repo 
-2. Install rustup, gcc and libudev-dev (only on linux) 
+2. Install rustup, gcc and (libudev-dev, libasound2-dev only on linux) 
 3. Run ```cargo run --release```
 4. Profit :)
 
