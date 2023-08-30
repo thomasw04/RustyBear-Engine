@@ -11,9 +11,10 @@ pub struct CameraUniform {
     pub view_projection: [[f32; 4]; 4],
 }
 
-impl CameraUniform {
-    pub fn new() -> CameraUniform
-    {
-        CameraUniform { view_projection: glam::Mat4::IDENTITY.to_cols_array_2d() }
+impl Default for CameraUniform {
+    fn default() -> Self {
+        CameraUniform {
+            view_projection: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        }
     }
 }

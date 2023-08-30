@@ -1,16 +1,17 @@
 #![allow(non_snake_case)]
 
 pub mod utils;
-#[macro_use] pub mod core;
-pub mod event;
-pub mod window;
-pub mod logging;
-pub mod entry;
-pub mod input;
+#[macro_use]
+pub mod core;
+pub mod config;
 pub mod context;
+pub mod entry;
+pub mod event;
+pub mod input;
+pub mod logging;
 pub mod render;
 pub mod sound;
-pub mod config;
+pub mod window;
 
 use std::cell::Ref;
 
@@ -19,27 +20,34 @@ use input::InputState;
 use wasm_bindgen::prelude::*;
 
 use rccell::RcCell;
-use render::{renderer::Renderer, camera::PerspectiveCamera};
+use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{core::Application, context::Context, config::load_themes, sound::AudioEngine};
+use crate::{config::load_themes, context::Context, core::Application, sound::AudioEngine};
 
-use event::{EventSubscriber, Event};
+use event::{Event, EventSubscriber};
 use window::Window;
-use winit::event::{VirtualKeyCode, ElementState, MouseButton};
+use winit::event::{ElementState, MouseButton, VirtualKeyCode};
 
 use crate::core::ModuleStack;
 
-struct MyHandler{
-    audio: AudioEngine
+struct MyHandler {
+    audio: AudioEngine,
 }
 
 impl EventSubscriber for MyHandler {
-    fn on_event(&mut self, event: &event::Event, _context: &mut Context) -> bool
-    {
+    fn on_event(&mut self, event: &event::Event, _context: &mut Context) -> bool {
         if let event::Event::MouseInput { mousecode, state } = event {
             match mousecode {
-                MouseButton::Left => if state == &ElementState::Pressed { self.audio.play_click() },
-                MouseButton::Right => if state == &ElementState::Pressed { self.audio.play_click() },
+                MouseButton::Left => {
+                    if state == &ElementState::Pressed {
+                        self.audio.play_click()
+                    }
+                }
+                MouseButton::Right => {
+                    if state == &ElementState::Pressed {
+                        self.audio.play_click()
+                    }
+                }
                 _ => {}
             }
         }
@@ -48,8 +56,7 @@ impl EventSubscriber for MyHandler {
 }
 
 impl MyHandler {
-    pub fn new() -> MyHandler
-    {
+    pub fn new() -> MyHandler {
         let theme_conf = load_themes();
 
         let mut audio = AudioEngine::new(&theme_conf);
@@ -65,45 +72,48 @@ struct MyApp<'a> {
     camera: RcCell<PerspectiveCamera>,
 }
 
-impl<'a> Application<'a> for MyApp<'a> { 
-
-    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool
-    {
+impl<'a> Application<'a> for MyApp<'a> {
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool {
         match event {
-            event::Event::KeyboardInput { keycode, state } => {
-                match keycode {
-                    VirtualKeyCode::V => {
-                        if *state == ElementState::Pressed {
-                            context.set_vsync(!context.vsync());
-                        }
-                        false
-                    },
-                    _ => {false}
+            event::Event::KeyboardInput { keycode, state } => match keycode {
+                VirtualKeyCode::V => {
+                    if *state == ElementState::Pressed {
+                        context.set_vsync(!context.vsync());
+                    }
+                    false
                 }
-                
+                _ => false,
             },
-            _ => {false}
+            _ => false,
         }
     }
 
-    fn render(&mut self, view: wgpu::TextureView, context: &mut Context)
-    {
+    fn render(&mut self, view: wgpu::TextureView, context: &mut Context) {
         {
             let mut renderer = self.renderer.borrow_mut();
 
-            renderer.update_camera_buffer(context, self.camera.borrow_mut().view_projection().to_cols_array_2d());
+            renderer.update_camera_buffer(
+                context,
+                self.camera
+                    .borrow_mut()
+                    .view_projection()
+                    .to_cols_array_2d(),
+            );
 
             renderer.render(context, view);
         }
-    } 
+    }
 
-    fn get_stack(&mut self) -> &mut ModuleStack<'a>
-    {
+    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
         &mut self.stack
     }
 
-    fn update(&mut self, delta: &utils::Timestep, input_state: Ref<InputState>, context: &mut Context) 
-    {
+    fn update(
+        &mut self,
+        delta: &utils::Timestep,
+        input_state: Ref<InputState>,
+        _context: &mut Context,
+    ) {
         let mut cam = self.camera.borrow_mut();
 
         if input_state.is_key_down(&VirtualKeyCode::W) {
@@ -135,11 +145,10 @@ impl<'a> Application<'a> for MyApp<'a> {
 }
 
 impl<'a> MyApp<'a> {
-    pub fn new(context: &Context) -> MyApp<'a>
-    {
+    pub fn new(context: &Context) -> MyApp<'a> {
         log::info!("Init Application");
 
-        let mut  stack = ModuleStack::new();
+        let mut stack = ModuleStack::new();
 
         let handler = RcCell::new(MyHandler::new());
         stack.subscribe(event::EventType::Layer, handler);
@@ -147,15 +156,22 @@ impl<'a> MyApp<'a> {
         let renderer = RcCell::new(Renderer::new(context));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
-        let camera = RcCell::new(PerspectiveCamera::new());
+        let camera = RcCell::new(PerspectiveCamera::default());
         stack.subscribe(event::EventType::Layer, camera.clone());
 
-        camera.borrow_mut().set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
-        camera.borrow_mut().set_position(glam::Vec3::new(0.0, 1.0, 2.0));
+        camera
+            .borrow_mut()
+            .set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
+        camera
+            .borrow_mut()
+            .set_position(glam::Vec3::new(0.0, 1.0, 2.0));
 
-        MyApp { stack, renderer, camera }
+        MyApp {
+            stack,
+            renderer,
+            camera,
+        }
     }
-
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
@@ -173,4 +189,3 @@ pub fn entry_point() {
     //Move my app and window into the context. And run the app.
     context.run(myapp, window);
 }
-

@@ -96,7 +96,7 @@ impl<'a> Context {
         app.get_stack().subscribe(event::EventType::App, input_state.clone());
 
        //Time since last frame
-        let mut ts = Timestep::new();
+        let mut ts = Timestep::default();
 
         window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
         {
@@ -200,7 +200,7 @@ impl<'a> Context {
         return_value
     }
 
-    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow, context: &mut Context) -> bool
+    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow, context: &mut Context) -> bool
     {
         apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
     }

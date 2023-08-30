@@ -1,6 +1,6 @@
-pub mod types;
+pub mod camera;
+pub mod framebuffer;
+pub mod material;
 pub mod renderer;
 pub mod texture;
-pub mod material;
-pub mod framebuffer;
-pub mod camera;
+pub mod types;

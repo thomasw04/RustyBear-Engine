@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-fn main() 
-{
+fn main() {
     RustyBear_Engine::entry_point();
 }

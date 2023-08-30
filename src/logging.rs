@@ -1,11 +1,9 @@
-
+#[cfg(not(target_arch = "wasm32"))]
+use simplelog::{Color, ColorChoice, Level, LevelFilter, TerminalMode};
 #[cfg(not(target_arch = "wasm32"))]
 use simplelog::{ConfigBuilder, TermLogger};
-#[cfg(not(target_arch = "wasm32"))]
-use simplelog::{Level, Color, LevelFilter, TerminalMode, ColorChoice};
 
-pub fn init()
-{
+pub fn init() {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "wasm32")]
         {
@@ -20,7 +18,7 @@ pub fn init()
             .set_level_color(Level::Warn, Some(Color::Yellow))
             .set_level_color(Level::Error, Some(Color::Red))
             .build();
-    
+
             let _ = TermLogger::init(LevelFilter::Info, config, TerminalMode::Mixed, ColorChoice::Auto);
         }
     }
