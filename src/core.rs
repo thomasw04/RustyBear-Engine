@@ -1,10 +1,11 @@
+use std::cell::Ref;
 
+use crate::context::Context;
+use crate::event::{Event, EventStack, EventSubscriber, EventType};
+use crate::input::InputState;
 use crate::utils::Timestep;
-use crate::window::Window;
-use crate::event::{EventSubscriber, EventStack, Event, EventType};
 
 use rccell::RcCell;
-use std::string::String;
 
 macro_rules! enclose {
     ( ($( $x:ident ),*) $y:expr ) => {
@@ -22,53 +23,53 @@ pub trait Module {
 }
 
 pub trait Application<'a> {
-    fn init(&mut self, config_json: String) -> Window;
-    fn get_stack(&mut self) -> & mut ModuleStack<'a>;
-    fn update(&mut self, delta: &Timestep);
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool;
+    fn render(&mut self, view: wgpu::TextureView, context: &mut Context);
+    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
     fn quit(&mut self);
+
+    fn get_stack(&mut self) -> &mut ModuleStack<'a>;
 }
 
+#[derive(Default)]
 pub struct ModuleStack<'a> {
     events: EventStack<'a>,
     modules: Vec<Box<dyn Module + 'a>>,
 }
 
 impl<'a> ModuleStack<'a> {
-
-    pub fn new() -> ModuleStack<'a>
-    {
-        ModuleStack { events: EventStack::new(), modules: Vec::new() }
+    pub fn new() -> ModuleStack<'a> {
+        ModuleStack::default()
     }
 
-    pub fn push(&mut self, module: impl Module + 'a)
-    {
+    pub fn push(&mut self, module: impl Module + 'a) {
         self.modules.push(Box::new(module));
     }
 
     #[allow(dead_code)]
-    fn update(&mut self, ts: &Timestep)
-    {
-        for mods in &mut self.modules
-        {
+    fn update(&mut self, ts: &Timestep) {
+        for mods in &mut self.modules {
             mods.update(ts);
         }
-    } 
+    }
 
-    pub fn dispatch_event(&mut self, event_type: EventType, event: &Event) -> bool
-    {
+    pub fn dispatch_event(
+        &mut self,
+        event_type: EventType,
+        event: &Event,
+        context: &mut Context,
+    ) -> bool {
         match event_type {
-            EventType::App => {
-                self.events.propagate_app_event(event)
-            },
-            EventType::Layer => {
-                self.events.propagate_event(event)
-            }
+            EventType::App => self.events.propagate_app_event(event, context),
+            EventType::Layer => self.events.propagate_event(event, context),
         }
     }
 
-    pub fn subscribe(&mut self, event_type: EventType, subscriber: RcCell<impl EventSubscriber + 'a>)
-    {
-        self.events.push(event_type, enclose! { (subscriber) move |event: &Event| { subscriber.borrow_mut().on_event(event) }});
+    pub fn subscribe(
+        &mut self,
+        event_type: EventType,
+        subscriber: RcCell<impl EventSubscriber + 'a>,
+    ) {
+        self.events.push(event_type, enclose! { (subscriber) move |event: &Event, context: &mut Context| { subscriber.borrow_mut().on_event(event, context) }});
     }
 }
-
