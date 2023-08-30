@@ -2,6 +2,7 @@
 name = "RustyBear-Engine"
 version = "0.1.0"
 edition = "2021"
+author = "Thomas Wachter"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

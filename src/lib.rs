@@ -34,7 +34,7 @@ struct MyHandler{
 }
 
 impl EventSubscriber for MyHandler {
-    fn on_event(&mut self, event: &event::Event, _context: &Context) -> bool
+    fn on_event(&mut self, event: &event::Event, _context: &mut Context) -> bool
     {
         if let event::Event::MouseInput { mousecode, state } = event {
             match mousecode {
@@ -69,7 +69,21 @@ impl<'a> Application<'a> for MyApp<'a> {
 
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool
     {
-        false
+        match event {
+            event::Event::KeyboardInput { keycode, state } => {
+                match keycode {
+                    VirtualKeyCode::V => {
+                        if *state == ElementState::Pressed {
+                            context.set_vsync(!context.vsync());
+                        }
+                        false
+                    },
+                    _ => {false}
+                }
+                
+            },
+            _ => {false}
+        }
     }
 
     fn render(&mut self, view: wgpu::TextureView, context: &mut Context)
@@ -93,40 +107,27 @@ impl<'a> Application<'a> for MyApp<'a> {
         let mut cam = self.camera.borrow_mut();
 
         if input_state.is_key_down(&VirtualKeyCode::W) {
-            let mut newPos = cam.position();
-            newPos.z += 0.1 * delta.norm();
-            log::info!("{}", delta.millis());
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(0.0, 0.0, -(0.1 * delta.norm())));
         }
 
         if input_state.is_key_down(&VirtualKeyCode::S) {
-            let mut newPos = cam.position();
-            newPos.z -= 0.1 * delta.norm();
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(0.0, 0.0, 0.1 * delta.norm()));
         }
 
         if input_state.is_key_down(&VirtualKeyCode::A) {
-            let mut newPos = cam.position();
-            newPos.x += 0.1 * delta.norm();
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(-(0.1 * delta.norm()), 0.0, 0.0));
         }
 
         if input_state.is_key_down(&VirtualKeyCode::D) {
-            let mut newPos = cam.position();
-            newPos.x -= 0.1 * delta.norm();
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(0.1 * delta.norm(), 0.0, 0.0));
         }
 
         if input_state.is_key_down(&VirtualKeyCode::Space) {
-            let mut newPos = cam.position();
-            newPos.y -= 0.1 * delta.norm();
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(0.0, 0.1 * delta.norm(), 0.0));
         }
 
         if input_state.is_key_down(&VirtualKeyCode::LShift) {
-            let mut newPos = cam.position();
-            newPos.y += 0.1 * delta.norm();
-            cam.set_position(newPos);
+            cam.inc_pos(glam::Vec3::new(0.0, -(0.1 * delta.norm()), 0.0));
         }
     }
 
@@ -150,7 +151,7 @@ impl<'a> MyApp<'a> {
         stack.subscribe(event::EventType::Layer, camera.clone());
 
         camera.borrow_mut().set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
-        camera.borrow_mut().set_position(glam::Vec3::new(0.0, 1.0, -2.0));
+        camera.borrow_mut().set_position(glam::Vec3::new(0.0, 1.0, 2.0));
 
         MyApp { stack, renderer, camera }
     }

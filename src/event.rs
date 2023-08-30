@@ -54,10 +54,10 @@ pub enum EventType {
 
 
 pub trait EventSubscriber {
-    fn on_event(&mut self, event: &Event, context: &Context) -> bool;
+    fn on_event(&mut self, event: &Event, context: &mut Context) -> bool;
 }
 
-type EventCallback<'a> = Box<dyn FnMut(&Event, &Context) -> bool + 'a>;
+type EventCallback<'a> = Box<dyn FnMut(&Event, &mut Context) -> bool + 'a>;
 
 #[derive(Default)]
 pub struct EventStack<'a> {
@@ -73,7 +73,7 @@ impl<'a> EventStack<'a> {
         EventStack { input_stack: Vec::new(), app_stack: Vec::new() }
     }
 
-    pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event, &Context) -> bool + 'a) -> usize
+    pub fn push(&mut self, event_type: EventType, callback: impl FnMut(&Event, &mut Context) -> bool + 'a) -> usize
     {
         match event_type {
             EventType::App => {
@@ -95,7 +95,7 @@ impl<'a> EventStack<'a> {
         self.input_stack.swap(lhs, rhs);
     }
 
-    pub fn propagate_event(&mut self, event: &Event, context: &Context) -> bool
+    pub fn propagate_event(&mut self, event: &Event, context: &mut Context) -> bool
     {
         self.propagate_app_event(event, context);
 
@@ -110,7 +110,7 @@ impl<'a> EventStack<'a> {
         false
     }
 
-    pub fn propagate_app_event(&mut self, event: &Event, context: &Context) -> bool
+    pub fn propagate_app_event(&mut self, event: &Event, context: &mut Context) -> bool
     {
         for callback in self.app_stack.iter_mut()
         {

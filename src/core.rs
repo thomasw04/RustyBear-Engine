@@ -60,7 +60,7 @@ impl<'a> ModuleStack<'a> {
         }
     } 
 
-    pub fn dispatch_event(&mut self, event_type: EventType, event: &Event, context: &Context) -> bool
+    pub fn dispatch_event(&mut self, event_type: EventType, event: &Event, context: &mut Context) -> bool
     {
         match event_type {
             EventType::App => {
@@ -74,7 +74,7 @@ impl<'a> ModuleStack<'a> {
 
     pub fn subscribe(&mut self, event_type: EventType, subscriber: RcCell<impl EventSubscriber + 'a>)
     {
-        self.events.push(event_type, enclose! { (subscriber) move |event: &Event, context: &Context| { subscriber.borrow_mut().on_event(event, context) }});
+        self.events.push(event_type, enclose! { (subscriber) move |event: &Event, context: &mut Context| { subscriber.borrow_mut().on_event(event, context) }});
     }
 }
 

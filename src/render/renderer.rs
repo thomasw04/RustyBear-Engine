@@ -19,7 +19,7 @@ pub struct Renderer {
 
 impl EventSubscriber for Renderer {
 
-    fn on_event(&mut self, event: &crate::event::Event, context: &Context) -> bool
+    fn on_event(&mut self, event: &crate::event::Event, context: &mut Context) -> bool
     {
         match event {
             event::Event::Resized {width, height} => {

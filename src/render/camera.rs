@@ -21,7 +21,7 @@ pub struct PerspectiveCamera {
 
 impl EventSubscriber for PerspectiveCamera {
 
-    fn on_event(&mut self, event: &crate::event::Event, _context: &Context) -> bool
+    fn on_event(&mut self, event: &crate::event::Event, _context: &mut Context) -> bool
     {
         match event {
             event::Event::Resized {width, height} => {
@@ -87,7 +87,9 @@ impl PerspectiveCamera {
         self.view = glam::Mat4::from_translation(position) * 
         glam::Mat4::from_rotation_x(rotation.x * PI / 180.0) *
         glam::Mat4::from_rotation_y(rotation.y * PI / 180.0) *
-        glam::Mat4::from_rotation_z(rotation.z * PI / 180.0)
+        glam::Mat4::from_rotation_z(rotation.z * PI / 180.0);
+
+        self.view = self.view.inverse();
     }
 
     pub fn position(&self) -> Vec3
@@ -153,6 +155,18 @@ impl PerspectiveCamera {
     pub fn set_aspect_ratio(&mut self, aspect_ratio: f32)
     {
         self.aspect_ratio = aspect_ratio;
+        self.dirty = true;
+    }
+
+    pub fn inc_pos(&mut self, size: Vec3)
+    {
+        self.position += size;
+        self.dirty = true;
+    }
+
+    pub fn inc_rot(&mut self, size: Vec3)
+    {
+        self.rotation += size;
         self.dirty = true;
     }
 

@@ -42,7 +42,7 @@ impl InputState {
 }
 
 impl EventSubscriber for InputState {
-    fn on_event(&mut self, event: &Event, _context: &Context) -> bool
+    fn on_event(&mut self, event: &Event, _context: &mut Context) -> bool
     {
         match event {
             Event::KeyboardInput { keycode, state } =>

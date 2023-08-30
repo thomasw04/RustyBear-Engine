@@ -116,7 +116,7 @@ impl<'a> Context {
                         _ => {}
                     }
 
-                    Context::dispatch_event(app.get_stack(), event, control_flow, &self);
+                    Context::dispatch_event(app.get_stack(), event, control_flow, &mut self);
                     app.on_event(&event::to_event(event), &mut self)
                 },
 
@@ -148,7 +148,7 @@ impl<'a> Context {
             let gilrs_event_option = gilrs.next_event();
 
             if let Some(gilrs_event) = gilrs_event_option {
-                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, control_flow, &self);
+                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, control_flow, &mut self);
             }
         }});
     }
@@ -173,7 +173,7 @@ impl<'a> Context {
         Ok(())
     }
 
-    fn set_vsync(&mut self, vsync: bool)
+    pub fn set_vsync(&mut self, vsync: bool)
     {
         match vsync {
             true => self.config.present_mode = PresentMode::AutoVsync,
@@ -183,8 +183,13 @@ impl<'a> Context {
        self.surface.configure(&self.device, &self.config);
     }
 
+    pub fn vsync(&self) -> bool
+    {
+        self.config.present_mode == PresentMode::AutoVsync
+    }
+
     //These wrapper are just making the code structure more logical in my opinion.
-    fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow, context: &Context) -> bool
+    fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow, context: &mut Context) -> bool
     {
         let return_value = apps.dispatch_event(event::EventType::Layer, &event::to_event(event), context);
 
@@ -195,7 +200,7 @@ impl<'a> Context {
         return_value
     }
 
-    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow, context: &Context) -> bool
+    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, control_flow: &mut ControlFlow, context: &mut Context) -> bool
     {
         apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
     }
