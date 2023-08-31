@@ -5,6 +5,7 @@ use crate::{
     context::Context,
     event::{self, EventSubscriber},
     render::texture::Texture2D,
+    window::Window,
 };
 
 use super::material::Material;
@@ -19,6 +20,7 @@ pub struct Renderer {
     material: Material,
     camera_buffer: CameraBuffer,
     indices: u32,
+    egui_render_pass: egui_wgpu_backend::RenderPass,
 }
 
 impl EventSubscriber for Renderer {
@@ -55,12 +57,16 @@ impl EventSubscriber for Renderer {
 impl Renderer {
     pub fn new(context: &Context) -> Self {
         //Renderable setup
-        let framebuffer = Framebuffer::new(context, 4);
+        let sample_count = 4;
+
+        let framebuffer = Framebuffer::new(context, sample_count);
 
         let texture = Texture2D::error_texture(context);
         let material = Material::new(context, vec![texture.view()], texture.sampler(), "Quad");
 
         let camera_buffer = CameraBuffer::new(context, "Default Camera");
+
+        let egui_render_pass = Renderer::recreate_gui(context, 1);
 
         //Pipeline creation
 
@@ -115,7 +121,12 @@ impl Renderer {
             material,
             camera_buffer,
             indices: INDICES.len() as u32,
+            egui_render_pass,
         }
+    }
+
+    fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu_backend::RenderPass {
+        egui_wgpu_backend::RenderPass::new(&context.device, context.config.format, sample_count)
     }
 
     fn recreate_pipeline(
@@ -177,13 +188,16 @@ impl Renderer {
             })
     }
 
-    pub fn enable_msaa(&mut self, context: &Context, sample_count: u32) -> bool {
+    pub fn enable_msaa(&mut self, context: &mut Context, sample_count: u32) -> bool {
         if self.framebuffer.change_sample_count(context, sample_count) {
             self.render_pipeline = Renderer::recreate_pipeline(
                 context,
                 sample_count,
                 vec![self.material.layout(), self.camera_buffer.layout()],
             );
+
+            // self.egui_render_pass = Renderer::recreate_gui(context, sample_count);
+
             return true;
         }
         false
@@ -193,7 +207,12 @@ impl Renderer {
         self.camera_buffer.update_buffer(context, camera);
     }
 
-    pub fn render(&mut self, context: &mut Context, view: TextureView) {
+    pub fn render(
+        &mut self,
+        context: &mut Context,
+        view: &TextureView,
+        window: &winit::window::Window,
+    ) {
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
 
@@ -203,17 +222,21 @@ impl Renderer {
                 label: Some("Render Encoder"),
             });
 
+        let output = context.egui.end_frame(Some(window));
+        let paint_jobs = context.egui.context().tessellate(output.shapes);
+        let texture_delta = output.textures_delta;
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: match sample_count {
-                        1 => &view,
+                        1 => view,
                         _ => &framebuffer_view,
                     },
                     resolve_target: match sample_count {
                         1 => None,
-                        _ => Some(&view),
+                        _ => Some(view),
                     },
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -234,6 +257,29 @@ impl Renderer {
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             render_pass.draw_indexed(0..self.indices, 0, 0..1);
+        }
+
+        {
+            let screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
+                physical_width: context.config.width,
+                physical_height: context.config.height,
+                scale_factor: window.scale_factor() as f32,
+            };
+
+            self.egui_render_pass
+                .add_textures(&context.device, &context.queue, &texture_delta)
+                .expect("[EGUI] Failed to add textures.");
+
+            self.egui_render_pass.update_buffers(
+                &context.device,
+                &context.queue,
+                &paint_jobs,
+                &screen_descriptor,
+            );
+
+            self.egui_render_pass
+                .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
+                .unwrap();
         }
 
         context.queue.submit(std::iter::once(encoder.finish()));

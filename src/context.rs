@@ -12,6 +12,7 @@ pub struct Context {
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub features: Features,
+    pub egui: egui_winit_platform::Platform,
 }
 
 impl<'a> Context {
@@ -73,7 +74,16 @@ impl<'a> Context {
 
         surface.configure(&device, &config);
 
-        Context { surface, device, queue, config, features }
+        let egui = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor
+        {
+            physical_width: window.native.inner_size().width, 
+            physical_height: window.native.inner_size().height, 
+            scale_factor: window.native.scale_factor(), 
+            font_definitions: egui::FontDefinitions::default(),
+            style: Default::default(),
+        });
+
+        Context { surface, device, queue, config, features, egui }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
@@ -100,6 +110,8 @@ impl<'a> Context {
 
         window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
         {
+            self.egui.handle_event(&event);
+
             let _handled = match event
             {
                 Event::WindowEvent { window_id, ref event }
@@ -125,8 +137,9 @@ impl<'a> Context {
                 if window_id == window.native.id() =>
                 {
                     app.update(ts.step_fwd(), input_state.borrow(), &mut self);
+                    self.egui.update_time(ts.total_secs());
 
-                    match self.render(&mut app) {
+                    match self.render(&window.native, &mut app) {
                         Ok(_) => {true}
                         Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.config.width, height: self.config.height }); false},
                         Err(wgpu::SurfaceError::OutOfMemory) => { *control_flow = ControlFlow::Exit; true},
@@ -162,13 +175,17 @@ impl<'a> Context {
         }
     }
 
-    fn render(&mut self, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
+    fn render(&mut self, window: &winit::window::Window, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
     {
         let output = self.surface.get_current_texture()?;
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        app.render(view, self);
+        self.egui.begin_frame();
+        app.gui_render(&view, self, &self.egui.context());
+
+        app.render(&view, self, window);
+
         output.present();
         Ok(())
     }
