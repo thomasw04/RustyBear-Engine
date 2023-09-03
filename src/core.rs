@@ -4,7 +4,6 @@ use crate::context::Context;
 use crate::event::{Event, EventStack, EventSubscriber, EventType};
 use crate::input::InputState;
 use crate::utils::Timestep;
-use crate::window::Window;
 
 use rccell::RcCell;
 
