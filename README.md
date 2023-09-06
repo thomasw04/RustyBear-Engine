@@ -17,7 +17,7 @@ It is more or less an eductational project. I just like building Game-Engines.
 
 ## Main Features (Planned: Sorted from highest priority)
 - 2D/3D renderer.
-- ImGui bindings for simple gui creation
+- Egui for simple gui creation
 - Rust scripting
 - 3D audio engine.
 - LDtk support. 

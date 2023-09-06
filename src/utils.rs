@@ -4,13 +4,17 @@ use std::ops;
 pub struct Timestep {
     delta: f64,
     last: Instant,
+    begin: Instant,
 }
 
 impl Default for Timestep {
     fn default() -> Self {
+        let begin = Instant::now();
+
         Timestep {
             delta: 0.0,
-            last: Instant::now(),
+            last: begin,
+            begin,
         }
     }
 }
@@ -37,13 +41,20 @@ impl Timestep {
     pub fn seconds(&self) -> f64 {
         self.delta / 1000.0
     }
+
+    pub fn total_secs(&self) -> f64 {
+        self.begin.elapsed().as_secs_f64()
+    }
 }
 
 impl From<f64> for Timestep {
     fn from(delta: f64) -> Timestep {
+        let begin = Instant::now();
+
         Timestep {
             delta,
-            last: Instant::now(),
+            last: begin,
+            begin,
         }
     }
 }

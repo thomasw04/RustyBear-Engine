@@ -32,11 +32,15 @@ rayon = "1.7.0"
 clap = { version = "4.3.10", features = ["derive"] }
 gltf = "1.2.0"
 glam = "0.24.1"
+egui_wgpu_backend = { version = "0.25.0", features = ["web"] }
+egui_winit_platform = "0.19.0"
+egui = "0.22.0"
+egui_demo_lib = "0.22.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0"
-wgpu = { version = "0.16", features = ["webgl"]}
+wgpu = { version = "0.17.0", features = ["webgl"]}
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.30"
 web-sys = { version = "0.3", features = [

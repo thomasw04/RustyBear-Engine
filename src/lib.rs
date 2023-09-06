@@ -70,6 +70,7 @@ struct MyApp<'a> {
     stack: ModuleStack<'a>,
     renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
+    demo_window: egui_demo_lib::DemoWindows,
 }
 
 impl<'a> Application<'a> for MyApp<'a> {
@@ -88,7 +89,21 @@ impl<'a> Application<'a> for MyApp<'a> {
         }
     }
 
-    fn render(&mut self, view: wgpu::TextureView, context: &mut Context) {
+    fn gui_render(
+        &mut self,
+        view: &wgpu::TextureView,
+        context: &mut Context,
+        gui_context: &egui::Context,
+    ) {
+        self.demo_window.ui(gui_context);
+    }
+
+    fn render(
+        &mut self,
+        view: &wgpu::TextureView,
+        context: &mut Context,
+        window: &winit::window::Window,
+    ) {
         {
             let mut renderer = self.renderer.borrow_mut();
 
@@ -100,7 +115,7 @@ impl<'a> Application<'a> for MyApp<'a> {
                     .to_cols_array_2d(),
             );
 
-            renderer.render(context, view);
+            renderer.render(context, view, window);
         }
     }
 
@@ -170,6 +185,7 @@ impl<'a> MyApp<'a> {
             stack,
             renderer,
             camera,
+            demo_window: egui_demo_lib::DemoWindows::default(),
         }
     }
 }
