@@ -3,6 +3,7 @@
 pub mod utils;
 #[macro_use]
 pub mod core;
+pub mod assets;
 pub mod config;
 pub mod context;
 pub mod entry;
@@ -16,13 +17,11 @@ pub mod window;
 use std::cell::Ref;
 
 use input::InputState;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{config::load_themes, context::Context, core::Application, sound::AudioEngine};
+use crate::{config::Config, context::Context, core::Application, sound::AudioEngine};
 
 use event::{Event, EventSubscriber};
 use window::Window;
@@ -56,10 +55,8 @@ impl EventSubscriber for MyHandler {
 }
 
 impl MyHandler {
-    pub fn new() -> MyHandler {
-        let theme_conf = load_themes();
-
-        let mut audio = AudioEngine::new(&theme_conf);
+    pub fn new(context: &Context) -> MyHandler {
+        let mut audio = AudioEngine::new(context.config.theme_config());
         audio.play_background();
 
         MyHandler { audio }
@@ -89,15 +86,6 @@ impl<'a> Application<'a> for MyApp<'a> {
         }
     }
 
-    fn gui_render(
-        &mut self,
-        view: &wgpu::TextureView,
-        context: &mut Context,
-        gui_context: &egui::Context,
-    ) {
-        self.demo_window.ui(gui_context);
-    }
-
     fn render(
         &mut self,
         view: &wgpu::TextureView,
@@ -119,8 +107,13 @@ impl<'a> Application<'a> for MyApp<'a> {
         }
     }
 
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
-        &mut self.stack
+    fn gui_render(
+        &mut self,
+        view: &wgpu::TextureView,
+        context: &mut Context,
+        gui_context: &egui::Context,
+    ) {
+        self.demo_window.ui(gui_context);
     }
 
     fn update(
@@ -157,6 +150,10 @@ impl<'a> Application<'a> for MyApp<'a> {
     }
 
     fn quit(&mut self) {}
+
+    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
+        &mut self.stack
+    }
 }
 
 impl<'a> MyApp<'a> {
@@ -165,7 +162,7 @@ impl<'a> MyApp<'a> {
 
         let mut stack = ModuleStack::new();
 
-        let handler = RcCell::new(MyHandler::new());
+        let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
 
         let renderer = RcCell::new(Renderer::new(context));
@@ -174,9 +171,9 @@ impl<'a> MyApp<'a> {
         let camera = RcCell::new(PerspectiveCamera::default());
         stack.subscribe(event::EventType::Layer, camera.clone());
 
-        camera
-            .borrow_mut()
-            .set_aspect_ratio(context.config.width as f32 / context.config.height as f32);
+        camera.borrow_mut().set_aspect_ratio(
+            context.surface_config.width as f32 / context.surface_config.height as f32,
+        );
         camera
             .borrow_mut()
             .set_position(glam::Vec3::new(0.0, 1.0, 2.0));
@@ -190,8 +187,7 @@ impl<'a> MyApp<'a> {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
-pub fn entry_point() {
+pub fn example_app() {
     logging::init();
     println!();
 

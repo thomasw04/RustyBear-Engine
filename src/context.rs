@@ -1,6 +1,7 @@
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
 use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
+use crate::config::Config;
 
 pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags
@@ -10,13 +11,16 @@ pub struct Context {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
+    pub surface_config: wgpu::SurfaceConfiguration,
     pub features: Features,
     pub egui: egui_winit_platform::Platform,
+    pub config: Config,
 }
 
 impl<'a> Context {
     pub async fn new(window: &mut Window) -> Context {
+
+        let config = Config::new();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 
         {
@@ -41,7 +45,7 @@ impl<'a> Context {
         let format = capabilities.formats.iter()
         .copied().find(|f| f.is_srgb()).unwrap_or(capabilities.formats[0]);
 
-        let config = wgpu::SurfaceConfiguration {
+        let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width: window.native.inner_size().width,
@@ -72,7 +76,7 @@ impl<'a> Context {
             features.texture_features.set(TextureFormatFeatureFlags::MULTISAMPLE_X16, false);
         }
 
-        surface.configure(&device, &config);
+        surface.configure(&device, &surface_config);
 
         let egui = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor
         {
@@ -83,7 +87,7 @@ impl<'a> Context {
             style: Default::default(),
         });
 
-        Context { surface, device, queue, config, features, egui }
+        Context { surface, device, queue, surface_config, features, egui, config }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
@@ -169,9 +173,9 @@ impl<'a> Context {
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>)
     {
         if new_size.width > 0 && new_size.height > 0 {
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
+            self.surface_config.width = new_size.width;
+            self.surface_config.height = new_size.height;
+            self.surface.configure(&self.device, &self.surface_config);
         }
     }
 
@@ -193,16 +197,16 @@ impl<'a> Context {
     pub fn set_vsync(&mut self, vsync: bool)
     {
         match vsync {
-            true => self.config.present_mode = PresentMode::AutoVsync,
-            false => self.config.present_mode = PresentMode::AutoNoVsync,
+            true => self.surface_config.present_mode = PresentMode::AutoVsync,
+            false => self.surface_config.present_mode = PresentMode::AutoNoVsync,
         }
        
-       self.surface.configure(&self.device, &self.config);
+       self.surface.configure(&self.device, &self.surface_config);
     }
 
     pub fn vsync(&self) -> bool
     {
-        self.config.present_mode == PresentMode::AutoVsync
+        self.surface_config.present_mode == PresentMode::AutoVsync
     }
 
     //These wrapper are just making the code structure more logical in my opinion.
