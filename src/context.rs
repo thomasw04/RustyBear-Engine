@@ -145,7 +145,7 @@ impl<'a> Context {
 
                     match self.render(&window.native, &mut app) {
                         Ok(_) => {true}
-                        Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.config.width, height: self.config.height }); false},
+                        Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.surface_config.width, height: self.surface_config.height }); false},
                         Err(wgpu::SurfaceError::OutOfMemory) => { *control_flow = ControlFlow::Exit; true},
                         Err(e) => 
                         { 

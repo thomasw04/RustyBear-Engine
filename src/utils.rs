@@ -113,8 +113,8 @@ impl FileUtils {
 
                 None
             }
-            Ok(mut files) => files
-                .find(|file_result| match file_result {
+            Ok(mut files) => {
+                let file_result = files.find(|file_result| match file_result {
                     Ok(file) => FileUtils::has_extension(file.path().as_path(), ext),
                     Err(error) => {
                         log::error!(
@@ -124,11 +124,11 @@ impl FileUtils {
                         );
                         false
                     }
-                })
-                .map(|file_result| file_result.ok().map(|file| file.path())),
-        }
+                });
 
-        None
+                file_result.and_then(|res| res.ok().map(|file| file.path()))
+            }
+        }
     }
 
     pub fn has_extension(file: &Path, ext: &str) -> bool {

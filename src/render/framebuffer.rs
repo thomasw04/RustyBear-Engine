@@ -10,16 +10,16 @@ impl Framebuffer {
         let texture = context.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),
             size: wgpu::Extent3d {
-                width: context.config.width,
-                height: context.config.height,
+                width: context.surface_config.width,
+                height: context.surface_config.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
             sample_count,
             dimension: wgpu::TextureDimension::D2,
-            format: context.config.format,
+            format: context.surface_config.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &context.config.view_formats,
+            view_formats: &context.surface_config.view_formats,
         });
 
         Framebuffer {
@@ -66,9 +66,9 @@ impl Framebuffer {
             mip_level_count: 1,
             sample_count,
             dimension: wgpu::TextureDimension::D2,
-            format: context.config.format,
+            format: context.surface_config.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &context.config.view_formats,
+            view_formats: &context.surface_config.view_formats,
         });
     }
 }

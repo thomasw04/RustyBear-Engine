@@ -126,7 +126,11 @@ impl Renderer {
     }
 
     fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu_backend::RenderPass {
-        egui_wgpu_backend::RenderPass::new(&context.device, context.config.format, sample_count)
+        egui_wgpu_backend::RenderPass::new(
+            &context.device,
+            context.surface_config.format,
+            sample_count,
+        )
     }
 
     fn recreate_pipeline(
@@ -179,7 +183,7 @@ impl Renderer {
                     module: &shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: context.config.format,
+                        format: context.surface_config.format,
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -261,8 +265,8 @@ impl Renderer {
 
         {
             let screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
-                physical_width: context.config.width,
-                physical_height: context.config.height,
+                physical_width: context.surface_config.width,
+                physical_height: context.surface_config.height,
                 scale_factor: window.scale_factor() as f32,
             };
 

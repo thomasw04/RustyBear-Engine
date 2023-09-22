@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::utils::FileUtils;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ProjectConfiguration {
     pub project_name: String,
     pub author: Option<String>,
@@ -103,27 +103,29 @@ impl Config {
     }
 
     pub fn find_project(&mut self, path: &Path) -> Option<&ProjectConfiguration> {
-        let file_path: Option<PathBuf> =
+        if let Some(file_path) =
             if FileUtils::has_extension(path, self.engine_config.project_file_extension.as_str()) {
                 Some(path.to_path_buf())
             } else {
                 FileUtils::find_ext_in_dir(path, self.engine_config.project_file_extension.as_str())
-            };
-
-        let file_result = std::fs::File::open(file_path);
-
-        match file_result {
-            Err(error) => {
-                log::error!("Could not access {}. Please check if the file exists and I am permitted to open it. Message: {}", file_path.to_str().unwrap_or("ERR_NON_UTF8_PATH"), error);
-                return None;
             }
-            Ok(file) => {
-                let reader = BufReader::new(file);
-                let configuration_result = serde_json::from_reader(reader);
+        {
+            let file_path_slice = file_path.as_path();
+            let file_result = std::fs::File::open(file_path_slice);
 
-                if let Ok(configuration) = configuration_result {
-                    self.project_config = Some(configuration);
-                    return self.project_config.as_ref();
+            match file_result {
+                Err(error) => {
+                    log::error!("Could not access {}. Please check if the file exists and I am permitted to open it. Message: {}", file_path_slice.to_str().unwrap_or("ERR_NON_UTF8_PATH"), error);
+                    return None;
+                }
+                Ok(file) => {
+                    let reader = BufReader::new(file);
+                    let configuration_result = serde_json::from_reader(reader);
+
+                    if let Ok(configuration) = configuration_result {
+                        self.project_config = Some(configuration);
+                        return self.project_config.as_ref();
+                    }
                 }
             }
         }
@@ -147,7 +149,9 @@ impl Config {
             return;
         }
 
-        if FileUtils::find_ext_in_dir(path, self.engine_config.project_file_extension.as_str()) {
+        if FileUtils::find_ext_in_dir(path, self.engine_config.project_file_extension.as_str())
+            .is_some()
+        {
             log::error!("Project {} already exists.", FileUtils::pts(path));
             return;
         }
@@ -165,9 +169,14 @@ impl Config {
 
             if let Err(e) = std::fs::write(
                 file_path.clone(),
-                serde_json::to_string(&self.project_config.unwrap()).unwrap_or("{}".to_string()),
+                serde_json::to_string(self.project_config.as_ref().unwrap())
+                    .unwrap_or("{}".to_string()),
             ) {
-                log::error!("Could not create {}. {}", FileUtils::pts(file_path), e);
+                log::error!(
+                    "Could not create {}. {}",
+                    FileUtils::pts(file_path.as_path()),
+                    e
+                );
             }
         }
     }

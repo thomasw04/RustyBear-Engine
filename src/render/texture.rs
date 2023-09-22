@@ -1,4 +1,67 @@
-use crate::context::Context;
+use crate::context::{self, Context};
+
+pub struct CubeTexture {
+    extend: wgpu::Extent3d,
+    texture: wgpu::Texture,
+}
+
+impl CubeTexture {
+    pub fn new(context: &Context, size: u32) -> Self {
+        let extend = wgpu::Extent3d {
+            width: size,
+            height: size,
+            depth_or_array_layers: 6,
+        };
+
+        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            mip_level_count: 1,
+            sample_count: 1,
+            size: extend,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        CubeTexture { extend, texture }
+    }
+
+    pub fn upload(&self, context: &Context, buffer: &[u8], layer: u32) {
+        context.queue.write_texture(
+            wgpu::ImageCopyTextureBase {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d {
+                    x: 0,
+                    y: 0,
+                    z: layer,
+                },
+                aspect: wgpu::TextureAspect::All,
+            },
+            &buffer,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * self.extend.width),
+                rows_per_image: Some(self.extend.height),
+            },
+            self.extend.clone(),
+        );
+    }
+
+    pub fn texture_view(&self) -> wgpu::TextureView {
+        self.texture
+            .create_view(&wgpu::TextureViewDescriptor::default())
+    }
+
+    pub fn texture(&self) -> &wgpu::Texture {
+        &self.texture
+    }
+
+    pub fn extend(&self) -> wgpu::Extent3d {
+        self.extend.clone()
+    }
+}
 
 pub struct Texture2D {
     texture: wgpu::Texture,
