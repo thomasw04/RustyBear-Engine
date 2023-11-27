@@ -6,7 +6,7 @@
 My very first Game-Engine written in Rust + wgpu. The plan is to use it at Ludum Dare 54.
 It is more or less an eductational project. I just like building Game-Engines.
 
-
+For the asset management of the engine see [thomasw04/what](https://github.com/thomasw04/what)
 
 ## Featues (Current)
 - Native Metal (macOS), Vulkan (Linux + Windows) and DirectX 12 (Windows) support. Thanks to wgpu.
@@ -14,10 +14,11 @@ It is more or less an eductational project. I just like building Game-Engines.
 - Easy to use event/input handling system + game controller support.
 - First triangle.
 - Camera controller, Textures, Quad.
+- Egui for simple gui creation.
+- WASM support. (Can be a little bit behind)
 
 ## Main Features (Planned: Sorted from highest priority)
 - 2D/3D renderer.
-- Egui for simple gui creation
 - Rust scripting
 - 3D audio engine.
 - LDtk support. 
