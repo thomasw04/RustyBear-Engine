@@ -1,61 +1,79 @@
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
 
 use crate::config::ProjectConfiguration;
-use crate::context::Context;
-use crate::render::texture::{CubeTexture, Texture2D};
+use crate::context::VisContext;
+use crate::render::texture::{Texture2D, TextureArray};
 use crate::utils::FileUtils;
 use std::collections::HashMap;
-use std::fs;
+
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc};
 
 pub enum AssetType {
-    Raw(Vec<u8>),
-    CubeTexture(CubeTexture),
+    TextureArray(TextureArray),
     Texture2D(Texture2D),
 }
 
 pub struct AssetManager {
-    file_waiters: HashMap<String, Receiver<Result<AssetType, String>>>,
-    file_cache: HashMap<String, AssetType>,
-    root_folder: PathBuf,
+    asset_waiters: HashMap<String, Receiver<Result<AssetType, String>>>,
+    gpu_cache: HashMap<String, AssetType>,
 
-    request_sender: Sender<PathBuf>,
+    request_sender: Sender<(PathBuf, usize)>,
     asset_receiver: Receiver<Result<AssetType, String>>,
 }
 
 impl AssetManager {
-    pub fn new(config: &ProjectConfiguration) -> Self {
-        let (in_sender, in_receiver): (Sender<PathBuf>, Receiver<PathBuf>) = mpsc::channel();
+    pub fn new(context: Arc<VisContext>, config: &ProjectConfiguration, max_size: usize) -> Self {
+        let (in_sender, in_receiver): (Sender<(PathBuf, usize)>, Receiver<(PathBuf, usize)>) =
+            mpsc::channel();
         let (out_sender, out_receiver): (
             Sender<Result<AssetType, String>>,
             Receiver<Result<AssetType, String>>,
         ) = mpsc::channel();
 
-        rayon::spawn(move || loop {
-            if let Ok(path) = in_receiver.recv() {
-                if let Ok(content) = fs::read(path) {}
-            } else {
-                break;
+        let root_folder = config.root_folder.clone();
+        rayon::spawn(move || {
+            let context = context.clone();
+
+            let mut what = what::What::new(
+                max_size,
+                Some(what::Location::File(PathBuf::from(root_folder))),
+            );
+
+            while let Ok((path, priority)) = in_receiver.recv() {
+                let out_sender = out_sender.clone();
+                let context = context.clone();
+
+                match what.load_asset(path.to_string_lossy(), priority) {
+                    Ok(asset) => {
+                        rayon::spawn(move || {
+                            let asset = AssetManager::load_asset(&context, asset);
+                            let _ = out_sender.send(Ok(asset));
+                        });
+                    }
+                    Err(_error) => {
+                        //TODO: Better error return type.
+                        let _ = out_sender.send(Err("Failed to load asset.".to_string()));
+                    }
+                }
             }
         });
 
         AssetManager {
-            file_waiters: HashMap::new(),
-            file_cache: HashMap::new(),
-            root_folder: PathBuf::from(config.data_folder.clone()),
+            asset_waiters: HashMap::new(),
+            gpu_cache: HashMap::new(),
 
             request_sender: in_sender,
             asset_receiver: out_receiver,
         }
     }
 
-    pub fn update(&mut self, context: &Context) {
-        self.file_waiters.retain(|path, receiver| {
+    pub fn update(&mut self) {
+        self.asset_waiters.retain(|path, receiver| {
             if let Ok(content_result) = receiver.try_recv() {
                 if let Ok(content) = content_result {
-                    self.file_cache.insert(path.clone(), content);
+                    self.gpu_cache.insert(path.clone(), content);
                 } else {
                     log::error!("{}", content_result.err().unwrap());
                 }
@@ -66,127 +84,52 @@ impl AssetManager {
         });
     }
 
-    pub fn get_file(&self, path: &Path) -> Option<&AssetType> {
-        self.file_cache.get(FileUtils::pts(path))
+    pub fn get_asset(&self, path: &Path) -> Option<&AssetType> {
+        self.gpu_cache.get(FileUtils::pts(path))
     }
 
-    pub fn delete_file(&mut self, path: &Path) {
-        self.file_cache.remove(FileUtils::pts(path));
+    pub fn delete_asset(&mut self, path: &Path) {
+        self.gpu_cache.remove(FileUtils::pts(path));
     }
 
-    pub fn preload_resource(resource: &Path) -> Vec<Vec<u8>> {
-        todo!()
-    }
+    fn load_asset(context: &VisContext, asset: what::Asset) -> AssetType {
+        match asset {
+            what::Asset::Texture(texture) => {
+                let texture_data = image::load_from_memory(&texture.data);
 
-    pub fn load_cube_texture(&mut self, context: &Context, folder: &Path) {
-        let path_str = FileUtils::pts(folder);
+                if let Ok(image) = texture_data {
+                    let rgba = image.to_rgba8();
 
-        if folder.is_absolute() {
-            log::error!(
-                "Did you specify an absolute path? Asset paths must be relative. {}",
-                path_str
-            );
-            return;
-        }
-
-        let full_path = self.root_folder.join(folder);
-
-        if self.file_waiters.contains_key(path_str) {
-            return;
-        }
-
-        if !full_path.exists() {
-            log::error!("The requested asset does not exist. {}", path_str);
-            return;
-        }
-
-        let (sender, receiver): (
-            Sender<Result<AssetType, String>>,
-            Receiver<Result<AssetType, String>>,
-        ) = mpsc::channel();
-
-        let thread_sender = sender.clone();
-
-        rayon::spawn(move || {
-            let bytes = AssetManager::preload_resource(folder);
-            let dimension_result = image::image_dimensions(paths[0]);
-
-            if let Ok(dimension) = dimension_result {
-                //If texture is not a cube fail.
-                if dimension.0 != dimension.1 {
-                    thread_sender.send(Err("Invalid cube texture. Width != height.".to_string()));
-                    return;
-                }
-
-                let texture = CubeTexture::new(context, dimension.0);
-
-                let mut successful = true;
-
-                (0..5).into_par_iter().for_each(|layer| {
-                    let content_result = fs::read(paths[0]);
-
-                    if let Ok(content) = content_result {
-                        if let Ok(image) = image::load_from_memory(&content) {
-                            let rgba = image.to_rgba8();
-
-                            if dimension != rgba.dimensions() {
-                                successful = false;
-                                return;
-                            }
-
-                            texture.upload(context, &rgba, layer);
+                    match Texture2D::new(context, None, &rgba, image::ImageFormat::Png) {
+                        Ok(texture) => AssetType::Texture2D(texture),
+                        Err(texture) => {
+                            log::error!("Failed to load texture. Loading error texture instead.");
+                            AssetType::Texture2D(texture)
                         }
+                    }
+                } else {
+                    AssetType::Texture2D(Texture2D::error_texture(context))
+                }
+            }
+            what::Asset::TextureArray(texture_array) => {
+                let texture =
+                    TextureArray::new(context, texture_array.size, texture_array.data.len() as u32);
+
+                let image_data = &texture_array.data;
+
+                image_data.par_iter().enumerate().for_each(|(i, image)| {
+                    if let Ok(image) = image::load_from_memory(image) {
+                        let rgba = image.to_rgba8();
+                        texture.upload(context, &rgba, i as u32);
+                    } else {
+                        log::error!("Failed to load texture. Loading error texture instead...");
+                        texture.upload_error_texture(context, i as u32);
                     }
                 });
 
-                if successful {
-                    thread_sender.send(Ok(AssetType::CubeTexture(texture)));
-                } else {
-                    thread_sender.send(Err("Invalid cube texture. Size not matching.".to_string()));
-                }
+                AssetType::TextureArray(texture)
             }
-        });
-
-        self.file_waiters.insert(path_str.to_string(), receiver);
-    }
-
-    pub fn load_file(&mut self, path: &Path) {
-        let path_str = FileUtils::pts(path);
-
-        if path.is_absolute() {
-            log::error!(
-                "Did you specify an absolute path? Asset paths must be relative. {}",
-                path_str
-            );
-            return;
+            _ => todo!("Implement other asset types."),
         }
-
-        let full_path = self.root_folder.join(path);
-
-        if self.file_waiters.contains_key(path_str) {
-            return;
-        }
-
-        if !full_path.exists() {
-            log::error!("The requested asset does not exist. {}", path_str);
-            return;
-        }
-
-        let (sender, receiver): (
-            Sender<Result<AssetType, String>>,
-            Receiver<Result<AssetType, String>>,
-        ) = mpsc::channel();
-
-        let thread_sender = sender.clone();
-        rayon::spawn(move || {
-            let content_result = fs::read(full_path);
-
-            if let Ok(content) = content_result {
-                //If we are not listening anymore we are not interested in the result thus just discarding it.
-                let _result = thread_sender.send(Ok(AssetType::Raw(content)));
-            }
-        });
-
-        self.file_waiters.insert(path_str.to_string(), receiver);
     }
 }

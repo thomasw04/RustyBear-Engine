@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use sysinfo::{System, SystemExt};
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
 use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
@@ -7,20 +10,27 @@ pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags
 } 
 
-pub struct Context {
+pub struct VisContext {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
+    pub format: wgpu::TextureFormat,
+}
+
+pub struct Context {
+    pub graphics: Arc<VisContext>,
     pub surface_config: wgpu::SurfaceConfiguration,
     pub features: Features,
     pub egui: egui_winit_platform::Platform,
     pub config: Config,
+    pub sysinfo: System,
 }
 
 impl<'a> Context {
     pub async fn new(window: &mut Window) -> Context {
 
         let config = Config::new();
+        let sysinfo = System::new_with_specifics(sysinfo::RefreshKind::new().with_memory());
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 
         {
@@ -87,7 +97,7 @@ impl<'a> Context {
             style: Default::default(),
         });
 
-        Context { surface, device, queue, surface_config, features, egui, config }
+        Context { graphics: Arc::new(VisContext { surface, device, queue, format }), surface_config, features, egui, config, sysinfo }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
@@ -175,13 +185,14 @@ impl<'a> Context {
         if new_size.width > 0 && new_size.height > 0 {
             self.surface_config.width = new_size.width;
             self.surface_config.height = new_size.height;
-            self.surface.configure(&self.device, &self.surface_config);
+
+            self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
         }
     }
 
     fn render(&mut self, window: &winit::window::Window, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
     {
-        let output = self.surface.get_current_texture()?;
+        let output = self.graphics.surface.get_current_texture()?;
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -201,7 +212,7 @@ impl<'a> Context {
             false => self.surface_config.present_mode = PresentMode::AutoNoVsync,
         }
        
-       self.surface.configure(&self.device, &self.surface_config);
+        self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
     }
 
     pub fn vsync(&self) -> bool

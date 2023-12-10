@@ -21,7 +21,7 @@ use input::InputState;
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{config::Config, context::Context, core::Application, sound::AudioEngine};
+use crate::{context::Context, core::Application, sound::AudioEngine};
 
 use event::{Event, EventSubscriber};
 use window::Window;
@@ -96,7 +96,7 @@ impl<'a> Application<'a> for MyApp<'a> {
             let mut renderer = self.renderer.borrow_mut();
 
             renderer.update_camera_buffer(
-                context,
+                &context.graphics,
                 self.camera
                     .borrow_mut()
                     .view_projection()

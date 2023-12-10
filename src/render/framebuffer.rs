@@ -7,20 +7,23 @@ pub struct Framebuffer {
 
 impl Framebuffer {
     pub fn new(context: &Context, sample_count: u32) -> Self {
-        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Texture"),
-            size: wgpu::Extent3d {
-                width: context.surface_config.width,
-                height: context.surface_config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count,
-            dimension: wgpu::TextureDimension::D2,
-            format: context.surface_config.format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &context.surface_config.view_formats,
-        });
+        let texture = context
+            .graphics
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Texture"),
+                size: wgpu::Extent3d {
+                    width: context.surface_config.width,
+                    height: context.surface_config.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: context.surface_config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &context.surface_config.view_formats,
+            });
 
         Framebuffer {
             texture,
@@ -56,20 +59,23 @@ impl Framebuffer {
     }
 
     fn create_buffer(&mut self, context: &Context, sample_count: u32, width: u32, height: u32) {
-        self.texture = context.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Texture"),
-            size: wgpu::Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count,
-            dimension: wgpu::TextureDimension::D2,
-            format: context.surface_config.format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &context.surface_config.view_formats,
-        });
+        self.texture = context
+            .graphics
+            .device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Texture"),
+                size: wgpu::Extent3d {
+                    width,
+                    height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count,
+                dimension: wgpu::TextureDimension::D2,
+                format: context.surface_config.format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &context.surface_config.view_formats,
+            });
     }
 }
 

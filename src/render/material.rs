@@ -1,8 +1,4 @@
-use wgpu::PrimitiveState;
-
-use crate::context::Context;
-
-use super::types::Vertex2D;
+use crate::context::VisContext;
 
 pub struct Skybox {
     name: String,
@@ -12,16 +8,20 @@ pub struct Skybox {
 
 impl Skybox {
     pub fn new(
-        context: &Context,
+        context: &VisContext,
         textures: [&wgpu::TextureView; 6],
         shader: &wgpu::ShaderModule,
         sampler: &wgpu::Sampler,
         name: &str,
     ) -> Self {
         let pipeline = Skybox::recreate_pipeline(context, shader);
+        todo!("Skybox::new")
     }
 
-    fn recreate_pipeline(context: &Context, shader: &wgpu::ShaderModule) -> wgpu::RenderPipeline {
+    fn recreate_pipeline(
+        context: &VisContext,
+        shader: &wgpu::ShaderModule,
+    ) -> wgpu::RenderPipeline {
         context
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -36,7 +36,7 @@ impl Skybox {
                     module: shader,
                     entry_point: "fs_main",
                     targets: &[Some(wgpu::ColorTargetState {
-                        format: context.surface_config.format,
+                        format: context.format,
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
@@ -60,7 +60,7 @@ impl Skybox {
             })
     }
 
-    fn pipeline_layout(context: &Context) -> wgpu::PipelineLayout {
+    fn pipeline_layout(context: &VisContext) -> wgpu::PipelineLayout {
         context
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -70,7 +70,7 @@ impl Skybox {
             })
     }
 
-    fn create_layout(context: &Context) -> wgpu::BindGroupLayout {
+    fn create_layout(context: &VisContext) -> wgpu::BindGroupLayout {
         context
             .device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -106,7 +106,7 @@ pub struct Material {
 
 impl Material {
     pub fn new(
-        context: &Context,
+        context: &VisContext,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
         name: &str,
@@ -125,7 +125,7 @@ impl Material {
 
     pub fn recreate_bind_group(
         &mut self,
-        context: &Context,
+        context: &VisContext,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
     ) {
@@ -134,7 +134,7 @@ impl Material {
     }
 
     fn create_bind_group(
-        context: &Context,
+        context: &VisContext,
         layout: &wgpu::BindGroupLayout,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
@@ -164,11 +164,15 @@ impl Material {
             })
     }
 
-    pub fn recreate_layout(&mut self, context: &Context, texture_count: u32, name: &str) {
+    pub fn recreate_layout(&mut self, context: &VisContext, texture_count: u32, name: &str) {
         self.layout = Material::create_layout(context, texture_count, name);
     }
 
-    fn create_layout(context: &Context, texture_count: u32, name: &str) -> wgpu::BindGroupLayout {
+    fn create_layout(
+        context: &VisContext,
+        texture_count: u32,
+        name: &str,
+    ) -> wgpu::BindGroupLayout {
         let mut entries = Vec::<wgpu::BindGroupLayoutEntry>::new();
         entries.reserve((texture_count + 1) as usize);
 

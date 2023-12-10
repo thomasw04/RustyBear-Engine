@@ -1,16 +1,16 @@
-use crate::context::{self, Context};
+use crate::context::VisContext;
 
-pub struct CubeTexture {
+pub struct TextureArray {
     extend: wgpu::Extent3d,
     texture: wgpu::Texture,
 }
 
-impl CubeTexture {
-    pub fn new(context: &Context, size: u32) -> Self {
+impl TextureArray {
+    pub fn new(context: &VisContext, size: u32, layers: u32) -> Self {
         let extend = wgpu::Extent3d {
             width: size,
             height: size,
-            depth_or_array_layers: 6,
+            depth_or_array_layers: layers,
         };
 
         let texture = context.device.create_texture(&wgpu::TextureDescriptor {
@@ -24,10 +24,22 @@ impl CubeTexture {
             view_formats: &[],
         });
 
-        CubeTexture { extend, texture }
+        TextureArray { extend, texture }
     }
 
-    pub fn upload(&self, context: &Context, buffer: &[u8], layer: u32) {
+    pub fn upload_error_texture(&self, context: &VisContext, layer: u32) {
+        if let Ok(image) = image::load_from_memory_with_format(
+            include_bytes!("../../resources/error.png"),
+            image::ImageFormat::Png,
+        ) {
+            let rgba = image.to_rgba8();
+            self.upload(context, &rgba, layer);
+        } else {
+            panic!("Fatal. Error texture should always be loadable. This suggest you messed with the executable. Abort.");
+        }
+    }
+
+    pub fn upload(&self, context: &VisContext, buffer: &[u8], layer: u32) {
         context.queue.write_texture(
             wgpu::ImageCopyTextureBase {
                 texture: &self.texture,
@@ -39,13 +51,13 @@ impl CubeTexture {
                 },
                 aspect: wgpu::TextureAspect::All,
             },
-            &buffer,
+            buffer,
             wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * self.extend.width),
                 rows_per_image: Some(self.extend.height),
             },
-            self.extend.clone(),
+            self.extend,
         );
     }
 
@@ -59,7 +71,7 @@ impl CubeTexture {
     }
 
     pub fn extend(&self) -> wgpu::Extent3d {
-        self.extend.clone()
+        self.extend
     }
 }
 
@@ -71,7 +83,7 @@ pub struct Texture2D {
 
 impl Texture2D {
     pub fn new(
-        context: &Context,
+        context: &VisContext,
         name: Option<&str>,
         bytes: &[u8],
         format: image::ImageFormat,
@@ -141,7 +153,7 @@ impl Texture2D {
         }
     }
 
-    pub fn error_texture(context: &Context) -> Texture2D {
+    pub fn error_texture(context: &VisContext) -> Texture2D {
         if let Ok(image) = image::load_from_memory_with_format(
             include_bytes!("../../resources/error.png"),
             image::ImageFormat::Png,

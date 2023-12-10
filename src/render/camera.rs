@@ -4,7 +4,7 @@ use glam::{Mat4, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::{
-    context::Context,
+    context::{Context, VisContext},
     event::{self, EventSubscriber},
 };
 
@@ -162,7 +162,7 @@ pub struct CameraBuffer {
 }
 
 impl CameraBuffer {
-    pub fn new(context: &Context, name: &str) -> CameraBuffer {
+    pub fn new(context: &VisContext, name: &str) -> CameraBuffer {
         let uniform = CameraUniform::default();
         let camera_buffer = context
             .device
@@ -194,7 +194,7 @@ impl CameraBuffer {
         }
     }
 
-    fn create_layout(context: &Context, name: &str) -> wgpu::BindGroupLayout {
+    fn create_layout(context: &VisContext, name: &str) -> wgpu::BindGroupLayout {
         context
             .device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -213,7 +213,7 @@ impl CameraBuffer {
     }
 
     //TODO: Use some kind of staging buffer, for performance
-    pub fn update_buffer(&mut self, context: &Context, camera: [[f32; 4]; 4]) {
+    pub fn update_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         self.uniform.view_projection = camera;
         context.queue.write_buffer(
             &self.camera_buffer,

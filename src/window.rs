@@ -2,9 +2,8 @@ use serde::{Deserialize, Serialize};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
     event_loop::EventLoop,
-    window::WindowBuilder,
+    window::{Fullscreen, WindowBuilder},
 };
-use winit_fullscreen::WindowFullScreen;
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {
@@ -64,7 +63,7 @@ impl Window {
             .unwrap();
 
         if window.fullscreen().is_some() ^ window_config.fullscreen {
-            window.toggle_fullscreen();
+            Window::toggle_fullscreen(&window);
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -89,6 +88,21 @@ impl Window {
         Window {
             native: window,
             event_loop,
+        }
+    }
+
+    fn toggle_fullscreen(window: &winit::window::Window) {
+        if window.fullscreen().is_some() {
+            window.set_fullscreen(None);
+        } else {
+            window.current_monitor().map(|monitor| {
+                monitor.video_modes().next().map(|video_mode| {
+                    #[cfg(any(target_os = "macos", unix))]
+                    window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
+                    #[cfg(not(any(target_os = "macos", unix)))]
+                    window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)))
+                })
+            });
         }
     }
 }

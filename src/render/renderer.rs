@@ -2,10 +2,9 @@ use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
-    context::Context,
+    context::{Context, VisContext},
     event::{self, EventSubscriber},
     render::texture::Texture2D,
-    window::Window,
 };
 
 use super::material::Material;
@@ -61,10 +60,16 @@ impl Renderer {
 
         let framebuffer = Framebuffer::new(context, sample_count);
 
-        let texture = Texture2D::error_texture(context);
-        let material = Material::new(context, vec![texture.view()], texture.sampler(), "Quad");
+        let texture = Texture2D::error_texture(&context.graphics);
 
-        let camera_buffer = CameraBuffer::new(context, "Default Camera");
+        let material = Material::new(
+            &context.graphics,
+            vec![texture.view()],
+            texture.sampler(),
+            "Quad",
+        );
+
+        let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
         let egui_render_pass = Renderer::recreate_gui(context, 1);
 
@@ -97,21 +102,25 @@ impl Renderer {
 
         const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
 
-        let vertex_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Default VertexBuffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let vertex_buffer =
+            context
+                .graphics
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Default VertexBuffer"),
+                    contents: bytemuck::cast_slice(VERTICES),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
-        let index_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Default IndexBuffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsages::INDEX,
-            });
+        let index_buffer =
+            context
+                .graphics
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Default IndexBuffer"),
+                    contents: bytemuck::cast_slice(INDICES),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
 
         Renderer {
             framebuffer,
@@ -127,7 +136,7 @@ impl Renderer {
 
     fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu_backend::RenderPass {
         egui_wgpu_backend::RenderPass::new(
-            &context.device,
+            &context.graphics.device,
             context.surface_config.format,
             sample_count,
         )
@@ -139,6 +148,7 @@ impl Renderer {
         bind_group_layouts: Vec<&BindGroupLayout>,
     ) -> RenderPipeline {
         let shader = context
+            .graphics
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("Default Shader"),
@@ -147,6 +157,7 @@ impl Renderer {
 
         let pipeline_layout =
             context
+                .graphics
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("Pipeline Layout"),
@@ -155,6 +166,7 @@ impl Renderer {
                 });
 
         context
+            .graphics
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                 label: Some("Pipeline"),
@@ -207,7 +219,7 @@ impl Renderer {
         false
     }
 
-    pub fn update_camera_buffer(&mut self, context: &Context, camera: [[f32; 4]; 4]) {
+    pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         self.camera_buffer.update_buffer(context, camera);
     }
 
@@ -220,11 +232,13 @@ impl Renderer {
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
 
-        let mut encoder = context
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder =
+            context
+                .graphics
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
         let output = context.egui.end_frame(Some(window));
         let paint_jobs = context.egui.context().tessellate(output.shapes);
@@ -271,12 +285,16 @@ impl Renderer {
             };
 
             self.egui_render_pass
-                .add_textures(&context.device, &context.queue, &texture_delta)
+                .add_textures(
+                    &context.graphics.device,
+                    &context.graphics.queue,
+                    &texture_delta,
+                )
                 .expect("[EGUI] Failed to add textures.");
 
             self.egui_render_pass.update_buffers(
-                &context.device,
-                &context.queue,
+                &context.graphics.device,
+                &context.graphics.queue,
                 &paint_jobs,
                 &screen_descriptor,
             );
@@ -286,6 +304,9 @@ impl Renderer {
                 .unwrap();
         }
 
-        context.queue.submit(std::iter::once(encoder.finish()));
+        context
+            .graphics
+            .queue
+            .submit(std::iter::once(encoder.finish()));
     }
 }
