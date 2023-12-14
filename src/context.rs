@@ -3,8 +3,7 @@ use std::sync::Arc;
 use sysinfo::{System, SystemExt};
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
 use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
-use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
-use crate::config::Config;
+use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
 
 pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags
@@ -27,9 +26,7 @@ pub struct Context {
 }
 
 impl<'a> Context {
-    pub async fn new(window: &mut Window) -> Context {
-
-        let config = Config::new();
+    pub async fn new(window: &mut Window, config: Config) -> Context {
         let sysinfo = System::new_with_specifics(sysinfo::RefreshKind::new().with_memory());
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 

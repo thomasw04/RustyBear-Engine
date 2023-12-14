@@ -4,9 +4,9 @@ pub mod utils;
 #[macro_use]
 pub mod core;
 pub mod assets;
-pub mod config;
 pub mod context;
 pub mod entry;
+pub mod environment;
 pub mod event;
 pub mod input;
 pub mod logging;
@@ -16,12 +16,13 @@ pub mod window;
 
 use std::cell::Ref;
 
+use assets::manager::AssetManager;
 use input::InputState;
 
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{context::Context, core::Application, sound::AudioEngine};
+use crate::{context::Context, core::Application, environment::config::Config, sound::AudioEngine};
 
 use event::{Event, EventSubscriber};
 use window::Window;
@@ -63,14 +64,14 @@ impl MyHandler {
     }
 }
 
-struct MyApp<'a> {
+pub struct RustyRuntime<'a> {
     stack: ModuleStack<'a>,
     renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
     demo_window: egui_demo_lib::DemoWindows,
 }
 
-impl<'a> Application<'a> for MyApp<'a> {
+impl<'a> Application<'a> for RustyRuntime<'a> {
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool {
         match event {
             event::Event::KeyboardInput { keycode, state } => match keycode {
@@ -156,9 +157,11 @@ impl<'a> Application<'a> for MyApp<'a> {
     }
 }
 
-impl<'a> MyApp<'a> {
-    pub fn new(context: &Context) -> MyApp<'a> {
+impl<'a> RustyRuntime<'a> {
+    pub fn new(context: &Context) -> RustyRuntime<'a> {
         log::info!("Init Application");
+
+        let config = context.config.project_config().unwrap();
 
         let mut stack = ModuleStack::new();
 
@@ -178,7 +181,7 @@ impl<'a> MyApp<'a> {
             .borrow_mut()
             .set_position(glam::Vec3::new(0.0, 1.0, 2.0));
 
-        MyApp {
+        RustyRuntime {
             stack,
             renderer,
             camera,
@@ -191,12 +194,14 @@ pub fn example_app() {
     logging::init();
     println!();
 
+    let config = Config::new();
+
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());
-    let context = pollster::block_on(Context::new(&mut window));
+    let context = pollster::block_on(Context::new(&mut window, config));
 
     //Create and init the application
-    let myapp = MyApp::new(&context);
+    let myapp = RustyRuntime::new(&context);
 
     //Move my app and window into the context. And run the app.
     context.run(myapp, window);

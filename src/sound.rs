@@ -7,7 +7,7 @@ use kira::{
     },
 };
 
-use crate::config::ThemeConfiguration;
+use crate::environment::config::ThemeConfiguration;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub struct AudioEngine {

@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 
-use crate::config::ProjectConfiguration;
 use crate::context::VisContext;
+use crate::environment::config::ProjectConfiguration;
 use crate::render::texture::{Texture2D, TextureArray};
 use crate::utils::FileUtils;
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ impl AssetManager {
             Receiver<Result<AssetType, String>>,
         ) = mpsc::channel();
 
-        let root_folder = config.root_folder.clone();
+        let root_folder = config.location.clone();
         rayon::spawn(move || {
             let context = context.clone();
 

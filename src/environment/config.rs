@@ -9,7 +9,11 @@ pub struct ProjectConfiguration {
     pub project_name: String,
     pub author: Option<String>,
     pub version: Option<String>,
-    pub root_folder: String,
+
+    //Root folder is simply the location of the project file.
+    #[serde(skip_serializing)]
+    pub location: String,
+
     pub data_folder: String,
     pub code_folder: String,
 }
@@ -20,7 +24,7 @@ impl ProjectConfiguration {
             project_name: "MyProject".to_string(),
             author: None,
             version: None,
-            root_folder: FileUtils::pts(path).to_string(),
+            location: FileUtils::pts(path).to_string(),
             data_folder: "data".to_string(),
             code_folder: "code".to_string(),
         }
@@ -28,27 +32,27 @@ impl ProjectConfiguration {
 
     pub fn with_name(mut self, name: &str) -> ProjectConfiguration {
         self.project_name = String::from(name);
-        return self;
+        self
     }
 
     pub fn with_author(mut self, author: &str) -> ProjectConfiguration {
         self.author = Some(String::from(author));
-        return self;
+        self
     }
 
     pub fn with_version(mut self, version: &str) -> ProjectConfiguration {
         self.version = Some(String::from(version));
-        return self;
+        self
     }
 
     pub fn with_data(mut self, path: &Path) -> ProjectConfiguration {
         self.data_folder = FileUtils::pts(path).to_string();
-        return self;
+        self
     }
 
     pub fn with_code(mut self, path: &Path) -> ProjectConfiguration {
         self.code_folder = FileUtils::pts(path).to_string();
-        return self;
+        self
     }
 }
 
@@ -102,7 +106,7 @@ impl Config {
                 .is_some()
     }
 
-    pub fn find_project(&mut self, path: &Path) -> Option<&ProjectConfiguration> {
+    pub fn find_and_open_project(&mut self, path: &Path) -> Option<&ProjectConfiguration> {
         if let Some(file_path) =
             if FileUtils::has_extension(path, self.engine_config.project_file_extension.as_str()) {
                 Some(path.to_path_buf())
@@ -133,8 +137,8 @@ impl Config {
         None
     }
 
-    pub fn create_project(&mut self, config: &ProjectConfiguration) {
-        let path = Path::new(config.root_folder.as_str());
+    pub fn create_and_open_project(&mut self, config: &ProjectConfiguration) {
+        let path = Path::new(config.location.as_str());
 
         if path.is_file() {
             log::error!(
@@ -156,7 +160,7 @@ impl Config {
             return;
         }
 
-        let mut file_name = String::from(config.project_name.clone());
+        let mut file_name = config.project_name.clone();
         file_name.push('.');
         file_name.push_str(self.engine_config.project_file_extension.as_str());
 
