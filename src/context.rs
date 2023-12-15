@@ -229,6 +229,11 @@ impl<'a> Context {
         return_value
     }
 
+    pub fn free_memory(&self) -> u64 
+    {
+        self.sysinfo.free_memory()
+    }
+
     fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow, context: &mut Context) -> bool
     {
         apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)

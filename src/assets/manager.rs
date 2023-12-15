@@ -1,7 +1,6 @@
 use rayon::prelude::*;
 
 use crate::context::VisContext;
-use crate::environment::config::ProjectConfiguration;
 use crate::render::texture::{Texture2D, TextureArray};
 use crate::utils::FileUtils;
 use std::collections::HashMap;
@@ -24,7 +23,7 @@ pub struct AssetManager {
 }
 
 impl AssetManager {
-    pub fn new(context: Arc<VisContext>, config: &ProjectConfiguration, max_size: usize) -> Self {
+    pub fn new(context: Arc<VisContext>, loc: Option<what::Location>, max_size: usize) -> Self {
         let (in_sender, in_receiver): (Sender<(PathBuf, usize)>, Receiver<(PathBuf, usize)>) =
             mpsc::channel();
         let (out_sender, out_receiver): (
@@ -32,14 +31,10 @@ impl AssetManager {
             Receiver<Result<AssetType, String>>,
         ) = mpsc::channel();
 
-        let root_folder = config.location.clone();
         rayon::spawn(move || {
             let context = context.clone();
 
-            let mut what = what::What::new(
-                max_size,
-                Some(what::Location::File(PathBuf::from(root_folder))),
-            );
+            let mut what = what::What::new(max_size, loc);
 
             while let Ok((path, priority)) = in_receiver.recv() {
                 let out_sender = out_sender.clone();

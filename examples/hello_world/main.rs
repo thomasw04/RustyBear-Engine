@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+use std::path::Path;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use RustyBear_Engine::{
@@ -12,7 +14,8 @@ fn main() {
     println!();
 
     //Create the config and init the example project.
-    let config = Config::new();
+    let mut config = Config::new(None);
+    config.find_project(Path::new("examples/hello_world"));
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());

@@ -68,6 +68,7 @@ pub struct RustyRuntime<'a> {
     stack: ModuleStack<'a>,
     renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
+    asset_manager: AssetManager,
     demo_window: egui_demo_lib::DemoWindows,
 }
 
@@ -161,9 +162,20 @@ impl<'a> RustyRuntime<'a> {
     pub fn new(context: &Context) -> RustyRuntime<'a> {
         log::info!("Init Application");
 
-        let config = context.config.project_config().unwrap();
-
         let mut stack = ModuleStack::new();
+
+        let loc = context
+            .config
+            .project_config()
+            .location
+            .clone()
+            .map(what::Location::File);
+
+        let asset_manager = AssetManager::new(
+            context.graphics.clone(),
+            loc,
+            (context.free_memory() / 2) as usize,
+        );
 
         let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
@@ -185,6 +197,7 @@ impl<'a> RustyRuntime<'a> {
             stack,
             renderer,
             camera,
+            asset_manager,
             demo_window: egui_demo_lib::DemoWindows::default(),
         }
     }
@@ -194,7 +207,7 @@ pub fn example_app() {
     logging::init();
     println!();
 
-    let config = Config::new();
+    let config = Config::new(None);
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());
