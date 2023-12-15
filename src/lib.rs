@@ -96,6 +96,7 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
     ) {
         {
             let mut renderer = self.renderer.borrow_mut();
+            self.asset_manager.update();
 
             renderer.update_camera_buffer(
                 &context.graphics,
@@ -105,7 +106,7 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
                     .to_cols_array_2d(),
             );
 
-            renderer.render(context, view, window);
+            renderer.render(context, view, window, &self.asset_manager);
         }
     }
 
@@ -180,7 +181,7 @@ impl<'a> RustyRuntime<'a> {
         let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
 
-        let renderer = RcCell::new(Renderer::new(context));
+        let renderer = RcCell::new(Renderer::new(context, &asset_manager));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(PerspectiveCamera::default());

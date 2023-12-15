@@ -2,9 +2,10 @@ use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
+    assets::manager::AssetManager,
     context::{Context, VisContext},
     event::{self, EventSubscriber},
-    render::texture::Texture2D,
+    render::{material::Skybox, texture::Texture2D},
 };
 
 use super::material::Material;
@@ -54,7 +55,7 @@ impl EventSubscriber for Renderer {
 }
 
 impl Renderer {
-    pub fn new(context: &Context) -> Self {
+    pub fn new(context: &Context, asset_manager: &AssetManager) -> Self {
         //Renderable setup
         let sample_count = 4;
 
@@ -228,6 +229,7 @@ impl Renderer {
         context: &mut Context,
         view: &TextureView,
         window: &winit::window::Window,
+        asset_manager: &AssetManager,
     ) {
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
