@@ -14,9 +14,10 @@ pub mod render;
 pub mod sound;
 pub mod window;
 
-use std::cell::Ref;
+use std::{cell::Ref, fs::File, ops::Sub, panic::Location};
 
 use assets::manager::AssetManager;
+use glam::Vec3;
 use input::InputState;
 
 use rccell::RcCell;
@@ -70,6 +71,7 @@ pub struct RustyRuntime<'a> {
     camera: RcCell<PerspectiveCamera>,
     asset_manager: AssetManager,
     demo_window: egui_demo_lib::DemoWindows,
+    last_mouse_pos: (f64, f64),
 }
 
 impl<'a> Application<'a> for RustyRuntime<'a> {
@@ -106,6 +108,16 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
                     .to_cols_array_2d(),
             );
 
+            let view_matrix = self.camera.borrow_mut().view().to_cols_array_2d();
+            let projection = self
+                .camera
+                .borrow_mut()
+                .projection()
+                .inverse()
+                .to_cols_array_2d();
+
+            renderer.update_skybox_buffer(&context.graphics, view_matrix, projection);
+
             renderer.render(context, view, window, &self.asset_manager);
         }
     }
@@ -126,6 +138,21 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
         _context: &mut Context,
     ) {
         let mut cam = self.camera.borrow_mut();
+
+        let (mut dx, mut dy) = input_state.get_mouse_pos();
+        let (last_dx, last_dy) = self.last_mouse_pos;
+        dx -= last_dx;
+        dy -= last_dy;
+
+        let rot = cam.rotation();
+
+        cam.set_rotation(Vec3::new(
+            (rot.x - (dy as f32 * delta.norm() * 1.0)).clamp(-90.0, 90.0),
+            rot.y - (dx as f32 * delta.norm() * 1.0),
+            rot.z,
+        ));
+
+        self.last_mouse_pos = input_state.get_mouse_pos();
 
         if input_state.is_key_down(&VirtualKeyCode::W) {
             cam.inc_pos(glam::Vec3::new(0.0, 0.0, -(0.1 * delta.norm())));
@@ -172,7 +199,13 @@ impl<'a> RustyRuntime<'a> {
             .clone()
             .map(what::Location::File);
 
-        let asset_manager = AssetManager::new(
+        if let Some(loc) = &loc {
+            if let what::Location::File(path) = loc {
+                log::warn!("Project: {:?}", path);
+            }
+        }
+
+        let mut asset_manager = AssetManager::new(
             context.graphics.clone(),
             loc,
             (context.free_memory() / 2) as usize,
@@ -181,7 +214,7 @@ impl<'a> RustyRuntime<'a> {
         let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
 
-        let renderer = RcCell::new(Renderer::new(context, &asset_manager));
+        let renderer = RcCell::new(Renderer::new(context, &mut asset_manager));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(PerspectiveCamera::default());
@@ -200,6 +233,7 @@ impl<'a> RustyRuntime<'a> {
             camera,
             asset_manager,
             demo_window: egui_demo_lib::DemoWindows::default(),
+            last_mouse_pos: (0.0, 0.0),
         }
     }
 }

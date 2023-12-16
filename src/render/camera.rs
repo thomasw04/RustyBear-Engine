@@ -49,7 +49,7 @@ impl Default for PerspectiveCamera {
         PerspectiveCamera {
             position: Vec3::new(0.0, 0.0, 0.0),
             rotation: Vec3::new(0.0, 0.0, 0.0),
-            fovy: 45.0,
+            fovy: 100.0,
             aspect_ratio: 1280.0 / 720.0,
             near: 0.1,
             far: 100.0,
@@ -69,6 +69,22 @@ impl PerspectiveCamera {
         OPENGL_TO_WGPU * self.projection * self.view
     }
 
+    pub fn projection(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.projection
+    }
+
+    pub fn view(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.view
+    }
+
     fn calc_view_projection(&mut self) {
         self.set_projection(self.fovy, self.aspect_ratio, self.near, self.far);
         self.set_view(self.position, self.rotation);
@@ -76,13 +92,13 @@ impl PerspectiveCamera {
     }
 
     pub fn set_projection(&mut self, fovy: f32, aspect_ratio: f32, near: f32, far: f32) {
-        self.projection = glam::Mat4::perspective_rh(fovy * 180.0 / PI, aspect_ratio, near, far)
+        self.projection = glam::Mat4::perspective_rh((fovy / 180.0) * PI, aspect_ratio, near, far)
     }
 
     pub fn set_view(&mut self, position: Vec3, rotation: Vec3) {
         self.view = glam::Mat4::from_translation(position)
-            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0)
             * glam::Mat4::from_rotation_y(rotation.y * PI / 180.0)
+            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0)
             * glam::Mat4::from_rotation_z(rotation.z * PI / 180.0);
 
         self.view = self.view.inverse();

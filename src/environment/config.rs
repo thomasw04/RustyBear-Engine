@@ -139,6 +139,7 @@ impl Config {
                         }
                         Ok(configuration) => {
                             self.project_config = configuration;
+                            self.project_config.location = Some(path.to_path_buf());
                             return Ok(());
                         }
                     }

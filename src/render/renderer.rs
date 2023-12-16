@@ -2,7 +2,7 @@ use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
-    assets::manager::AssetManager,
+    assets::manager::{AssetManager, AssetType},
     context::{Context, VisContext},
     event::{self, EventSubscriber},
     render::{material::Skybox, texture::Texture2D},
@@ -15,11 +15,13 @@ use super::{camera::CameraBuffer, framebuffer::Framebuffer};
 pub struct Renderer {
     framebuffer: Framebuffer,
     render_pipeline: wgpu::RenderPipeline,
+    skybox_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     material: Material,
     camera_buffer: CameraBuffer,
     indices: u32,
+    skybox: Skybox,
     egui_render_pass: egui_wgpu_backend::RenderPass,
 }
 
@@ -55,7 +57,7 @@ impl EventSubscriber for Renderer {
 }
 
 impl Renderer {
-    pub fn new(context: &Context, asset_manager: &AssetManager) -> Self {
+    pub fn new(context: &Context, asset_manager: &mut AssetManager) -> Self {
         //Renderable setup
         let sample_count = 4;
 
@@ -69,6 +71,31 @@ impl Renderer {
             texture.sampler(),
             "Quad",
         );
+
+        let skybox_guid = asset_manager.request_id("data/skybox.fur");
+        let skybox_texture = asset_manager.get_asset(skybox_guid, 0);
+
+        let skybox = if let AssetType::TextureArray(skybox_texture) = skybox_texture {
+            Skybox::new(
+                &context.graphics,
+                &skybox_texture.texture_view(),
+                skybox_texture.sampler(),
+                "Skybox",
+            )
+        } else {
+            panic!("Failed to load skybox.")
+        };
+
+        let skybox_shader =
+            context
+                .graphics
+                .device
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("Default Shader"),
+                    source: wgpu::ShaderSource::Wgsl(include_str!("skybox.wgsl").into()),
+                });
+
+        let skybox_pipeline = Skybox::create_pipeline(&context.graphics, &skybox_shader);
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
@@ -126,11 +153,13 @@ impl Renderer {
         Renderer {
             framebuffer,
             render_pipeline,
+            skybox_pipeline,
             vertex_buffer,
             index_buffer,
             material,
             camera_buffer,
             indices: INDICES.len() as u32,
+            skybox,
             egui_render_pass,
         }
     }
@@ -224,12 +253,21 @@ impl Renderer {
         self.camera_buffer.update_buffer(context, camera);
     }
 
+    pub fn update_skybox_buffer(
+        &mut self,
+        context: &VisContext,
+        view: [[f32; 4]; 4],
+        projection: [[f32; 4]; 4],
+    ) {
+        self.skybox.update_buffer(context, view, projection);
+    }
+
     pub fn render(
         &mut self,
         context: &mut Context,
         view: &TextureView,
         window: &winit::window::Window,
-        asset_manager: &AssetManager,
+        _asset_manager: &AssetManager,
     ) {
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
@@ -271,6 +309,10 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
 
+            render_pass.set_pipeline(&self.skybox_pipeline);
+            render_pass.set_bind_group(0, self.skybox.bind_group(), &[]);
+            render_pass.draw(0..3, 0..1);
+
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, self.material.bind_group(), &[]);
             render_pass.set_bind_group(1, self.camera_buffer.bind_group(), &[]);
@@ -301,9 +343,9 @@ impl Renderer {
                 &screen_descriptor,
             );
 
-            self.egui_render_pass
-                .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
-                .unwrap();
+            /*self.egui_render_pass
+            .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
+            .unwrap();*/
         }
 
         context

@@ -3,6 +3,7 @@ use crate::context::VisContext;
 pub struct TextureArray {
     extend: wgpu::Extent3d,
     texture: wgpu::Texture,
+    sampler: wgpu::Sampler,
 }
 
 impl TextureArray {
@@ -24,7 +25,21 @@ impl TextureArray {
             view_formats: &[],
         });
 
-        TextureArray { extend, texture }
+        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        TextureArray {
+            extend,
+            texture,
+            sampler,
+        }
     }
 
     pub fn upload_error_texture(&self, context: &VisContext, layer: u32) {
@@ -41,7 +56,7 @@ impl TextureArray {
 
     pub fn upload(&self, context: &VisContext, buffer: &[u8], layer: u32) {
         context.queue.write_texture(
-            wgpu::ImageCopyTextureBase {
+            wgpu::ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d {
@@ -57,13 +72,29 @@ impl TextureArray {
                 bytes_per_row: Some(4 * self.extend.width),
                 rows_per_image: Some(self.extend.height),
             },
-            self.extend,
+            wgpu::Extent3d {
+                width: self.extend.width,
+                height: self.extend.height,
+                depth_or_array_layers: 1,
+            },
         );
     }
 
     pub fn texture_view(&self) -> wgpu::TextureView {
-        self.texture
-            .create_view(&wgpu::TextureViewDescriptor::default())
+        self.texture.create_view(&wgpu::TextureViewDescriptor {
+            label: None,
+            format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+            dimension: Some(wgpu::TextureViewDimension::Cube),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: Some(self.extend.depth_or_array_layers),
+        })
+    }
+
+    pub fn sampler(&self) -> &wgpu::Sampler {
+        &self.sampler
     }
 
     pub fn texture(&self) -> &wgpu::Texture {

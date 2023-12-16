@@ -1,24 +1,61 @@
+use std::num::NonZeroU64;
+
 use crate::context::VisContext;
+use wgpu::util::DeviceExt;
+
+use super::types::{CameraUniform, SplitCameraUniform};
 
 pub struct Skybox {
     name: String,
-    pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
+    buffer: wgpu::Buffer,
+    uniform: SplitCameraUniform,
 }
 
 impl Skybox {
     pub fn new(
         context: &VisContext,
-        textures: [&wgpu::TextureView; 6],
-        shader: &wgpu::ShaderModule,
+        texture: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
         name: &str,
     ) -> Self {
-        let pipeline = Skybox::recreate_pipeline(context, shader);
-        todo!("Skybox::new")
+        let uniform = SplitCameraUniform::default();
+        let buffer = context
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(name),
+                contents: bytemuck::cast_slice(&[uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
+
+        let bind_group = Skybox::create_bind_group(&buffer, context, texture, sampler, name);
+
+        Skybox {
+            name: String::from(name),
+            bind_group,
+            buffer,
+            uniform,
+        }
     }
 
-    fn recreate_pipeline(
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
+        &self.bind_group
+    }
+
+    pub fn update_buffer(
+        &mut self,
+        context: &VisContext,
+        view: [[f32; 4]; 4],
+        projection: [[f32; 4]; 4],
+    ) {
+        self.uniform.view = view;
+        self.uniform.projection = projection;
+        context
+            .queue
+            .write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
+    }
+
+    pub fn create_pipeline(
         context: &VisContext,
         shader: &wgpu::ShaderModule,
     ) -> wgpu::RenderPipeline {
@@ -44,7 +81,7 @@ impl Skybox {
                 primitive: wgpu::PrimitiveState {
                     topology: wgpu::PrimitiveTopology::TriangleList,
                     strip_index_format: None,
-                    front_face: wgpu::FrontFace::Cw,
+                    front_face: wgpu::FrontFace::Ccw,
                     cull_mode: Some(wgpu::Face::Back),
                     polygon_mode: wgpu::PolygonMode::Fill,
                     unclipped_depth: false,
@@ -52,11 +89,46 @@ impl Skybox {
                 },
                 depth_stencil: None,
                 multisample: wgpu::MultisampleState {
-                    count: 1,
+                    count: 4,
                     mask: !0,
                     alpha_to_coverage_enabled: false,
                 },
                 multiview: None,
+            })
+    }
+
+    fn create_bind_group(
+        buffer: &wgpu::Buffer,
+        context: &VisContext,
+        texture: &wgpu::TextureView,
+        sampler: &wgpu::Sampler,
+        name: &str,
+    ) -> wgpu::BindGroup {
+        let entries = [
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer,
+                    offset: 0,
+                    size: NonZeroU64::new(buffer.size()),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(texture),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ];
+
+        context
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(name),
+                layout: &Skybox::create_layout(context),
+                entries: &entries,
             })
     }
 
@@ -78,6 +150,16 @@ impl Skybox {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
@@ -87,7 +169,7 @@ impl Skybox {
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: 1,
+                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,

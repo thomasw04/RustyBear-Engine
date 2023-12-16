@@ -3,10 +3,10 @@ use rayon::prelude::*;
 
 use crate::context::VisContext;
 use crate::render::texture::{Texture2D, TextureArray};
-use crate::utils::{FileUtils, Guid, GuidGenerator};
+use crate::utils::{Guid, GuidGenerator};
 use std::collections::HashMap;
 
-use std::path::{Path, PathBuf};
+use std::fmt::format;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
 
@@ -26,14 +26,17 @@ pub struct AssetManager {
 
 impl AssetManager {
     pub fn new(context: Arc<VisContext>, loc: Option<what::Location>, max_size: usize) -> Self {
-        let (in_sender, in_receiver): (
+        type InChannel = (
             Sender<(String, Guid, usize)>,
             Receiver<(String, Guid, usize)>,
-        ) = mpsc::channel();
-        let (out_sender, out_receiver): (
+        );
+        type OutChannel = (
             Sender<(Guid, Result<AssetType, String>)>,
             Receiver<(Guid, Result<AssetType, String>)>,
-        ) = mpsc::channel();
+        );
+
+        let (in_sender, in_receiver): InChannel = mpsc::channel();
+        let (out_sender, out_receiver): OutChannel = mpsc::channel();
 
         rayon::spawn(move || {
             let context = context.clone();
@@ -51,9 +54,9 @@ impl AssetManager {
                             let _ = out_sender.send((guid, Ok(asset)));
                         });
                     }
-                    Err(_error) => {
-                        //TODO: Better error return type.
-                        let _ = out_sender.send((guid, Err("Failed to load asset.".to_string())));
+                    Err(error) => {
+                        let _ = out_sender
+                            .send((guid, Err(format!("Failed to load asset. Error: {error:?}"))));
                     }
                 }
             }
@@ -84,16 +87,11 @@ impl AssetManager {
     }
 
     pub fn update(&mut self) {
-        loop {
-            match self.asset_receiver.try_recv() {
-                Ok(content_result) => {
-                    if let (guid, Ok(content)) = content_result {
-                        self.gpu_cache.insert(guid, content);
-                    } else if let (guid, Err(error)) = content_result {
-                        log::error!("{}", error);
-                    }
-                }
-                Err(_) => break,
+        while let Ok(content_result) = self.asset_receiver.try_recv() {
+            if let (guid, Ok(content)) = content_result {
+                self.gpu_cache.insert(guid, content);
+            } else if let (_, Err(error)) = content_result {
+                log::error!("{}", error);
             }
         }
     }
@@ -120,14 +118,20 @@ impl AssetManager {
         }
     }
 
-    pub fn get_asset(&self, guid: Guid, priority: usize) -> Option<&AssetType> {
-        if let Some(asset) = self.gpu_cache.get(&guid) {
-            return Some(asset);
-        } else {
+    pub fn get_asset(&mut self, guid: Guid, priority: usize) -> &AssetType {
+        if !self.gpu_cache.contains_key(&guid) {
             self.request_asset(guid, priority);
-            self.update();
-            todo!("Implement asset waiters.")
         }
+
+        while !self.gpu_cache.contains_key(&guid) {
+            self.update();
+        }
+
+        self.gpu_cache.get(&guid).unwrap()
+    }
+
+    pub fn try_asset(&mut self, guid: Guid) -> Option<&AssetType> {
+        self.gpu_cache.get(&guid)
     }
 
     pub fn delete_asset(&mut self, guid: Guid) {
@@ -160,6 +164,7 @@ impl AssetManager {
                 let image_data = &texture_array.data;
 
                 image_data.par_iter().enumerate().for_each(|(i, image)| {
+                    log::info!("Loading texture {}/{}", i, image_data.len());
                     if let Ok(image) = image::load_from_memory(image) {
                         let rgba = image.to_rgba8();
                         texture.upload(context, &rgba, i as u32);
