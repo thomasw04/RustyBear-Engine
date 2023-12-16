@@ -343,9 +343,9 @@ impl Renderer {
                 &screen_descriptor,
             );
 
-            /*self.egui_render_pass
-            .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
-            .unwrap();*/
+            self.egui_render_pass
+                .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
+                .unwrap();
         }
 
         context

@@ -227,6 +227,8 @@ impl<'a> RustyRuntime<'a> {
             .borrow_mut()
             .set_position(glam::Vec3::new(0.0, 1.0, 2.0));
 
+        camera.borrow_mut().set_centered(true);
+
         RustyRuntime {
             stack,
             renderer,

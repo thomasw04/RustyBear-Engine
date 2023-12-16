@@ -20,6 +20,8 @@ pub struct PerspectiveCamera {
     view: Mat4,
     projection: Mat4,
     dirty: bool,
+
+    centered: bool,
 }
 
 impl EventSubscriber for PerspectiveCamera {
@@ -56,6 +58,7 @@ impl Default for PerspectiveCamera {
             view: glam::Mat4::IDENTITY,
             projection: glam::Mat4::IDENTITY,
             dirty: true,
+            centered: false,
         }
     }
 }
@@ -96,12 +99,22 @@ impl PerspectiveCamera {
     }
 
     pub fn set_view(&mut self, position: Vec3, rotation: Vec3) {
-        self.view = glam::Mat4::from_translation(position)
+        let rotation = glam::Mat4::from_rotation_z(rotation.z * PI / 180.0)
             * glam::Mat4::from_rotation_y(rotation.y * PI / 180.0)
-            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0)
-            * glam::Mat4::from_rotation_z(rotation.z * PI / 180.0);
+            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0);
+
+        if self.centered {
+            self.view = rotation * glam::Mat4::from_translation(position);
+        } else {
+            self.view = glam::Mat4::from_translation(position) * rotation;
+        }
 
         self.view = self.view.inverse();
+    }
+
+    pub fn set_centered(&mut self, centered: bool) {
+        self.centered = centered;
+        self.dirty = true;
     }
 
     pub fn position(&self) -> Vec3 {
