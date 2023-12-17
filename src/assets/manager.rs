@@ -1,7 +1,9 @@
 use bimap::BiMap;
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::context::VisContext;
+use crate::logging;
 use crate::render::texture::{Texture2D, TextureArray};
 use crate::utils::{Guid, GuidGenerator};
 use std::collections::HashMap;
@@ -47,11 +49,12 @@ impl AssetManager {
                 let out_sender = out_sender.clone();
                 let context = context.clone();
 
-                match what.load_asset(path, priority) {
+                match what.load_asset(path.clone(), priority) {
                     Ok(asset) => {
                         rayon::spawn(move || {
                             let asset = AssetManager::load_asset(&context, asset);
                             let _ = out_sender.send((guid, Ok(asset)));
+                            log::info!("Loaded asset: {}", path);
                         });
                     }
                     Err(error) => {
@@ -163,14 +166,30 @@ impl AssetManager {
 
                 let image_data = &texture_array.data;
 
+                let spinner_style = ProgressStyle::with_template(
+                    "{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m    {wide_msg}",
+                )
+                .unwrap();
+
                 image_data.par_iter().enumerate().for_each(|(i, image)| {
-                    log::info!("Loading texture {}/{}", i, image_data.len());
-                    if let Ok(image) = image::load_from_memory(image) {
-                        let rgba = image.to_rgba8();
-                        texture.upload(context, &rgba, i as u32);
-                    } else {
-                        log::error!("Failed to load texture. Loading error texture instead...");
-                        texture.upload_error_texture(context, i as u32);
+                    if let Some(spinner) = logging::install_bar(ProgressBar::new_spinner()) {
+                        spinner.set_style(spinner_style.clone());
+                        spinner.set_message(format!(
+                            "Loading textures... [{}/{}]",
+                            i + 1,
+                            image_data.len()
+                        ));
+
+                        if let Ok(image) = image::load_from_memory(image) {
+                            let rgba = image.to_rgba8();
+                            texture.upload(context, &rgba, i as u32);
+                        } else {
+                            log::error!("Failed to load texture. Loading error texture instead...");
+                            texture.upload_error_texture(context, i as u32);
+                        }
+
+                        //spinner.set_prefix("");
+                        spinner.finish_with_message("Done!");
                     }
                 });
 

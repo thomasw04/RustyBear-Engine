@@ -38,6 +38,9 @@ egui_demo_lib = "0.22.0"
 what = { git = "https://github.com/thomasw04/what.git" }
 sysinfo = "0.29.11"
 rand = "0.8.5"
+indicatif = "0.17.7"
+indicatif-log-bridge = "0.2.2"
+once_cell = "1.19.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"

@@ -226,6 +226,16 @@ impl<'a> Context {
             control_flow.set_exit();
         }
 
+        if let WindowEvent::KeyboardInput { device_id, input, is_synthetic } = *event {
+            if !is_synthetic {
+                if let Some(keycode) = input.virtual_keycode {
+                    if keycode == winit::event::VirtualKeyCode::Escape {
+                        control_flow.set_exit();
+                    }
+                }
+            }
+        }
+
         return_value
     }
 
