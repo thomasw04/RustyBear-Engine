@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use sysinfo::{System, SystemExt};
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
-use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
+use winit::{event::{WindowEvent, Event}, event_loop::{ControlFlow, EventLoopWindowTarget}, dpi::PhysicalSize, window::CursorGrabMode, keyboard::{Key, NamedKey}, raw_window_handle::HasWindowHandle};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
 
 pub struct Features {
@@ -32,7 +32,8 @@ impl<'a> Context {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 
         {
             backends: wgpu::Backends::all(),
-            dx12_shader_compiler: Default::default(), 
+            dx12_shader_compiler: Default::default(),
+            ..Default::default()
         });
 
         let surface = unsafe {
@@ -119,7 +120,7 @@ impl<'a> Context {
        //Time since last frame
         let mut ts = Timestep::default();
 
-        window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
+        let _ = window.event_loop.run(enclose! { (input_state) move |event, window_target|
         {
             self.egui.handle_event(&event);
 
@@ -133,36 +134,31 @@ impl<'a> Context {
                         WindowEvent::Resized(new_size) => {
                             self.resize(*new_size);
                         },
-                        WindowEvent::ScaleFactorChanged { new_inner_size, ..} => {
+                        /*WindowEvent::ScaleFactorChanged { new_inner_size, ..} => {
                             self.resize(**new_inner_size);
-                        },
+                        },*/
+                        WindowEvent::RedrawRequested => {
+                            app.update(ts.step_fwd(), input_state.borrow(), &mut self);
+                            self.egui.update_time(ts.total_secs());
+
+                            match self.render(&window.native, &mut app) {
+                                Ok(_) => {}
+                                Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.surface_config.width, height: self.surface_config.height }); },
+                                Err(wgpu::SurfaceError::OutOfMemory) => { window_target.exit(); },
+                                Err(e) => 
+                                { 
+                                    log::error!("{:?}", e);
+                                },
+                            }
+                        }
                         _ => {}
                     }
 
-                    Context::dispatch_event(app.get_stack(), event, control_flow, &mut self);
+                    Context::dispatch_event(app.get_stack(), &window.native, event, window_target, &mut self);
                     app.on_event(&event::to_event(event), &mut self)
                 },
 
-                Event::RedrawRequested(window_id)
-
-                if window_id == window.native.id() =>
-                {
-                    app.update(ts.step_fwd(), input_state.borrow(), &mut self);
-                    self.egui.update_time(ts.total_secs());
-
-                    match self.render(&window.native, &mut app) {
-                        Ok(_) => {true}
-                        Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.surface_config.width, height: self.surface_config.height }); false},
-                        Err(wgpu::SurfaceError::OutOfMemory) => { *control_flow = ControlFlow::Exit; true},
-                        Err(e) => 
-                        { 
-                            log::error!("{:?}", e);
-                            true
-                        },
-                    }
-                },
-
-                Event::MainEventsCleared => {
+                Event::AboutToWait => {
                     window.native.request_redraw();
                     false
                 },
@@ -172,7 +168,7 @@ impl<'a> Context {
             let gilrs_event_option = gilrs.next_event();
 
             if let Some(gilrs_event) = gilrs_event_option {
-                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, control_flow, &mut self);
+                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, window_target, &mut self);
             }
         }});
     }
@@ -218,21 +214,27 @@ impl<'a> Context {
     }
 
     //These wrapper are just making the code structure more logical in my opinion.
-    fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow, context: &mut Context) -> bool
+    fn dispatch_event(apps: &mut ModuleStack, window: &winit::window::Window, event: &WindowEvent, window_target: &EventLoopWindowTarget<()>, context: &mut Context) -> bool
     {
         let return_value = apps.dispatch_event(event::EventType::Layer, &event::to_event(event), context);
 
         if *event == WindowEvent::CloseRequested || *event == WindowEvent::Destroyed {
-            control_flow.set_exit();
+            window_target.exit();
         }
 
-        if let WindowEvent::KeyboardInput { device_id, input, is_synthetic } = *event {
-            if !is_synthetic {
-                if let Some(keycode) = input.virtual_keycode {
-                    if keycode == winit::event::VirtualKeyCode::Escape {
-                        control_flow.set_exit();
-                    }
-                }
+        if let WindowEvent::KeyboardInput { event, .. } = event {
+            if let Key::Named(NamedKey::Escape) = event.logical_key {
+                window_target.exit();
+            }
+        }
+
+        if let WindowEvent::MouseInput { device_id, state, button } = *event {
+            if button == winit::event::MouseButton::Right && state == winit::event::ElementState::Pressed {
+                window.set_cursor_visible(false);
+                //window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+            } else if button == winit::event::MouseButton::Right && state == winit::event::ElementState::Released {
+                //window.set_cursor_grab(CursorGrabMode::None);
+                window.set_cursor_visible(true);
             }
         }
 
@@ -244,7 +246,7 @@ impl<'a> Context {
         self.sysinfo.free_memory()
     }
 
-    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow, context: &mut Context) -> bool
+    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _window_target: &EventLoopWindowTarget<()>, context: &mut Context) -> bool
     {
         apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
     }

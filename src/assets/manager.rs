@@ -1,5 +1,7 @@
 use bimap::BiMap;
+use indicatif::style::TemplateError;
 use indicatif::{ProgressBar, ProgressStyle};
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 
 use crate::context::VisContext;
@@ -16,6 +18,16 @@ pub enum AssetType {
     TextureArray(TextureArray),
     Texture2D(Texture2D),
 }
+
+static LOADING_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+    ProgressStyle::with_template("{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m    {wide_msg}")
+        .unwrap()
+});
+
+static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
+    ProgressStyle::with_template("{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m {spinner} {wide_msg}")
+        .unwrap()
+});
 
 pub struct AssetManager {
     gpu_cache: HashMap<Guid, AssetType>,
@@ -126,11 +138,25 @@ impl AssetManager {
             self.request_asset(guid, priority);
         }
 
-        while !self.gpu_cache.contains_key(&guid) {
-            self.update();
-        }
+        if let Some(spinner) = logging::install_bar(ProgressBar::new_spinner()) {
+            spinner.set_style(LOADING_SPINNER_STYLE.clone());
+            spinner.set_message(format!("Loading asset: {}", self.asset_path(guid).unwrap()));
 
-        self.gpu_cache.get(&guid).unwrap()
+            while !self.gpu_cache.contains_key(&guid) {
+                self.update();
+                spinner.tick();
+            }
+
+            spinner.finish_with_message("Done!");
+
+            self.gpu_cache.get(&guid).unwrap()
+        } else {
+            while !self.gpu_cache.contains_key(&guid) {
+                self.update();
+            }
+
+            self.gpu_cache.get(&guid).unwrap()
+        }
     }
 
     pub fn try_asset(&mut self, guid: Guid) -> Option<&AssetType> {
@@ -166,14 +192,9 @@ impl AssetManager {
 
                 let image_data = &texture_array.data;
 
-                let spinner_style = ProgressStyle::with_template(
-                    "{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m    {wide_msg}",
-                )
-                .unwrap();
-
                 image_data.par_iter().enumerate().for_each(|(i, image)| {
                     if let Some(spinner) = logging::install_bar(ProgressBar::new_spinner()) {
-                        spinner.set_style(spinner_style.clone());
+                        spinner.set_style(LOADING_STYLE.clone());
                         spinner.set_message(format!(
                             "Loading textures... [{}/{}]",
                             i + 1,

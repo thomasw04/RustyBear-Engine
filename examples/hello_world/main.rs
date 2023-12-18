@@ -21,6 +21,9 @@ fn main() {
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());
+    window.native.set_ime_allowed(true);
+    window.native.set_cursor_visible(false);
+
     let context = pollster::block_on(Context::new(&mut window, config));
 
     //Create and init the application

@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use gilrs::GamepadId;
-use winit::event::{MouseScrollDelta, WindowEvent};
+use winit::{
+    event::{MouseScrollDelta, WindowEvent},
+    keyboard::PhysicalKey,
+};
 
 use crate::context::Context;
 
@@ -28,13 +31,12 @@ pub enum Event {
     DroppedFile(PathBuf),
     HoveredFile(PathBuf),
     HoveredFileCancelled,
-    ReceivedCharacter(char),
     Focused(bool),
     KeyboardInput {
-        keycode: winit::event::VirtualKeyCode,
+        keycode: winit::keyboard::KeyCode,
         state: winit::event::ElementState,
     },
-    ModifiersChanged(winit::event::ModifiersState),
+    ModifiersChanged(winit::event::Modifiers),
     CursorMoved {
         x: f64,
         y: f64,
@@ -207,25 +209,21 @@ pub fn to_event(event: &WindowEvent) -> Event {
             width: size.width,
             height: size.height,
         },
-        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => Event::Resized {
-            width: new_inner_size.width,
-            height: new_inner_size.height,
-        },
         WindowEvent::Moved(pos) => Event::Moved { x: pos.x, y: pos.y },
         WindowEvent::CloseRequested => Event::CloseRequested,
         WindowEvent::Destroyed => Event::Destroyed,
         WindowEvent::DroppedFile(path) => Event::DroppedFile(path.clone()),
         WindowEvent::HoveredFile(path) => Event::HoveredFile(path.clone()),
         WindowEvent::HoveredFileCancelled => Event::HoveredFileCancelled,
-        WindowEvent::ReceivedCharacter(ch) => Event::ReceivedCharacter(*ch),
         WindowEvent::Focused(focused) => Event::Focused(*focused),
-        WindowEvent::KeyboardInput { input, .. } => {
-            if input.virtual_keycode.is_some() {
+        WindowEvent::KeyboardInput { event, .. } => {
+            if let PhysicalKey::Code(code) = event.physical_key {
                 Event::KeyboardInput {
-                    keycode: input.virtual_keycode.unwrap(),
-                    state: input.state,
+                    keycode: code,
+                    state: event.state,
                 }
             } else {
+                //TODO support non standard keys.
                 Event::Unknown
             }
         }

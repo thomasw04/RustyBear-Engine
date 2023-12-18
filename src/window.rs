@@ -45,7 +45,8 @@ impl Window {
 
         let window_config: WindowConfig = json_unchecked.unwrap_or(Default::default());
 
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().expect("Failed to create event loop. Abort.");
+
         let window = WindowBuilder::new()
             .with_title(window_config.title)
             .with_inner_size(PhysicalSize {

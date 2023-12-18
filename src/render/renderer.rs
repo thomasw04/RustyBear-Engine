@@ -1,5 +1,5 @@
 use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
-use winit::event::{ElementState, VirtualKeyCode};
+use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::manager::{AssetManager, AssetType},
@@ -33,13 +33,13 @@ impl EventSubscriber for Renderer {
                 false
             }
             event::Event::KeyboardInput { keycode, state } => match keycode {
-                VirtualKeyCode::Left => {
+                KeyCode::ArrowLeft => {
                     if *state == ElementState::Pressed {
                         self.enable_msaa(context, self.framebuffer.sample_count() * 2);
                     }
                     false
                 }
-                VirtualKeyCode::Right => {
+                KeyCode::ArrowRight => {
                     if *state == ElementState::Pressed {
                         let new_count = self.framebuffer.sample_count() / 2;
 
@@ -281,7 +281,10 @@ impl Renderer {
                 });
 
         let output = context.egui.end_frame(Some(window));
-        let paint_jobs = context.egui.context().tessellate(output.shapes);
+        let paint_jobs = context
+            .egui
+            .context()
+            .tessellate(output.shapes, context.egui.context().pixels_per_point());
         let texture_delta = output.textures_delta;
 
         {
@@ -303,10 +306,11 @@ impl Renderer {
                             b: 0.3,
                             a: 1.0,
                         }),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
+                ..Default::default()
             });
 
             render_pass.set_pipeline(&self.skybox_pipeline);

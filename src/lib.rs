@@ -17,6 +17,7 @@ pub mod window;
 use std::{cell::Ref, fs::File, ops::Sub, panic::Location};
 
 use assets::manager::AssetManager;
+use egui::lerp;
 use glam::Vec3;
 use input::InputState;
 
@@ -27,7 +28,10 @@ use crate::{context::Context, core::Application, environment::config::Config, so
 
 use event::{Event, EventSubscriber};
 use window::Window;
-use winit::event::{ElementState, MouseButton, VirtualKeyCode};
+use winit::{
+    event::{ElementState, MouseButton},
+    keyboard::KeyCode,
+};
 
 use crate::core::ModuleStack;
 
@@ -71,14 +75,13 @@ pub struct RustyRuntime<'a> {
     camera: RcCell<PerspectiveCamera>,
     asset_manager: AssetManager,
     demo_window: egui_demo_lib::DemoWindows,
-    last_mouse_pos: (f64, f64),
 }
 
 impl<'a> Application<'a> for RustyRuntime<'a> {
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool {
         match event {
             event::Event::KeyboardInput { keycode, state } => match keycode {
-                VirtualKeyCode::V => {
+                KeyCode::KeyV => {
                     if *state == ElementState::Pressed {
                         context.set_vsync(!context.vsync());
                     }
@@ -135,46 +138,58 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
         &mut self,
         delta: &utils::Timestep,
         input_state: Ref<InputState>,
-        _context: &mut Context,
+        context: &mut Context,
     ) {
         let mut cam = self.camera.borrow_mut();
 
-        let (mut dx, mut dy) = input_state.get_mouse_pos();
-        let (last_dx, last_dy) = self.last_mouse_pos;
-        dx -= last_dx;
-        dy -= last_dy;
+        let (x, y) = input_state.get_mouse_pos();
+        let (last_x, last_y) = input_state.get_last_mouse_pos();
+
+        let (width, height) = (context.surface_config.width, context.surface_config.height);
+
+        //Convert x and y to degrees using the window with and height.
+        let (x, y) = (
+            (x / width as f64) * 180.0 - 90.0,
+            (y / height as f64) * 180.0 - 90.0,
+        );
+
+        let (last_x, last_y) = (
+            (last_x / width as f64) * 180.0 - 90.0,
+            (last_y / height as f64) * 180.0 - 90.0,
+        );
+
+        let newX = lerp(last_x..=x, 0.6 * delta.norm() as f64);
+        let newY = lerp(last_y..=y, 0.6 * delta.norm() as f64);
 
         let rot = cam.rotation();
 
         cam.set_rotation(Vec3::new(
-            (rot.x - (dy as f32 * delta.norm() * 1.0)).clamp(-90.0, 90.0),
-            rot.y - (dx as f32 * delta.norm() * 1.0),
+            -newY.clamp(-90.0, 90.0) as f32,
+            -newX as f32,
             rot.z,
         ));
 
-        self.last_mouse_pos = input_state.get_mouse_pos();
-
-        if input_state.is_key_down(&VirtualKeyCode::W) {
+        if input_state.is_key_down(&KeyCode::KeyW) {
             cam.inc_pos(glam::Vec3::new(0.0, 0.0, -(0.1 * delta.norm())));
         }
 
-        if input_state.is_key_down(&VirtualKeyCode::S) {
+        if input_state.is_key_down(&KeyCode::KeyS) {
             cam.inc_pos(glam::Vec3::new(0.0, 0.0, 0.1 * delta.norm()));
         }
 
-        if input_state.is_key_down(&VirtualKeyCode::A) {
+        if input_state.is_key_down(&KeyCode::KeyA) {
             cam.inc_pos(glam::Vec3::new(-(0.1 * delta.norm()), 0.0, 0.0));
         }
 
-        if input_state.is_key_down(&VirtualKeyCode::D) {
+        if input_state.is_key_down(&KeyCode::KeyD) {
             cam.inc_pos(glam::Vec3::new(0.1 * delta.norm(), 0.0, 0.0));
         }
 
-        if input_state.is_key_down(&VirtualKeyCode::Space) {
+        if input_state.is_key_down(&KeyCode::Space) {
             cam.inc_pos(glam::Vec3::new(0.0, 0.1 * delta.norm(), 0.0));
         }
 
-        if input_state.is_key_down(&VirtualKeyCode::LShift) {
+        if input_state.is_key_down(&KeyCode::ShiftLeft) {
             cam.inc_pos(glam::Vec3::new(0.0, -(0.1 * delta.norm()), 0.0));
         }
     }
@@ -235,7 +250,6 @@ impl<'a> RustyRuntime<'a> {
             camera,
             asset_manager,
             demo_window: egui_demo_lib::DemoWindows::default(),
-            last_mouse_pos: (0.0, 0.0),
         }
     }
 }

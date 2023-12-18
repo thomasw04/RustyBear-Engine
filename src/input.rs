@@ -9,11 +9,12 @@ use crate::{
 
 #[derive(Default)]
 pub struct InputState {
-    keyboard: HashMap<winit::event::VirtualKeyCode, bool>,
+    keyboard: HashMap<winit::keyboard::KeyCode, bool>,
     mouse_button: HashMap<winit::event::MouseButton, bool>,
     gamepad_button: HashMap<gilrs::Button, bool>,
     gamepad_axis: HashMap<gilrs::Axis, f32>,
     mouse_position: (f64, f64),
+    last_mouse_position: (f64, f64),
 }
 
 impl InputState {
@@ -21,7 +22,7 @@ impl InputState {
         InputState::default()
     }
 
-    pub fn is_key_down(&self, keycode: &winit::event::VirtualKeyCode) -> bool {
+    pub fn is_key_down(&self, keycode: &winit::keyboard::KeyCode) -> bool {
         *self.keyboard.get(keycode).unwrap_or(&false)
     }
 
@@ -39,6 +40,17 @@ impl InputState {
 
     pub fn get_mouse_pos(&self) -> (f64, f64) {
         self.mouse_position
+    }
+
+    pub fn get_last_mouse_pos(&self) -> (f64, f64) {
+        self.last_mouse_position
+    }
+
+    pub fn get_mouse_delta(&self) -> (f64, f64) {
+        (
+            self.mouse_position.0 - self.last_mouse_position.0,
+            self.mouse_position.1 - self.last_mouse_position.1,
+        )
     }
 }
 
@@ -60,6 +72,7 @@ impl EventSubscriber for InputState {
                 }
             }
             Event::CursorMoved { x, y } => {
+                self.last_mouse_position = self.mouse_position;
                 self.mouse_position = (*x, *y);
             }
             Event::GamepadInput {
