@@ -2,10 +2,13 @@ use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
 use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
-    assets::manager::{AssetManager, AssetType},
+    assets::{
+        manager::{AssetManager, AssetType},
+        texture::Texture2D,
+    },
     context::{Context, VisContext},
     event::{self, EventSubscriber},
-    render::{material::Skybox, texture::Texture2D},
+    render::material::Skybox,
 };
 
 use super::material::Material;

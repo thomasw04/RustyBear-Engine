@@ -1,5 +1,3 @@
-use bytemuck::ByteHash;
-
 #[repr(C)]
 #[derive(wgpu_macros::VertexLayout, Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex2D {
@@ -8,8 +6,8 @@ pub struct Vertex2D {
 }
 
 impl VertexLayout for Vertex2D {
-    fn layout(&self) -> (&wgpu::VertexBufferLayout, u64) {
-        (&Vertex2D::LAYOUT, 0)
+    fn layout(&self) -> Option<&wgpu::VertexBufferLayout> {
+        Some(&Vertex2D::LAYOUT)
     }
 }
 
@@ -27,7 +25,7 @@ pub struct SplitCameraUniform {
 }
 
 pub trait BindGroup {
-    fn bind_group_entries(&self) -> (&str, &[wgpu::BindGroupEntry]);
+    fn entries(&self) -> &[&wgpu::BindGroupEntry];
 }
 
 pub trait VertexShader {
@@ -41,30 +39,19 @@ pub trait FragmentShader {
 }
 
 pub trait VertexLayout {
-    fn layout(&self) -> (&wgpu::VertexBufferLayout, u64);
+    fn layout(&self) -> Option<&wgpu::VertexBufferLayout>;
 }
 
-pub trait VertexBuffer {
-    fn buffer(&self) -> &wgpu::Buffer;
+pub trait VertexBuffer: VertexLayout {
+    fn buffer(&self) -> Option<&wgpu::Buffer>;
 }
 
 pub trait IndexBuffer {
-    fn buffer(&self) -> &wgpu::Buffer;
-    fn format(&self) -> wgpu::IndexFormat;
+    fn buffer(&self) -> Option<&wgpu::Buffer>;
+    fn format(&self) -> Option<wgpu::IndexFormat>;
 }
 
-/*An unique id that can grow if the number of entities grows. Should be allocated from a pool allocator. */
-pub struct Uid<'a> {
-    id: &'a [u8],
-}
-
-impl PartialEq for PipelineHash {
-    fn eq(&self, other: &Self) -> bool {
-        todo!("Implement PartialEq for PipelineHash")
-    }
-}
-
-impl Eq for PipelineHash {}
+pub trait Material: VertexShader + FragmentShader + VertexBuffer + IndexBuffer + BindGroup {}
 
 impl Default for CameraUniform {
     fn default() -> Self {

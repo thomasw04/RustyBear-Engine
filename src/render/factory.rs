@@ -1,52 +1,75 @@
-use std::{ascii::AsciiExt, collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{context::VisContext, utils::Guid};
 
 use super::types::{
-    BindGroup, FragmentShader, IndexBuffer, PipelineHash, VertexBuffer, VertexShader,
+    BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexLayout, VertexShader,
 };
 
-struct PipelineConfig<'a> {
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: Option<wgpu::Buffer>,
-    bind_groups: Vec<wgpu::BindGroup>,
-    pipeline_layout_desc: wgpu::PipelineLayoutDescriptor<'a>,
-    pipeline_desc: wgpu::RenderPipelineDescriptor<'a>,
-    uid: PipelineHash,
+struct PrimitiveConfig {
+    cull: bool,
+    polygon_mode: wgpu::PolygonMode,
 }
 
-impl<'a> PipelineConfig<'a> {
-    pub fn new() -> Self {
-        todo!("Implement PipelineConfig::new")
+struct RenderPipelineConfig<'a> {
+    //Descriptors
+    vertex_shader: Guid,
+    fragment_shader: Guid,
+    blend: Option<wgpu::BlendState>,
+    write_mask: wgpu::ColorWrites,
+    vertex_buffer: Option<(&'a wgpu::Buffer, &'a wgpu::VertexBufferLayout<'a>)>,
+    bind_groups: Option<&'a [&'a wgpu::BindGroupEntry<'a>]>,
+    primitive_config: Option<PrimitiveConfig>,
+
+    //Data
+    index_buffer: Option<(&'a wgpu::Buffer, wgpu::IndexFormat)>,
+}
+
+impl<'a> RenderPipelineConfig<'a> {
+    pub fn new(vertex_shader: impl VertexShader, fragment_shader: impl FragmentShader) -> Self {
+        Self {
+            vertex_shader: vertex_shader.module(),
+            fragment_shader: fragment_shader.module(),
+            blend: fragment_shader.blend(),
+            write_mask: fragment_shader.mask(),
+            vertex_buffer: None,
+            bind_groups: None,
+            primitive_config: None,
+            index_buffer: None,
+        }
     }
 
-    pub fn with_shaders(vertex: impl VertexShader, fragment: impl FragmentShader) -> Self {
-        todo!("Implement PipelineConfig::with_shaders")
-    }
-
-    /* T must be a type that derives a wgpu_macros::VertexLayout */
     pub fn with_buffer(
-        vertex_buffer: impl VertexBuffer,
+        mut self,
+        vertex_buffer: impl VertexLayout + VertexBuffer,
         index_buffer: Option<impl IndexBuffer>,
     ) -> Self {
-        todo!("Implement PipelineConfig::with_vertex_buffer")
+        self.vertex_buffer = Some((vertex_buffer.buffer(), vertex_buffer.layout()));
+        self.index_buffer =
+            index_buffer.map(|index_buffer| (index_buffer.buffer(), index_buffer.format()));
+        self
     }
 
-    pub fn with_bind_groups(bind_groups: &[impl BindGroup]) -> Self {
-        todo!("Implement PipelineConfig::with_bind_groups")
+    pub fn with_bind_groups(mut self, bind_groups: &'a [impl BindGroup]) -> Self {
+        self.bind_groups = Some(
+            bind_groups
+                .iter()
+                .map(|bind_group| bind_group.entry())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        );
+        self
     }
 
-    pub fn with_primitive_state(primitive_state: wgpu::PrimitiveState) -> Self {
-        todo!("Implement PipelineConfig::with_primitive_state")
-    }
-
-    pub fn with_multisampled(&mut self, multisampled: Option<u32>) -> Self {
-        todo!("Implement PipelineConfig::multisampled")
+    pub fn with_config(mut self, primitive_config: PrimitiveConfig) -> Self {
+        self.primitive_config = Some(primitive_config);
+        self
     }
 }
 
 struct PipelineFactory {
-    cache: HashMap<PipelineHash, wgpu::RenderPipeline>,
+    shader_ids: HashMap<wgpu::ShaderModule, u32>,
+    cache: HashMap<u64, wgpu::RenderPipeline>,
 }
 
 impl<'a> PipelineFactory {
@@ -79,7 +102,7 @@ impl<'a> PipelineFactory {
     }
 }
 
-fn shader_id(vertex: impl VertexShader, fragment: impl FragmentShader) -> u64 {
+/*fn shader_id(vertex: impl VertexShader, fragment: impl FragmentShader) -> u64 {
     // 2xu64 + 1xu64
 }
 
@@ -103,4 +126,4 @@ fn gen_pipeline_id(config: &PipelineConfig) -> u64 {
     config.
 
     todo!("Implement hash_pipeline")
-}
+}*/

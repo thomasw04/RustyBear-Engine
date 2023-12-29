@@ -1,22 +1,23 @@
 use bimap::BiMap;
-use indicatif::style::TemplateError;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
 
 use crate::context::VisContext;
 use crate::logging;
-use crate::render::texture::{Texture2D, TextureArray};
 use crate::utils::{Guid, GuidGenerator};
 use std::collections::HashMap;
 
-use std::fmt::format;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
+
+use super::shader::Shader;
+use super::texture::{Texture2D, TextureArray};
 
 pub enum AssetType {
     TextureArray(TextureArray),
     Texture2D(Texture2D),
+    Shader(Shader),
 }
 
 static LOADING_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
@@ -215,6 +216,14 @@ impl AssetManager {
                 });
 
                 AssetType::TextureArray(texture)
+            }
+            what::Asset::Shader(shader) => {
+                if let Ok(shader) = Shader::new(context, shader.data, shader.stages) {
+                    return AssetType::Shader(shader);
+                } else {
+                    log::error!("Failed to load shader. Loading error shader instead.");
+                    todo!("Implement error shader.")
+                }
             }
             _ => todo!("Implement other asset types."),
         }
