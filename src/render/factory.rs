@@ -109,7 +109,7 @@ impl PipelineFactory {
         context: &VisContext,
         config: RenderPipelineConfig,
     ) -> wgpu::RenderPipeline {
-        let base = config.base_config.unwrap_or(PipelineBaseConfig::default());
+        let base = config.base_config.unwrap_or_default();
 
         let pipeline_layout =
             context
@@ -182,7 +182,7 @@ impl PipelineFactory {
             if let Some(pipeline) = pipelines.get(idx) {
                 if pipeline.0 == config.vertex_shader.1
                     && pipeline.1 == config.fragment_shader.1
-                    && pipeline.2 == config.base_config.unwrap_or(PipelineBaseConfig::default())
+                    && pipeline.2 == config.base_config.unwrap_or_default()
                 {
                     return true;
                 }

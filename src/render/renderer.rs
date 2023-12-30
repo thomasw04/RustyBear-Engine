@@ -24,7 +24,7 @@ pub struct Renderer {
     material: Material,
     camera_buffer: CameraBuffer,
     indices: u32,
-    skybox: Skybox,
+    skybox: Option<Skybox>,
     egui_render_pass: egui_wgpu_backend::RenderPass,
 }
 
@@ -78,15 +78,19 @@ impl Renderer {
         let skybox_guid = asset_manager.request_id("data/skybox.fur");
         let skybox_texture = asset_manager.get_asset(skybox_guid, 0);
 
-        let skybox = if let AssetType::TextureArray(skybox_texture) = skybox_texture {
-            Skybox::new(
-                &context.graphics,
-                &skybox_texture.texture_view(),
-                skybox_texture.sampler(),
-                "Skybox",
-            )
+        let skybox = if let Some(asset) = skybox_texture {
+            if let AssetType::TextureArray(skybox_texture) = asset {
+                Some(Skybox::new(
+                    &context.graphics,
+                    &skybox_texture.texture_view(),
+                    skybox_texture.sampler(),
+                    "Skybox",
+                ))
+            } else {
+                panic!("Failed to load skybox.")
+            }
         } else {
-            panic!("Failed to load skybox.")
+            None
         };
 
         let skybox_shader =
@@ -262,7 +266,9 @@ impl Renderer {
         view: [[f32; 4]; 4],
         projection: [[f32; 4]; 4],
     ) {
-        self.skybox.update_buffer(context, view, projection);
+        if let Some(ref mut skybox) = &mut self.skybox {
+            skybox.update_buffer(context, view, projection);
+        }
     }
 
     pub fn render(
@@ -316,9 +322,11 @@ impl Renderer {
                 ..Default::default()
             });
 
-            render_pass.set_pipeline(&self.skybox_pipeline);
-            render_pass.set_bind_group(0, self.skybox.bind_group(), &[]);
-            render_pass.draw(0..3, 0..1);
+            if let Some(skybox) = &self.skybox {
+                render_pass.set_pipeline(&self.skybox_pipeline);
+                render_pass.set_bind_group(0, skybox.bind_group(), &[]);
+                render_pass.draw(0..3, 0..1);
+            }
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, self.material.bind_group(), &[]);

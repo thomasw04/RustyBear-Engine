@@ -102,14 +102,17 @@ impl AssetManager {
         self.path_cache.get_by_left(&id)
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> Result<(), Guid> {
         while let Ok(content_result) = self.asset_receiver.try_recv() {
             if let (guid, Ok(content)) = content_result {
                 self.gpu_cache.insert(guid, content);
-            } else if let (_, Err(error)) = content_result {
+            } else if let (guid, Err(error)) = content_result {
                 log::error!("{}", error);
+                return Err(guid);
             }
         }
+
+        Ok(())
     }
 
     pub fn request_asset(&mut self, guid: Guid, priority: usize) {
@@ -134,7 +137,7 @@ impl AssetManager {
         }
     }
 
-    pub fn get_asset(&mut self, guid: Guid, priority: usize) -> &AssetType {
+    pub fn get_asset(&mut self, guid: Guid, priority: usize) -> Option<&AssetType> {
         if !self.gpu_cache.contains_key(&guid) {
             self.request_asset(guid, priority);
         }
@@ -144,19 +147,23 @@ impl AssetManager {
             spinner.set_message(format!("Loading asset: {}", self.asset_path(guid).unwrap()));
 
             while !self.gpu_cache.contains_key(&guid) {
-                self.update();
+                if let Err(err) = self.update() {
+                    if guid == err {
+                        return None;
+                    }
+                }
                 spinner.tick();
             }
 
             spinner.finish_with_message("Done!");
 
-            self.gpu_cache.get(&guid).unwrap()
+            Some(self.gpu_cache.get(&guid).unwrap())
         } else {
             while !self.gpu_cache.contains_key(&guid) {
                 self.update();
             }
 
-            self.gpu_cache.get(&guid).unwrap()
+            Some(self.gpu_cache.get(&guid).unwrap())
         }
     }
 
