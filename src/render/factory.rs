@@ -220,6 +220,7 @@ impl PipelineFactory {
     ) -> &wgpu::RenderPipeline {
         let hash = Self::hash_pipeline(&config);
 
+        //Weird implementation because of: https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
         let mut index = None;
 
         if let Some(pipelines) = self.cache.get(&hash) {
