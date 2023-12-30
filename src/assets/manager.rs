@@ -65,7 +65,7 @@ impl AssetManager {
                 match what.load_asset(path.clone(), priority) {
                     Ok(asset) => {
                         rayon::spawn(move || {
-                            let asset = AssetManager::load_asset(&context, asset);
+                            let asset = AssetManager::load_asset(&context, asset, guid);
                             let _ = out_sender.send((guid, Ok(asset)));
                             log::info!("Loaded asset: {}", path);
                         });
@@ -168,7 +168,7 @@ impl AssetManager {
         self.gpu_cache.remove(&guid);
     }
 
-    fn load_asset(context: &VisContext, asset: what::Asset) -> AssetType {
+    fn load_asset(context: &VisContext, asset: what::Asset, guid: Guid) -> AssetType {
         match asset {
             what::Asset::Texture(texture) => {
                 let texture_data = image::load_from_memory(&texture.data);
@@ -176,7 +176,7 @@ impl AssetManager {
                 if let Ok(image) = texture_data {
                     let rgba = image.to_rgba8();
 
-                    match Texture2D::new(context, None, &rgba, image::ImageFormat::Png) {
+                    match Texture2D::new(context, guid, None, &rgba, image::ImageFormat::Png) {
                         Ok(texture) => AssetType::Texture2D(texture),
                         Err(texture) => {
                             log::error!("Failed to load texture. Loading error texture instead.");
@@ -188,8 +188,12 @@ impl AssetManager {
                 }
             }
             what::Asset::TextureArray(texture_array) => {
-                let texture =
-                    TextureArray::new(context, texture_array.size, texture_array.data.len() as u32);
+                let texture = TextureArray::new(
+                    context,
+                    guid,
+                    texture_array.size,
+                    texture_array.data.len() as u32,
+                );
 
                 let image_data = &texture_array.data;
 
@@ -218,7 +222,7 @@ impl AssetManager {
                 AssetType::TextureArray(texture)
             }
             what::Asset::Shader(shader) => {
-                if let Ok(shader) = Shader::new(context, shader.data, shader.stages) {
+                if let Ok(shader) = Shader::new(context, guid, shader.data, shader.stages) {
                     return AssetType::Shader(shader);
                 } else {
                     log::error!("Failed to load shader. Loading error shader instead.");

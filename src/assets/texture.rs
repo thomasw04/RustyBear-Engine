@@ -1,13 +1,14 @@
-use crate::context::VisContext;
+use crate::{context::VisContext, utils::Guid};
 
 pub struct TextureArray {
     extend: wgpu::Extent3d,
     texture: wgpu::Texture,
     sampler: wgpu::Sampler,
+    guid: Guid,
 }
 
 impl TextureArray {
-    pub fn new(context: &VisContext, size: u32, layers: u32) -> Self {
+    pub fn new(context: &VisContext, guid: Guid, size: u32, layers: u32) -> Self {
         let extend = wgpu::Extent3d {
             width: size,
             height: size,
@@ -39,6 +40,7 @@ impl TextureArray {
             extend,
             texture,
             sampler,
+            guid,
         }
     }
 
@@ -110,11 +112,13 @@ pub struct Texture2D {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
+    guid: Guid,
 }
 
 impl Texture2D {
     pub fn new(
         context: &VisContext,
+        guid: Guid,
         name: Option<&str>,
         bytes: &[u8],
         format: image::ImageFormat,
@@ -173,6 +177,7 @@ impl Texture2D {
                 texture,
                 view,
                 sampler,
+                guid,
             })
         } else {
             log::error!(
@@ -241,6 +246,7 @@ impl Texture2D {
                 texture,
                 view,
                 sampler,
+                guid: Guid::default(), //TODO think about something better
             }
         } else {
             //For devs: Of course this can also happen while engine development. E.g. broken png in resources/

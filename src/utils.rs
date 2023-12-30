@@ -143,19 +143,19 @@ impl FileUtils {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Guid {
-    id: u32,
+    id: u64,
 }
 
 impl Guid {
-    fn new(id: u32) -> Guid {
+    fn new(id: u64) -> Guid {
         Guid { id }
     }
 }
 
 pub struct GuidGenerator {
-    used: HashSet<u32>,
+    used: HashSet<u64>,
 }
 
 impl GuidGenerator {
@@ -166,9 +166,9 @@ impl GuidGenerator {
     }
 
     pub fn generate(&mut self) -> Guid {
-        let mut id = rand::random::<u32>();
-        while self.used.contains(&id) {
-            id = rand::random::<u32>();
+        let mut id = rand::random::<u64>();
+        while self.used.contains(&id) && id < 10 {
+            id = rand::random::<u64>();
         }
         self.used.insert(id);
         Guid::new(id)

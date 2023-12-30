@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use lazy_static::lazy_static;
 use sysinfo::{System, SystemExt};
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
 use winit::{event::{WindowEvent, Event}, event_loop::{ControlFlow, EventLoopWindowTarget}, dpi::PhysicalSize, window::CursorGrabMode, keyboard::{Key, NamedKey}, raw_window_handle::HasWindowHandle};
-use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
+use crate::{window::Window, core::{ModuleStack, Application}, utils::{Timestep, GuidGenerator}, event, input::InputState, environment::config::Config};
 
 pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags
