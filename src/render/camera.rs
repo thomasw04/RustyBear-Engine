@@ -193,62 +193,46 @@ pub struct CameraBuffer {
 impl CameraBuffer {
     pub fn new(context: &VisContext, name: &str) -> CameraBuffer {
         let uniform = CameraUniform::default();
-        let camera_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(name),
-                contents: bytemuck::cast_slice(&[uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
+        let camera_buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(name),
+            contents: bytemuck::cast_slice(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         let layout = CameraBuffer::create_layout(context, name);
 
-        let bind_group = context
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some(name),
-                layout: &layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_buffer.as_entire_binding(),
-                }],
-            });
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(name),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
 
-        CameraBuffer {
-            name: String::from(name),
-            bind_group,
-            layout,
-            camera_buffer,
-            uniform,
-        }
+        CameraBuffer { name: String::from(name), bind_group, layout, camera_buffer, uniform }
     }
 
     fn create_layout(context: &VisContext, name: &str) -> wgpu::BindGroupLayout {
-        context
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some(name),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            })
+        context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(name),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        })
     }
 
     //TODO: Use some kind of staging buffer, for performance
     pub fn update_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         self.uniform.view_projection = camera;
-        context.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniform]),
-        );
+        context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 
     pub fn name(&self) -> &str {

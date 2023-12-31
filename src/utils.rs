@@ -13,11 +13,7 @@ impl Default for Timestep {
     fn default() -> Self {
         let begin = Instant::now();
 
-        Timestep {
-            delta: 0.0,
-            last: begin,
-            begin,
-        }
+        Timestep { delta: 0.0, last: begin, begin }
     }
 }
 
@@ -53,11 +49,7 @@ impl From<f64> for Timestep {
     fn from(delta: f64) -> Timestep {
         let begin = Instant::now();
 
-        Timestep {
-            delta,
-            last: begin,
-            begin,
-        }
+        Timestep { delta, last: begin, begin }
     }
 }
 
@@ -137,9 +129,7 @@ impl FileUtils {
             return false;
         }
 
-        file.extension()
-            .and_then(|s| s.to_str())
-            .is_some_and(|extension| extension.eq(ext))
+        file.extension().and_then(|s| s.to_str()).is_some_and(|extension| extension.eq(ext))
     }
 }
 
@@ -149,7 +139,7 @@ pub struct Guid {
 }
 
 impl Guid {
-    fn new(id: u64) -> Guid {
+    pub fn new(id: u64) -> Guid {
         Guid { id }
     }
 }
@@ -160,9 +150,7 @@ pub struct GuidGenerator {
 
 impl GuidGenerator {
     pub fn new() -> GuidGenerator {
-        GuidGenerator {
-            used: HashSet::new(),
-        }
+        GuidGenerator { used: HashSet::new() }
     }
 
     pub fn generate(&mut self) -> Guid {

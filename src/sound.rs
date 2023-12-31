@@ -43,10 +43,7 @@ impl AudioEngine {
             let mut sound = self.manager.play(sound_data).unwrap();
             let _ = sound.set_volume(kira::Volume::Decibels(-20.0), kira::tween::Tween::default());
         } else {
-            log::error!(
-                "Could not load background music {}. Silence.",
-                self.background_music
-            );
+            log::error!("Could not load background music {}. Silence.", self.background_music);
         }
     }
 }

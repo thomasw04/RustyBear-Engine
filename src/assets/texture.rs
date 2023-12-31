@@ -3,17 +3,14 @@ use crate::{context::VisContext, utils::Guid};
 pub struct TextureArray {
     extend: wgpu::Extent3d,
     texture: wgpu::Texture,
+    current_view: Option<wgpu::TextureView>,
     sampler: wgpu::Sampler,
     guid: Guid,
 }
 
 impl TextureArray {
     pub fn new(context: &VisContext, guid: Guid, size: u32, layers: u32) -> Self {
-        let extend = wgpu::Extent3d {
-            width: size,
-            height: size,
-            depth_or_array_layers: layers,
-        };
+        let extend = wgpu::Extent3d { width: size, height: size, depth_or_array_layers: layers };
 
         let texture = context.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
@@ -36,12 +33,7 @@ impl TextureArray {
             ..Default::default()
         });
 
-        TextureArray {
-            extend,
-            texture,
-            sampler,
-            guid,
-        }
+        TextureArray { extend, texture, current_view: None, sampler, guid }
     }
 
     pub fn upload_error_texture(&self, context: &VisContext, layer: u32) {
@@ -61,11 +53,7 @@ impl TextureArray {
             wgpu::ImageCopyTexture {
                 texture: &self.texture,
                 mip_level: 0,
-                origin: wgpu::Origin3d {
-                    x: 0,
-                    y: 0,
-                    z: layer,
-                },
+                origin: wgpu::Origin3d { x: 0, y: 0, z: layer },
                 aspect: wgpu::TextureAspect::All,
             },
             buffer,
@@ -82,8 +70,8 @@ impl TextureArray {
         );
     }
 
-    pub fn texture_view(&self) -> wgpu::TextureView {
-        self.texture.create_view(&wgpu::TextureViewDescriptor {
+    pub fn finish_creation(&mut self, context: &VisContext) {
+        self.current_view = Some(self.texture.create_view(&wgpu::TextureViewDescriptor {
             label: None,
             format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
             dimension: Some(wgpu::TextureViewDimension::Cube),
@@ -92,7 +80,31 @@ impl TextureArray {
             mip_level_count: None,
             base_array_layer: 0,
             array_layer_count: Some(self.extend.depth_or_array_layers),
-        })
+        }));
+    }
+
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        self.current_view.as_ref().unwrap()
+    }
+
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::Cube,
+                multisampled: false,
+            },
+            count: None,
+        }
+    }
+
+    pub fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::TextureView(self.texture_view()),
+        }
     }
 
     pub fn sampler(&self) -> &wgpu::Sampler {
@@ -108,6 +120,46 @@ impl TextureArray {
     }
 }
 
+pub struct Sampler {
+    sampler: wgpu::Sampler,
+}
+
+impl Sampler {
+    pub fn new(context: &VisContext) -> Self {
+        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        Self { sampler }
+    }
+
+    pub fn sampler(&self) -> &wgpu::Sampler {
+        &self.sampler
+    }
+
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        }
+    }
+
+    pub fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::Sampler(&self.sampler),
+        }
+    }
+}
+
 pub struct Texture2D {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
@@ -117,10 +169,7 @@ pub struct Texture2D {
 
 impl Texture2D {
     pub fn new(
-        context: &VisContext,
-        guid: Guid,
-        name: Option<&str>,
-        bytes: &[u8],
+        context: &VisContext, guid: Guid, name: Option<&str>, bytes: &[u8],
         format: image::ImageFormat,
     ) -> Result<Texture2D, Texture2D> {
         if let Ok(image) = image::load_from_memory_with_format(bytes, format) {
@@ -128,11 +177,7 @@ impl Texture2D {
             let rgba = image.to_rgba8();
             let dim = rgba.dimensions();
 
-            let extend = wgpu::Extent3d {
-                width: dim.0,
-                height: dim.1,
-                depth_or_array_layers: 1,
-            };
+            let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
 
             let texture = context.device.create_texture(&wgpu::TextureDescriptor {
                 label: name,
@@ -173,12 +218,7 @@ impl Texture2D {
                 ..Default::default()
             });
 
-            Ok(Texture2D {
-                texture,
-                view,
-                sampler,
-                guid,
-            })
+            Ok(Texture2D { texture, view, sampler, guid })
         } else {
             log::error!(
                 "Failed to parse image {}. Did you choose a supported format?",
@@ -197,11 +237,7 @@ impl Texture2D {
             let rgba = image.to_rgba8();
             let dim = rgba.dimensions();
 
-            let extend = wgpu::Extent3d {
-                width: dim.0,
-                height: dim.1,
-                depth_or_array_layers: 1,
-            };
+            let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
 
             let texture = context.device.create_texture(&wgpu::TextureDescriptor {
                 label: Some("error_texture"),

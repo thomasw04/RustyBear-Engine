@@ -17,7 +17,7 @@ struct VertexOutput {
 
 
 @vertex
-fn vs_main(
+fn vertex_main(
     mesh: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
@@ -43,6 +43,6 @@ var texture: texture_cube<f32>;
 var texture_sampler: sampler;
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fragment_main(in: VertexOutput) -> @location(0) vec4<f32> {
     return textureSample(texture, texture_sampler, in.eye_direction);
 }

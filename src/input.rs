@@ -75,18 +75,14 @@ impl EventSubscriber for InputState {
                 self.last_mouse_position = self.mouse_position;
                 self.mouse_position = (*x, *y);
             }
-            Event::GamepadInput {
-                buttoncode, state, ..
-            } => {
+            Event::GamepadInput { buttoncode, state, .. } => {
                 if *state == GamepadButtonState::Pressed {
                     self.gamepad_button.insert(*buttoncode, true);
                 } else {
                     self.gamepad_button.insert(*buttoncode, false);
                 }
             }
-            Event::GamepadAxis {
-                axiscode, value, ..
-            } => {
+            Event::GamepadAxis { axiscode, value, .. } => {
                 self.gamepad_axis.insert(*axiscode, *value);
             }
             _ => {}

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::utils::Guid;
 
 #[repr(C)]
@@ -34,16 +36,16 @@ impl Default for PipelineBaseConfig {
         Self {
             cull: true,
             polygon_mode: wgpu::PolygonMode::Fill,
-            blend: None,
+            blend: Some(wgpu::BlendState::REPLACE),
             write_mask: wgpu::ColorWrites::ALL,
-            samples: 1,
+            samples: 4,
         }
     }
 }
 
 pub trait BindGroup {
-    fn groups(&self) -> &[&wgpu::BindGroup];
-    fn layouts(&self) -> &[&wgpu::BindGroupLayout];
+    fn groups(&self) -> Cow<[&wgpu::BindGroup]>;
+    fn layouts(&self) -> Cow<[&wgpu::BindGroupLayout]>;
 }
 
 pub trait VertexShader {
@@ -70,9 +72,7 @@ pub trait Mesh: VertexBuffer + IndexBuffer {}
 
 impl Default for CameraUniform {
     fn default() -> Self {
-        CameraUniform {
-            view_projection: glam::Mat4::IDENTITY.to_cols_array_2d(),
-        }
+        CameraUniform { view_projection: glam::Mat4::IDENTITY.to_cols_array_2d() }
     }
 }
 

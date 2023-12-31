@@ -1,4 +1,5 @@
 use bimap::BiMap;
+use hashbrown::HashMap;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -6,18 +7,19 @@ use rayon::prelude::*;
 use crate::context::VisContext;
 use crate::logging;
 use crate::utils::{Guid, GuidGenerator};
-use std::collections::HashMap;
 
+use std::rc::Rc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
 
 use super::shader::Shader;
 use super::texture::{Texture2D, TextureArray};
 
+#[derive(Clone)]
 pub enum AssetType {
-    TextureArray(TextureArray),
-    Texture2D(Texture2D),
-    Shader(Shader),
+    TextureArray(Arc<TextureArray>),
+    Texture2D(Arc<Texture2D>),
+    Shader(Arc<Shader>),
 }
 
 static LOADING_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
@@ -30,6 +32,35 @@ static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
         .unwrap()
 });
 
+pub struct StaticRegistry {
+    static_cache: HashMap<String, AssetType>,
+}
+
+impl StaticRegistry {
+    pub fn new(context: &VisContext) -> Self {
+        let mut static_cache = HashMap::new();
+
+        static_cache.insert(
+            "skybox.wgsl".to_owned(),
+            AssetType::Shader(Arc::new(
+                Shader::new(
+                    context,
+                    Guid::new(0),
+                    wgpu::ShaderSource::Wgsl(include_str!("skybox.wgsl").into()),
+                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
+                )
+                .unwrap(),
+            )),
+        );
+
+        StaticRegistry { static_cache }
+    }
+
+    pub fn get<S: AsRef<str>>(&self, path: S) -> Option<AssetType> {
+        self.static_cache.get(path.as_ref()).cloned()
+    }
+}
+
 pub struct AssetManager {
     gpu_cache: HashMap<Guid, AssetType>,
     path_cache: BiMap<Guid, String>,
@@ -41,10 +72,7 @@ pub struct AssetManager {
 
 impl AssetManager {
     pub fn new(context: Arc<VisContext>, loc: Option<what::Location>, max_size: usize) -> Self {
-        type InChannel = (
-            Sender<(String, Guid, usize)>,
-            Receiver<(String, Guid, usize)>,
-        );
+        type InChannel = (Sender<(String, Guid, usize)>, Receiver<(String, Guid, usize)>);
         type OutChannel = (
             Sender<(Guid, Result<AssetType, String>)>,
             Receiver<(Guid, Result<AssetType, String>)>,
@@ -115,16 +143,15 @@ impl AssetManager {
         Ok(())
     }
 
-    pub fn request_asset(&mut self, guid: Guid, priority: usize) {
-        let path = if let Some(path) = self.asset_path(guid) {
-            path
-        } else {
-            log::error!("Failed to request asset. Asset not found.");
-            return;
-        };
+    pub fn request_asset<S: Into<String> + AsRef<str>>(
+        &mut self, path: S, priority: usize,
+    ) -> Guid {
+        let path = path.as_ref();
+
+        let guid = self.request_id(path);
 
         if self.gpu_cache.contains_key(&guid) {
-            return;
+            return guid;
         }
 
         if let Err(error) = self.request_sender.send((path.to_owned(), guid, priority)) {
@@ -135,12 +162,14 @@ impl AssetManager {
         } else {
             log::info!("Requested asset: {}", path);
         }
+
+        guid
     }
 
-    pub fn get_asset(&mut self, guid: Guid, priority: usize) -> Option<&AssetType> {
-        if !self.gpu_cache.contains_key(&guid) {
-            self.request_asset(guid, priority);
-        }
+    pub fn get_asset<S: Into<String> + AsRef<str>>(
+        &mut self, path: S, priority: usize,
+    ) -> (Option<AssetType>, Guid) {
+        let guid = self.request_asset(path, priority);
 
         if let Some(spinner) = logging::install_bar(ProgressBar::new_spinner()) {
             spinner.set_style(LOADING_SPINNER_STYLE.clone());
@@ -149,7 +178,7 @@ impl AssetManager {
             while !self.gpu_cache.contains_key(&guid) {
                 if let Err(err) = self.update() {
                     if guid == err {
-                        return None;
+                        return (None, guid);
                     }
                 }
                 spinner.tick();
@@ -157,18 +186,18 @@ impl AssetManager {
 
             spinner.finish_with_message("Done!");
 
-            Some(self.gpu_cache.get(&guid).unwrap())
+            (Some(self.gpu_cache.get(&guid).unwrap().clone()), guid)
         } else {
             while !self.gpu_cache.contains_key(&guid) {
                 self.update();
             }
 
-            Some(self.gpu_cache.get(&guid).unwrap())
+            (Some(self.gpu_cache.get(&guid).unwrap().clone()), guid)
         }
     }
 
-    pub fn try_asset(&mut self, guid: Guid) -> Option<&AssetType> {
-        self.gpu_cache.get(&guid)
+    pub fn try_asset(&mut self, guid: Guid) -> Option<AssetType> {
+        self.gpu_cache.get(&guid).cloned()
     }
 
     pub fn delete_asset(&mut self, guid: Guid) {
@@ -184,18 +213,18 @@ impl AssetManager {
                     let rgba = image.to_rgba8();
 
                     match Texture2D::new(context, guid, None, &rgba, image::ImageFormat::Png) {
-                        Ok(texture) => AssetType::Texture2D(texture),
+                        Ok(texture) => AssetType::Texture2D(Arc::new(texture)),
                         Err(texture) => {
                             log::error!("Failed to load texture. Loading error texture instead.");
-                            AssetType::Texture2D(texture)
+                            AssetType::Texture2D(Arc::new(texture))
                         }
                     }
                 } else {
-                    AssetType::Texture2D(Texture2D::error_texture(context))
+                    AssetType::Texture2D(Arc::new(Texture2D::error_texture(context)))
                 }
             }
             what::Asset::TextureArray(texture_array) => {
-                let texture = TextureArray::new(
+                let mut texture = TextureArray::new(
                     context,
                     guid,
                     texture_array.size,
@@ -226,11 +255,18 @@ impl AssetManager {
                     }
                 });
 
-                AssetType::TextureArray(texture)
+                texture.finish_creation(context);
+
+                AssetType::TextureArray(Arc::new(texture))
             }
             what::Asset::Shader(shader) => {
-                if let Ok(shader) = Shader::new(context, guid, shader.data, shader.stages) {
-                    return AssetType::Shader(shader);
+                if let Ok(shader) = Shader::new(
+                    context,
+                    guid,
+                    wgpu::ShaderSource::SpirV(shader.data.into()),
+                    shader.stages,
+                ) {
+                    return AssetType::Shader(Arc::new(shader));
                 } else {
                     log::error!("Failed to load shader. Loading error shader instead.");
                     todo!("Implement error shader.")

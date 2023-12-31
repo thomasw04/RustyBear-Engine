@@ -25,16 +25,10 @@ pub trait Module {
 pub trait Application<'a> {
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool;
     fn render(
-        &mut self,
-        view: &wgpu::TextureView,
-        context: &mut Context,
-        window: &winit::window::Window,
+        &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
     );
     fn gui_render(
-        &mut self,
-        view: &wgpu::TextureView,
-        context: &mut Context,
-        gui_context: &egui::Context,
+        &mut self, view: &wgpu::TextureView, context: &mut Context, gui_context: &egui::Context,
     );
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
     fn quit(&mut self);
@@ -65,10 +59,7 @@ impl<'a> ModuleStack<'a> {
     }
 
     pub fn dispatch_event(
-        &mut self,
-        event_type: EventType,
-        event: &Event,
-        context: &mut Context,
+        &mut self, event_type: EventType, event: &Event, context: &mut Context,
     ) -> bool {
         match event_type {
             EventType::App => self.events.propagate_app_event(event, context),
@@ -77,9 +68,7 @@ impl<'a> ModuleStack<'a> {
     }
 
     pub fn subscribe(
-        &mut self,
-        event_type: EventType,
-        subscriber: RcCell<impl EventSubscriber + 'a>,
+        &mut self, event_type: EventType, subscriber: RcCell<impl EventSubscriber + 'a>,
     ) {
         self.events.push(event_type, enclose! { (subscriber) move |event: &Event, context: &mut Context| { subscriber.borrow_mut().on_event(event, context) }});
     }

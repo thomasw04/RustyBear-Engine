@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -11,35 +12,33 @@ use super::types::{
     BindGroup, FragmentShader, Material, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader,
 };
 
-struct RenderPipelineConfig<'a> {
+pub struct RenderPipelineConfig<'a> {
     pub vertex_shader: (&'a wgpu::ShaderModule, Guid),
     pub fragment_shader: (&'a wgpu::ShaderModule, Guid),
     pub vertex_layout: &'a [wgpu::VertexBufferLayout<'a>],
-    pub bind_layouts: &'a [&'a wgpu::BindGroupLayout],
+    pub bind_layouts: Cow<'a, [&'a wgpu::BindGroupLayout]>,
     pub base_config: PipelineBaseConfig,
 }
 
-struct RenderPipelineBuilder<'a> {
+pub struct RenderPipelineBuilder<'a> {
     vertex_shader: (&'a wgpu::ShaderModule, Guid),
     fragment_shader: (&'a wgpu::ShaderModule, Guid),
     vertex_layout: &'a [wgpu::VertexBufferLayout<'a>],
-    bind_layouts: &'a [&'a wgpu::BindGroupLayout],
+    bind_layouts: Cow<'a, [&'a wgpu::BindGroupLayout]>,
     base_config: PipelineBaseConfig,
 }
 
 impl<'a> RenderPipelineConfig<'a> {
     pub fn new(
-        material: &'a impl Material,
-        mesh: &'a impl Mesh,
+        material: &'a impl Material, mesh: Option<&'a impl Mesh>,
         config: Option<PipelineBaseConfig>,
     ) -> Self {
+        let vertex_layout = mesh.map(|m| VertexBuffer::layout(m)).unwrap_or(&[]);
+
         Self {
             vertex_shader: (VertexShader::module(material), VertexShader::guid(material)),
-            fragment_shader: (
-                FragmentShader::module(material),
-                FragmentShader::guid(material),
-            ),
-            vertex_layout: VertexBuffer::layout(mesh),
+            fragment_shader: (FragmentShader::module(material), FragmentShader::guid(material)),
+            vertex_layout,
             bind_layouts: BindGroup::layouts(material),
             base_config: config.unwrap_or_default(),
         }
@@ -48,14 +47,13 @@ impl<'a> RenderPipelineConfig<'a> {
 
 impl<'a> RenderPipelineBuilder<'a> {
     pub fn new(
-        vertex_shader: &'a impl VertexShader,
-        fragment_shader: &'a impl FragmentShader,
+        vertex_shader: &'a impl VertexShader, fragment_shader: &'a impl FragmentShader,
     ) -> Self {
         Self {
             vertex_shader: (vertex_shader.module(), vertex_shader.guid()),
             fragment_shader: (fragment_shader.module(), fragment_shader.guid()),
             vertex_layout: &[],
-            bind_layouts: &[],
+            bind_layouts: Cow::Borrowed(&[]),
             base_config: PipelineBaseConfig::default(),
         }
     }
@@ -65,12 +63,12 @@ impl<'a> RenderPipelineBuilder<'a> {
         self
     }
 
-    pub fn with_vertex_buffer(mut self, vertex_layout: &[wgpu::VertexBufferLayout<'a>]) -> Self {
+    pub fn with_vertex_buffer(mut self, vertex_layout: &'a [wgpu::VertexBufferLayout<'a>]) -> Self {
         self.vertex_layout = vertex_layout;
         self
     }
 
-    pub fn with_bind_groups(mut self, bind_layouts: &'a [&'a wgpu::BindGroupLayout]) -> Self {
+    pub fn with_bind_groups(mut self, bind_layouts: Cow<'a, [&'a wgpu::BindGroupLayout]>) -> Self {
         self.bind_layouts = bind_layouts;
         self
     }
@@ -86,33 +84,25 @@ impl<'a> RenderPipelineBuilder<'a> {
     }
 }
 
-struct PipelineFactory {
+pub struct PipelineFactory {
     cache: HashMap<u64, Vec<wgpu::RenderPipeline>>,
     lookup: HashMap<u64, Vec<(Guid, Guid, PipelineBaseConfig)>>,
 }
 
 impl PipelineFactory {
     pub fn new() -> Self {
-        Self {
-            cache: HashMap::new(),
-            lookup: HashMap::new(),
-        }
+        Self { cache: HashMap::new(), lookup: HashMap::new() }
     }
 
     pub fn for_object(
-        &mut self,
-        context: &VisContext,
-        material: &impl Material,
-        mesh: &impl Mesh,
+        &mut self, context: &VisContext, material: &impl Material, mesh: Option<&impl Mesh>,
         config: Option<PipelineBaseConfig>,
     ) -> &wgpu::RenderPipeline {
         self.get_for(context, &RenderPipelineConfig::new(material, mesh, config))
     }
 
     pub fn get_for(
-        &mut self,
-        context: &VisContext,
-        config: &RenderPipelineConfig,
+        &mut self, context: &VisContext, config: &RenderPipelineConfig,
     ) -> &wgpu::RenderPipeline {
         let hash = Self::hash_pipeline(&config);
 
@@ -139,13 +129,17 @@ impl PipelineFactory {
     //Create a new pipeline.
     fn create(&self, context: &VisContext, config: &RenderPipelineConfig) -> wgpu::RenderPipeline {
         let pipeline_layout =
-            context
-                .device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: None,
-                    bind_group_layouts: config.bind_layouts,
-                    push_constant_ranges: &[],
-                });
+            context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &config.bind_layouts,
+                push_constant_ranges: &[],
+            });
+
+        let color_state = &[Some(wgpu::ColorTargetState {
+            format: context.format,
+            blend: config.base_config.blend,
+            write_mask: config.base_config.write_mask,
+        })];
 
         let pipeline_desc = wgpu::RenderPipelineDescriptor {
             label: None,
@@ -167,11 +161,7 @@ impl PipelineFactory {
             fragment: Some(wgpu::FragmentState {
                 module: config.fragment_shader.0,
                 entry_point: "fragment_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: context.format,
-                    blend: config.base_config.blend,
-                    write_mask: config.base_config.write_mask,
-                })],
+                targets: color_state,
             }),
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
@@ -211,10 +201,7 @@ impl PipelineFactory {
     }
 
     fn insert_pipeline(
-        &mut self,
-        hash: u64,
-        context: &VisContext,
-        config: &RenderPipelineConfig,
+        &mut self, hash: u64, context: &VisContext, config: &RenderPipelineConfig,
     ) -> &wgpu::RenderPipeline {
         self.lookup.entry(hash).or_default().push((
             config.vertex_shader.1,

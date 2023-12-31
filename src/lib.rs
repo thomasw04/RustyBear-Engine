@@ -24,7 +24,10 @@ use input::InputState;
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{context::Context, core::Application, environment::config::Config, sound::AudioEngine};
+use crate::{
+    assets::manager::StaticRegistry, context::Context, core::Application,
+    environment::config::Config, sound::AudioEngine,
+};
 
 use event::{Event, EventSubscriber};
 use window::Window;
@@ -73,7 +76,6 @@ pub struct RustyRuntime<'a> {
     stack: ModuleStack<'a>,
     renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
-    asset_manager: AssetManager,
     demo_window: egui_demo_lib::DemoWindows,
 }
 
@@ -94,51 +96,33 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
     }
 
     fn render(
-        &mut self,
-        view: &wgpu::TextureView,
-        context: &mut Context,
-        window: &winit::window::Window,
+        &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
     ) {
         {
             let mut renderer = self.renderer.borrow_mut();
-            self.asset_manager.update();
 
             renderer.update_camera_buffer(
                 &context.graphics,
-                self.camera
-                    .borrow_mut()
-                    .view_projection()
-                    .to_cols_array_2d(),
+                self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
             let view_matrix = self.camera.borrow_mut().view().to_cols_array_2d();
-            let projection = self
-                .camera
-                .borrow_mut()
-                .projection()
-                .inverse()
-                .to_cols_array_2d();
+            let projection = self.camera.borrow_mut().projection().inverse().to_cols_array_2d();
 
             renderer.update_skybox_buffer(&context.graphics, view_matrix, projection);
 
-            renderer.render(context, view, window, &self.asset_manager);
+            renderer.render(context, view, window);
         }
     }
 
     fn gui_render(
-        &mut self,
-        view: &wgpu::TextureView,
-        context: &mut Context,
-        gui_context: &egui::Context,
+        &mut self, view: &wgpu::TextureView, context: &mut Context, gui_context: &egui::Context,
     ) {
         self.demo_window.ui(gui_context);
     }
 
     fn update(
-        &mut self,
-        delta: &utils::Timestep,
-        input_state: Ref<InputState>,
-        context: &mut Context,
+        &mut self, delta: &utils::Timestep, input_state: Ref<InputState>, context: &mut Context,
     ) {
         let mut cam = self.camera.borrow_mut();
 
@@ -148,26 +132,17 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
         let (width, height) = (context.surface_config.width, context.surface_config.height);
 
         //Convert x and y to degrees using the window with and height.
-        let (x, y) = (
-            (x / width as f64) * 180.0 - 90.0,
-            (y / height as f64) * 180.0 - 90.0,
-        );
+        let (x, y) = ((x / width as f64) * 180.0 - 90.0, (y / height as f64) * 180.0 - 90.0);
 
-        let (last_x, last_y) = (
-            (last_x / width as f64) * 180.0 - 90.0,
-            (last_y / height as f64) * 180.0 - 90.0,
-        );
+        let (last_x, last_y) =
+            ((last_x / width as f64) * 180.0 - 90.0, (last_y / height as f64) * 180.0 - 90.0);
 
         let newX = lerp(last_x..=x, 0.6 * delta.norm() as f64);
         let newY = lerp(last_y..=y, 0.6 * delta.norm() as f64);
 
         let rot = cam.rotation();
 
-        cam.set_rotation(Vec3::new(
-            -newY.clamp(-90.0, 90.0) as f32,
-            -newX as f32,
-            rot.z,
-        ));
+        cam.set_rotation(Vec3::new(-newY.clamp(-90.0, 90.0) as f32, -newX as f32, rot.z));
 
         if input_state.is_key_down(&KeyCode::KeyW) {
             cam.inc_pos(glam::Vec3::new(0.0, 0.0, -(0.1 * delta.norm())));
@@ -207,12 +182,7 @@ impl<'a> RustyRuntime<'a> {
 
         let mut stack = ModuleStack::new();
 
-        let loc = context
-            .config
-            .project_config()
-            .location
-            .clone()
-            .map(what::Location::File);
+        let loc = context.config.project_config().location.clone().map(what::Location::File);
 
         if let Some(loc) = &loc {
             if let what::Location::File(path) = loc {
@@ -220,16 +190,15 @@ impl<'a> RustyRuntime<'a> {
             }
         }
 
-        let mut asset_manager = AssetManager::new(
-            context.graphics.clone(),
-            loc,
-            (context.free_memory() / 2) as usize,
-        );
+        let mut asset_manager =
+            AssetManager::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
+
+        let static_registry = StaticRegistry::new(&context.graphics);
 
         let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
 
-        let renderer = RcCell::new(Renderer::new(context, &mut asset_manager));
+        let renderer = RcCell::new(Renderer::new(context, asset_manager, static_registry));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(PerspectiveCamera::default());
@@ -238,19 +207,11 @@ impl<'a> RustyRuntime<'a> {
         camera.borrow_mut().set_aspect_ratio(
             context.surface_config.width as f32 / context.surface_config.height as f32,
         );
-        camera
-            .borrow_mut()
-            .set_position(glam::Vec3::new(0.0, 1.0, 2.0));
+        camera.borrow_mut().set_position(glam::Vec3::new(0.0, 1.0, 2.0));
 
         camera.borrow_mut().set_centered(true);
 
-        RustyRuntime {
-            stack,
-            renderer,
-            camera,
-            asset_manager,
-            demo_window: egui_demo_lib::DemoWindows::default(),
-        }
+        RustyRuntime { stack, renderer, camera, demo_window: egui_demo_lib::DemoWindows::default() }
     }
 }
 

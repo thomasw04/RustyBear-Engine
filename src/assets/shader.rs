@@ -1,8 +1,46 @@
+use std::sync::Arc;
+
 use crate::{
     context::VisContext,
     render::types::{FragmentShader, VertexShader},
     utils::Guid,
 };
+
+//Convience enum for handling assets that contain both a vertex and fragment shader or just one of them.
+pub enum ShaderVariant {
+    Single(Arc<Shader>),
+    Double(Arc<Shader>, Arc<Shader>),
+}
+
+impl ShaderVariant {
+    pub fn vertex_module(&self) -> &wgpu::ShaderModule {
+        match self {
+            ShaderVariant::Single(shader) => shader.module(),
+            ShaderVariant::Double(shader, _) => shader.module(),
+        }
+    }
+
+    pub fn fragment_module(&self) -> &wgpu::ShaderModule {
+        match self {
+            ShaderVariant::Single(shader) => shader.module(),
+            ShaderVariant::Double(_, shader) => shader.module(),
+        }
+    }
+
+    pub fn vertex_guid(&self) -> Guid {
+        match self {
+            ShaderVariant::Single(shader) => VertexShader::guid(shader.as_ref()),
+            ShaderVariant::Double(shader, _) => VertexShader::guid(shader.as_ref()),
+        }
+    }
+
+    pub fn fragment_guid(&self) -> Guid {
+        match self {
+            ShaderVariant::Single(shader) => FragmentShader::guid(shader.as_ref()),
+            ShaderVariant::Double(_, shader) => FragmentShader::guid(shader.as_ref()),
+        }
+    }
+}
 
 pub struct Shader {
     module: wgpu::ShaderModule,
@@ -12,23 +50,13 @@ pub struct Shader {
 
 impl Shader {
     pub fn new(
-        context: &VisContext,
-        guid: Guid,
-        spirv: Vec<u32>,
-        stages: what::ShaderStages,
+        context: &VisContext, guid: Guid, source: wgpu::ShaderSource, stages: what::ShaderStages,
     ) -> Result<Self, String> {
         let module = context
             .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::SpirV(spirv.into()),
-            });
+            .create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source });
 
-        Ok(Self {
-            module,
-            stages,
-            guid,
-        })
+        Ok(Self { module, stages, guid })
     }
 
     pub fn module(&self) -> &wgpu::ShaderModule {

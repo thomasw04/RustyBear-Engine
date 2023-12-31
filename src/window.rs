@@ -86,10 +86,7 @@ impl Window {
                 .expect("Couldn't append canvas to the document body.");
         }
 
-        Window {
-            native: window,
-            event_loop,
-        }
+        Window { native: window, event_loop }
     }
 
     fn toggle_fullscreen(window: &winit::window::Window) {
