@@ -1,6 +1,6 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
-use std::{borrow::Cow, hash::Hasher};
+use std::hash::Hasher;
 
 use hashbrown::HashMap;
 
@@ -8,22 +8,45 @@ use crate::context::VisContext;
 use crate::utils::Guid;
 
 use super::types::{
-    BindGroup, FragmentShader, IndexBuffer, Material, PipelineBaseConfig, VertexBuffer,
-    VertexShader,
+    BindGroup, FragmentShader, Material, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader,
 };
 
 struct RenderPipelineConfig<'a> {
-    //Descriptors
+    pub vertex_shader: (&'a wgpu::ShaderModule, Guid),
+    pub fragment_shader: (&'a wgpu::ShaderModule, Guid),
+    pub vertex_layout: &'a [wgpu::VertexBufferLayout<'a>],
+    pub bind_layouts: &'a [&'a wgpu::BindGroupLayout],
+    pub base_config: PipelineBaseConfig,
+}
+
+struct RenderPipelineBuilder<'a> {
     vertex_shader: (&'a wgpu::ShaderModule, Guid),
     fragment_shader: (&'a wgpu::ShaderModule, Guid),
-    vertex_buffer: Option<(&'a wgpu::Buffer, &'a wgpu::VertexBufferLayout<'a>)>,
-    bind_groups: Cow<'a, [&'a wgpu::BindGroup]>,
-    bind_group_layouts: Cow<'a, [&'a wgpu::BindGroupLayout]>,
-    base_config: Option<PipelineBaseConfig>,
-    index_buffer: Option<(&'a wgpu::Buffer, wgpu::IndexFormat)>,
+    vertex_layout: &'a [wgpu::VertexBufferLayout<'a>],
+    bind_layouts: &'a [&'a wgpu::BindGroupLayout],
+    base_config: PipelineBaseConfig,
 }
 
 impl<'a> RenderPipelineConfig<'a> {
+    pub fn new(
+        material: &'a impl Material,
+        mesh: &'a impl Mesh,
+        config: Option<PipelineBaseConfig>,
+    ) -> Self {
+        Self {
+            vertex_shader: (VertexShader::module(material), VertexShader::guid(material)),
+            fragment_shader: (
+                FragmentShader::module(material),
+                FragmentShader::guid(material),
+            ),
+            vertex_layout: VertexBuffer::layout(mesh),
+            bind_layouts: BindGroup::layouts(material),
+            base_config: config.unwrap_or_default(),
+        }
+    }
+}
+
+impl<'a> RenderPipelineBuilder<'a> {
     pub fn new(
         vertex_shader: &'a impl VertexShader,
         fragment_shader: &'a impl FragmentShader,
@@ -31,62 +54,35 @@ impl<'a> RenderPipelineConfig<'a> {
         Self {
             vertex_shader: (vertex_shader.module(), vertex_shader.guid()),
             fragment_shader: (fragment_shader.module(), fragment_shader.guid()),
-            vertex_buffer: None,
-            bind_groups: Cow::from(vec![]),
-            bind_group_layouts: Cow::from(vec![]),
-            base_config: None,
-            index_buffer: None,
+            vertex_layout: &[],
+            bind_layouts: &[],
+            base_config: PipelineBaseConfig::default(),
         }
-    }
-
-    pub fn from_material(material: &'a impl Material) -> Self {
-        Self {
-            vertex_shader: (VertexShader::module(material), VertexShader::guid(material)),
-            fragment_shader: (
-                FragmentShader::module(material),
-                FragmentShader::guid(material),
-            ),
-            vertex_buffer: VertexBuffer::buffer(material),
-            bind_groups: Cow::from(BindGroup::groups(material)),
-            bind_group_layouts: Cow::from(BindGroup::layouts(material)),
-            base_config: None,
-            index_buffer: IndexBuffer::buffer(material),
-        }
-    }
-
-    pub fn with_buffer(
-        mut self,
-        vertex_buffer: &'a impl VertexBuffer,
-        index_buffer: &'a impl IndexBuffer,
-    ) -> Self {
-        self.vertex_buffer = vertex_buffer.buffer();
-        self.index_buffer = index_buffer.buffer();
-        self
-    }
-
-    pub fn with_bind_groups(mut self, bind_groups: &'a [impl BindGroup]) -> Self {
-        self.bind_groups = Cow::from(
-            bind_groups
-                .iter()
-                .flat_map(|group| group.groups())
-                .cloned()
-                .collect::<Vec<_>>(),
-        );
-
-        self.bind_group_layouts = Cow::from(
-            bind_groups
-                .iter()
-                .flat_map(|group| group.layouts())
-                .cloned()
-                .collect::<Vec<_>>(),
-        );
-
-        self
     }
 
     pub fn with_config(mut self, base_config: PipelineBaseConfig) -> Self {
-        self.base_config = Some(base_config);
+        self.base_config = base_config;
         self
+    }
+
+    pub fn with_vertex_buffer(mut self, vertex_layout: &[wgpu::VertexBufferLayout<'a>]) -> Self {
+        self.vertex_layout = vertex_layout;
+        self
+    }
+
+    pub fn with_bind_groups(mut self, bind_layouts: &'a [&'a wgpu::BindGroupLayout]) -> Self {
+        self.bind_layouts = bind_layouts;
+        self
+    }
+
+    pub fn build(self) -> RenderPipelineConfig<'a> {
+        RenderPipelineConfig {
+            vertex_shader: self.vertex_shader,
+            fragment_shader: self.fragment_shader,
+            vertex_layout: self.vertex_layout,
+            bind_layouts: self.bind_layouts,
+            base_config: self.base_config,
+        }
     }
 }
 
@@ -103,34 +99,53 @@ impl PipelineFactory {
         }
     }
 
-    //Create a new pipeline.
-    pub fn create(
-        &self,
+    pub fn for_object(
+        &mut self,
         context: &VisContext,
-        config: RenderPipelineConfig,
-    ) -> wgpu::RenderPipeline {
-        let base = config.base_config.unwrap_or_default();
+        material: &impl Material,
+        mesh: &impl Mesh,
+        config: Option<PipelineBaseConfig>,
+    ) -> &wgpu::RenderPipeline {
+        self.get_for(context, &RenderPipelineConfig::new(material, mesh, config))
+    }
 
+    pub fn get_for(
+        &mut self,
+        context: &VisContext,
+        config: &RenderPipelineConfig,
+    ) -> &wgpu::RenderPipeline {
+        let hash = Self::hash_pipeline(&config);
+
+        //Weird implementation because of: https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
+        let mut index = None;
+
+        if let Some(pipelines) = self.cache.get(&hash) {
+            for (idx, _) in pipelines.iter().enumerate() {
+                if !self.compatible_pipeline(hash, idx, &config) {
+                    continue;
+                }
+
+                index = Some(idx);
+                break;
+            }
+        }
+
+        if index.is_none() {
+            return self.insert_pipeline(hash, context, config);
+        }
+        return self.cache.get(&hash).unwrap().get(index.unwrap()).unwrap();
+    }
+
+    //Create a new pipeline.
+    fn create(&self, context: &VisContext, config: &RenderPipelineConfig) -> wgpu::RenderPipeline {
         let pipeline_layout =
             context
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: None,
-                    bind_group_layouts: &config.bind_group_layouts,
+                    bind_group_layouts: config.bind_layouts,
                     push_constant_ranges: &[],
                 });
-
-        let buffer = if let Some(vertex_buffer) = config.vertex_buffer {
-            std::slice::from_ref(vertex_buffer.1)
-        } else {
-            &[]
-        };
-
-        let color_state = &[Some(wgpu::ColorTargetState {
-            format: context.format,
-            blend: base.blend,
-            write_mask: base.write_mask,
-        })];
 
         let pipeline_desc = wgpu::RenderPipelineDescriptor {
             label: None,
@@ -139,24 +154,28 @@ impl PipelineFactory {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: base.cull.then_some(wgpu::Face::Back),
-                polygon_mode: base.polygon_mode,
+                cull_mode: config.base_config.cull.then_some(wgpu::Face::Back),
+                polygon_mode: config.base_config.polygon_mode,
                 conservative: false,
                 unclipped_depth: false,
             },
             vertex: wgpu::VertexState {
                 module: config.vertex_shader.0,
                 entry_point: "vertex_main",
-                buffers: buffer,
+                buffers: config.vertex_layout,
             },
             fragment: Some(wgpu::FragmentState {
                 module: config.fragment_shader.0,
                 entry_point: "fragment_main",
-                targets: color_state,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: context.format,
+                    blend: config.base_config.blend,
+                    write_mask: config.base_config.write_mask,
+                })],
             }),
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: 1,
+                count: config.base_config.samples,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -182,7 +201,7 @@ impl PipelineFactory {
             if let Some(pipeline) = pipelines.get(idx) {
                 if pipeline.0 == config.vertex_shader.1
                     && pipeline.1 == config.fragment_shader.1
-                    && pipeline.2 == config.base_config.unwrap_or_default()
+                    && pipeline.2 == config.base_config
                 {
                     return true;
                 }
@@ -195,12 +214,12 @@ impl PipelineFactory {
         &mut self,
         hash: u64,
         context: &VisContext,
-        config: RenderPipelineConfig,
+        config: &RenderPipelineConfig,
     ) -> &wgpu::RenderPipeline {
         self.lookup.entry(hash).or_default().push((
             config.vertex_shader.1,
             config.fragment_shader.1,
-            config.base_config.unwrap_or_default(),
+            config.base_config,
         ));
 
         //Create a new pipeline if there are no compatible pipelines in the cache.
@@ -211,32 +230,5 @@ impl PipelineFactory {
 
         //Return the newly created pipeline.
         self.cache.get(&hash).unwrap().last().unwrap()
-    }
-
-    pub fn get(
-        &mut self,
-        context: &VisContext,
-        config: RenderPipelineConfig,
-    ) -> &wgpu::RenderPipeline {
-        let hash = Self::hash_pipeline(&config);
-
-        //Weird implementation because of: https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
-        let mut index = None;
-
-        if let Some(pipelines) = self.cache.get(&hash) {
-            for (idx, _) in pipelines.iter().enumerate() {
-                if !self.compatible_pipeline(hash, idx, &config) {
-                    continue;
-                }
-
-                index = Some(idx);
-                break;
-            }
-        }
-
-        if index.is_none() {
-            return self.insert_pipeline(hash, context, config);
-        }
-        return self.cache.get(&hash).unwrap().get(index.unwrap()).unwrap();
     }
 }

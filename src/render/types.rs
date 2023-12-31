@@ -26,6 +26,7 @@ pub struct PipelineBaseConfig {
     pub polygon_mode: wgpu::PolygonMode,
     pub blend: Option<wgpu::BlendState>,
     pub write_mask: wgpu::ColorWrites,
+    pub samples: u32,
 }
 
 impl Default for PipelineBaseConfig {
@@ -35,6 +36,7 @@ impl Default for PipelineBaseConfig {
             polygon_mode: wgpu::PolygonMode::Fill,
             blend: None,
             write_mask: wgpu::ColorWrites::ALL,
+            samples: 1,
         }
     }
 }
@@ -55,14 +57,16 @@ pub trait FragmentShader {
 }
 
 pub trait VertexBuffer {
-    fn buffer(&self) -> Option<(&wgpu::Buffer, &wgpu::VertexBufferLayout)>;
+    fn layout(&self) -> &[wgpu::VertexBufferLayout];
+    fn buffer(&self) -> Option<&wgpu::Buffer>;
 }
 
 pub trait IndexBuffer {
     fn buffer(&self) -> Option<(&wgpu::Buffer, wgpu::IndexFormat)>;
 }
 
-pub trait Material: VertexShader + FragmentShader + VertexBuffer + IndexBuffer + BindGroup {}
+pub trait Material: VertexShader + FragmentShader + BindGroup {}
+pub trait Mesh: VertexBuffer + IndexBuffer {}
 
 impl Default for CameraUniform {
     fn default() -> Self {
