@@ -1,0 +1,7 @@
+{
+    "project_name":"Hello World",
+    "author":"Thomas Wachter",
+    "version":"0.1.0",
+    "data_folder":"data",
+    "code_folder":"code"
+}

@@ -1,7 +1,29 @@
+use indicatif::{MultiProgress, ProgressBar};
+use indicatif_log_bridge::LogWrapper;
+use once_cell::sync::OnceCell;
 #[cfg(not(target_arch = "wasm32"))]
 use simplelog::{Color, ColorChoice, Level, LevelFilter, TerminalMode};
 #[cfg(not(target_arch = "wasm32"))]
 use simplelog::{ConfigBuilder, TermLogger};
+
+static PROGRESS_BARS: OnceCell<MultiProgress> = OnceCell::new();
+
+pub fn install_bar(bar: ProgressBar) -> Option<ProgressBar> {
+    if let Some(bars) = PROGRESS_BARS.get() {
+        Some(bars.add(bar))
+    } else {
+        log::error!("Failed to install progress bar.");
+        None
+    }
+}
+
+pub fn remove_bar(bar: &ProgressBar) {
+    if let Some(bars) = PROGRESS_BARS.get() {
+        bars.remove(bar);
+    } else {
+        log::error!("Failed to remove progress bar.");
+    }
+}
 
 pub fn init() {
     cfg_if::cfg_if! {
@@ -19,7 +41,16 @@ pub fn init() {
             .set_level_color(Level::Error, Some(Color::Red))
             .build();
 
-            let _ = TermLogger::init(LevelFilter::Info, config, TerminalMode::Mixed, ColorChoice::Auto);
+            let logger = TermLogger::new(LevelFilter::Info, config, TerminalMode::Mixed, ColorChoice::Auto);
+            let _ = PROGRESS_BARS.set(MultiProgress::new());
+
+            if let Some(bar) = PROGRESS_BARS.get() {
+                if let Err(err) = LogWrapper::new(bar.clone(), logger).try_init() {
+                    eprintln!("Failed to init logger: {} Abort.", err);
+                }
+            } else {
+                eprintln!("Failed to install progress bar. Abort.");
+            }
         }
     }
 }

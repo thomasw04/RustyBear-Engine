@@ -4,7 +4,7 @@ use glam::{Mat4, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::{
-    context::Context,
+    context::{Context, VisContext},
     event::{self, EventSubscriber},
 };
 
@@ -20,6 +20,8 @@ pub struct PerspectiveCamera {
     view: Mat4,
     projection: Mat4,
     dirty: bool,
+
+    centered: bool,
 }
 
 impl EventSubscriber for PerspectiveCamera {
@@ -49,13 +51,14 @@ impl Default for PerspectiveCamera {
         PerspectiveCamera {
             position: Vec3::new(0.0, 0.0, 0.0),
             rotation: Vec3::new(0.0, 0.0, 0.0),
-            fovy: 45.0,
+            fovy: 100.0,
             aspect_ratio: 1280.0 / 720.0,
             near: 0.1,
             far: 100.0,
             view: glam::Mat4::IDENTITY,
             projection: glam::Mat4::IDENTITY,
             dirty: true,
+            centered: false,
         }
     }
 }
@@ -69,6 +72,22 @@ impl PerspectiveCamera {
         OPENGL_TO_WGPU * self.projection * self.view
     }
 
+    pub fn projection(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.projection
+    }
+
+    pub fn view(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.view
+    }
+
     fn calc_view_projection(&mut self) {
         self.set_projection(self.fovy, self.aspect_ratio, self.near, self.far);
         self.set_view(self.position, self.rotation);
@@ -76,16 +95,26 @@ impl PerspectiveCamera {
     }
 
     pub fn set_projection(&mut self, fovy: f32, aspect_ratio: f32, near: f32, far: f32) {
-        self.projection = glam::Mat4::perspective_rh(fovy * 180.0 / PI, aspect_ratio, near, far)
+        self.projection = glam::Mat4::perspective_rh((fovy / 180.0) * PI, aspect_ratio, near, far)
     }
 
     pub fn set_view(&mut self, position: Vec3, rotation: Vec3) {
-        self.view = glam::Mat4::from_translation(position)
-            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0)
+        let rotation = glam::Mat4::from_rotation_z(rotation.z * PI / 180.0)
             * glam::Mat4::from_rotation_y(rotation.y * PI / 180.0)
-            * glam::Mat4::from_rotation_z(rotation.z * PI / 180.0);
+            * glam::Mat4::from_rotation_x(rotation.x * PI / 180.0);
+
+        if self.centered {
+            self.view = rotation * glam::Mat4::from_translation(position);
+        } else {
+            self.view = glam::Mat4::from_translation(position) * rotation;
+        }
 
         self.view = self.view.inverse();
+    }
+
+    pub fn set_centered(&mut self, centered: bool) {
+        self.centered = centered;
+        self.dirty = true;
     }
 
     pub fn position(&self) -> Vec3 {
@@ -162,64 +191,48 @@ pub struct CameraBuffer {
 }
 
 impl CameraBuffer {
-    pub fn new(context: &Context, name: &str) -> CameraBuffer {
+    pub fn new(context: &VisContext, name: &str) -> CameraBuffer {
         let uniform = CameraUniform::default();
-        let camera_buffer = context
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(name),
-                contents: bytemuck::cast_slice(&[uniform]),
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            });
+        let camera_buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some(name),
+            contents: bytemuck::cast_slice(&[uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
 
         let layout = CameraBuffer::create_layout(context, name);
 
-        let bind_group = context
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some(name),
-                layout: &layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: camera_buffer.as_entire_binding(),
-                }],
-            });
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(name),
+            layout: &layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
 
-        CameraBuffer {
-            name: String::from(name),
-            bind_group,
-            layout,
-            camera_buffer,
-            uniform,
-        }
+        CameraBuffer { name: String::from(name), bind_group, layout, camera_buffer, uniform }
     }
 
-    fn create_layout(context: &Context, name: &str) -> wgpu::BindGroupLayout {
-        context
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some(name),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-            })
+    fn create_layout(context: &VisContext, name: &str) -> wgpu::BindGroupLayout {
+        context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some(name),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        })
     }
 
     //TODO: Use some kind of staging buffer, for performance
-    pub fn update_buffer(&mut self, context: &Context, camera: [[f32; 4]; 4]) {
+    pub fn update_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         self.uniform.view_projection = camera;
-        context.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniform]),
-        );
+        context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 
     pub fn name(&self) -> &str {

@@ -1,5 +1,7 @@
 use instant::Instant;
+use std::collections::HashSet;
 use std::ops;
+use std::path::{Path, PathBuf};
 
 pub struct Timestep {
     delta: f64,
@@ -11,11 +13,7 @@ impl Default for Timestep {
     fn default() -> Self {
         let begin = Instant::now();
 
-        Timestep {
-            delta: 0.0,
-            last: begin,
-            begin,
-        }
+        Timestep { delta: 0.0, last: begin, begin }
     }
 }
 
@@ -51,11 +49,7 @@ impl From<f64> for Timestep {
     fn from(delta: f64) -> Timestep {
         let begin = Instant::now();
 
-        Timestep {
-            delta,
-            last: begin,
-            begin,
-        }
+        Timestep { delta, last: begin, begin }
     }
 }
 
@@ -86,5 +80,85 @@ impl ops::MulAssign<f64> for Timestep {
 impl ops::DivAssign<f64> for Timestep {
     fn div_assign(&mut self, rhs: f64) {
         self.delta /= rhs;
+    }
+}
+
+pub struct FileUtils {}
+
+impl FileUtils {
+    pub fn pts(path: &Path) -> &str {
+        path.to_str().unwrap_or("ERR_NON_UTF8_PATH")
+    }
+    pub fn find_ext_in_dir(root_dir: &Path, ext: &str) -> Option<PathBuf> {
+        if !root_dir.is_dir() {
+            return None;
+        }
+
+        let files_result = std::fs::read_dir(root_dir);
+
+        match files_result {
+            Err(error) => {
+                log::error!(
+                    "Could not look into directory {}. Message: {}",
+                    root_dir.to_str().unwrap_or("ERR_NON_UTF8_PATH"),
+                    error
+                );
+
+                None
+            }
+            Ok(mut files) => {
+                let file_result = files.find(|file_result| match file_result {
+                    Ok(file) => FileUtils::has_extension(file.path().as_path(), ext),
+                    Err(error) => {
+                        log::error!(
+                            "A file error occurred while in {}. Message: {}",
+                            root_dir.to_str().unwrap_or("ERR_NON_UTF8_PATH"),
+                            error
+                        );
+                        false
+                    }
+                });
+
+                file_result.and_then(|res| res.ok().map(|file| file.path()))
+            }
+        }
+    }
+
+    pub fn has_extension(file: &Path, ext: &str) -> bool {
+        if !file.is_file() {
+            return false;
+        }
+
+        file.extension().and_then(|s| s.to_str()).is_some_and(|extension| extension.eq(ext))
+    }
+}
+
+#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Guid {
+    id: u64,
+}
+
+impl Guid {
+    pub fn new(id: u64) -> Guid {
+        Guid { id }
+    }
+}
+
+pub struct GuidGenerator {
+    used: HashSet<u64>,
+}
+
+impl GuidGenerator {
+    pub fn new() -> GuidGenerator {
+        GuidGenerator { used: HashSet::new() }
+    }
+
+    pub fn generate(&mut self) -> Guid {
+        let mut id = rand::random::<u64>();
+        while self.used.contains(&id) && id < 10 {
+            id = rand::random::<u64>();
+        }
+        self.used.insert(id);
+        Guid::new(id)
     }
 }

@@ -2,9 +2,8 @@ use serde::{Deserialize, Serialize};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
     event_loop::EventLoop,
-    window::WindowBuilder,
+    window::{Fullscreen, WindowBuilder},
 };
-use winit_fullscreen::WindowFullScreen;
 
 #[derive(Serialize, Deserialize)]
 pub struct WindowConfig {
@@ -46,7 +45,8 @@ impl Window {
 
         let window_config: WindowConfig = json_unchecked.unwrap_or(Default::default());
 
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().expect("Failed to create event loop. Abort.");
+
         let window = WindowBuilder::new()
             .with_title(window_config.title)
             .with_inner_size(PhysicalSize {
@@ -64,7 +64,7 @@ impl Window {
             .unwrap();
 
         if window.fullscreen().is_some() ^ window_config.fullscreen {
-            window.toggle_fullscreen();
+            Window::toggle_fullscreen(&window);
         }
 
         #[cfg(target_arch = "wasm32")]
@@ -86,9 +86,21 @@ impl Window {
                 .expect("Couldn't append canvas to the document body.");
         }
 
-        Window {
-            native: window,
-            event_loop,
+        Window { native: window, event_loop }
+    }
+
+    fn toggle_fullscreen(window: &winit::window::Window) {
+        if window.fullscreen().is_some() {
+            window.set_fullscreen(None);
+        } else {
+            window.current_monitor().map(|monitor| {
+                monitor.video_modes().next().map(|video_mode| {
+                    #[cfg(any(target_os = "macos", unix))]
+                    window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));
+                    #[cfg(not(any(target_os = "macos", unix)))]
+                    window.set_fullscreen(Some(Fullscreen::Exclusive(video_mode)))
+                })
+            });
         }
     }
 }

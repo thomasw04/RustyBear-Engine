@@ -1,2 +1,6 @@
 unstable_features = true
 brace_style = "AlwaysNextLine"
+fn_args_layout = "Compressed"
+imports_granularity = "Module"
+reorder_imports = true
+use_small_heuristics = "Max"

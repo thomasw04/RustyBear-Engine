@@ -1,27 +1,39 @@
+use std::sync::Arc;
+
+use sysinfo::{System, SystemExt};
 use wgpu::{TextureFormatFeatureFlags, PresentMode};
-use winit::{event::{WindowEvent, Event}, event_loop::ControlFlow, dpi::PhysicalSize};
-use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState};
+use winit::{event::{WindowEvent, Event}, event_loop::EventLoopWindowTarget, dpi::PhysicalSize, keyboard::{Key, NamedKey}};
+use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
 
 pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags
 } 
 
-pub struct Context {
+pub struct VisContext {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub config: wgpu::SurfaceConfiguration,
+    pub format: wgpu::TextureFormat,
+}
+
+pub struct Context {
+    pub graphics: Arc<VisContext>,
+    pub surface_config: wgpu::SurfaceConfiguration,
     pub features: Features,
     pub egui: egui_winit_platform::Platform,
+    pub config: Config,
+    pub sysinfo: System,
 }
 
 impl<'a> Context {
-    pub async fn new(window: &mut Window) -> Context {
+    pub async fn new(window: &mut Window, config: Config) -> Context {
+        let sysinfo = System::new_with_specifics(sysinfo::RefreshKind::new().with_memory());
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 
         {
             backends: wgpu::Backends::all(),
-            dx12_shader_compiler: Default::default(), 
+            dx12_shader_compiler: Default::default(),
+            ..Default::default()
         });
 
         let surface = unsafe {
@@ -41,7 +53,7 @@ impl<'a> Context {
         let format = capabilities.formats.iter()
         .copied().find(|f| f.is_srgb()).unwrap_or(capabilities.formats[0]);
 
-        let config = wgpu::SurfaceConfiguration {
+        let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width: window.native.inner_size().width,
@@ -72,7 +84,7 @@ impl<'a> Context {
             features.texture_features.set(TextureFormatFeatureFlags::MULTISAMPLE_X16, false);
         }
 
-        surface.configure(&device, &config);
+        surface.configure(&device, &surface_config);
 
         let egui = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor
         {
@@ -83,7 +95,7 @@ impl<'a> Context {
             style: Default::default(),
         });
 
-        Context { surface, device, queue, config, features, egui }
+        Context { graphics: Arc::new(VisContext { surface, device, queue, format }), surface_config, features, egui, config, sysinfo }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
@@ -108,7 +120,7 @@ impl<'a> Context {
        //Time since last frame
         let mut ts = Timestep::default();
 
-        window.event_loop.run(enclose! { (input_state) move |event, _, control_flow|
+        let _ = window.event_loop.run(enclose! { (input_state) move |event, window_target|
         {
             self.egui.handle_event(&event);
 
@@ -122,36 +134,31 @@ impl<'a> Context {
                         WindowEvent::Resized(new_size) => {
                             self.resize(*new_size);
                         },
-                        WindowEvent::ScaleFactorChanged { new_inner_size, ..} => {
+                        /*WindowEvent::ScaleFactorChanged { new_inner_size, ..} => {
                             self.resize(**new_inner_size);
-                        },
+                        },*/
+                        WindowEvent::RedrawRequested => {
+                            app.update(ts.step_fwd(), input_state.borrow(), &mut self);
+                            self.egui.update_time(ts.total_secs());
+
+                            match self.render(&window.native, &mut app) {
+                                Ok(_) => {}
+                                Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.surface_config.width, height: self.surface_config.height }); },
+                                Err(wgpu::SurfaceError::OutOfMemory) => { window_target.exit(); },
+                                Err(e) => 
+                                { 
+                                    log::error!("{:?}", e);
+                                },
+                            }
+                        }
                         _ => {}
                     }
 
-                    Context::dispatch_event(app.get_stack(), event, control_flow, &mut self);
+                    Context::dispatch_event(app.get_stack(), &window.native, event, window_target, &mut self);
                     app.on_event(&event::to_event(event), &mut self)
                 },
 
-                Event::RedrawRequested(window_id)
-
-                if window_id == window.native.id() =>
-                {
-                    app.update(ts.step_fwd(), input_state.borrow(), &mut self);
-                    self.egui.update_time(ts.total_secs());
-
-                    match self.render(&window.native, &mut app) {
-                        Ok(_) => {true}
-                        Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.config.width, height: self.config.height }); false},
-                        Err(wgpu::SurfaceError::OutOfMemory) => { *control_flow = ControlFlow::Exit; true},
-                        Err(e) => 
-                        { 
-                            log::error!("{:?}", e);
-                            true
-                        },
-                    }
-                },
-
-                Event::MainEventsCleared => {
+                Event::AboutToWait => {
                     window.native.request_redraw();
                     false
                 },
@@ -161,7 +168,7 @@ impl<'a> Context {
             let gilrs_event_option = gilrs.next_event();
 
             if let Some(gilrs_event) = gilrs_event_option {
-                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, control_flow, &mut self);
+                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, window_target, &mut self);
             }
         }});
     }
@@ -169,15 +176,16 @@ impl<'a> Context {
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>)
     {
         if new_size.width > 0 && new_size.height > 0 {
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
+            self.surface_config.width = new_size.width;
+            self.surface_config.height = new_size.height;
+
+            self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
         }
     }
 
     fn render(&mut self, window: &winit::window::Window, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
     {
-        let output = self.surface.get_current_texture()?;
+        let output = self.graphics.surface.get_current_texture()?;
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -193,31 +201,52 @@ impl<'a> Context {
     pub fn set_vsync(&mut self, vsync: bool)
     {
         match vsync {
-            true => self.config.present_mode = PresentMode::AutoVsync,
-            false => self.config.present_mode = PresentMode::AutoNoVsync,
+            true => self.surface_config.present_mode = PresentMode::AutoVsync,
+            false => self.surface_config.present_mode = PresentMode::AutoNoVsync,
         }
        
-       self.surface.configure(&self.device, &self.config);
+        self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
     }
 
     pub fn vsync(&self) -> bool
     {
-        self.config.present_mode == PresentMode::AutoVsync
+        self.surface_config.present_mode == PresentMode::AutoVsync
     }
 
     //These wrapper are just making the code structure more logical in my opinion.
-    fn dispatch_event(apps: &mut ModuleStack, event: &WindowEvent, control_flow: &mut ControlFlow, context: &mut Context) -> bool
+    fn dispatch_event(apps: &mut ModuleStack, window: &winit::window::Window, event: &WindowEvent, window_target: &EventLoopWindowTarget<()>, context: &mut Context) -> bool
     {
         let return_value = apps.dispatch_event(event::EventType::Layer, &event::to_event(event), context);
 
         if *event == WindowEvent::CloseRequested || *event == WindowEvent::Destroyed {
-            control_flow.set_exit();
+            window_target.exit();
+        }
+
+        if let WindowEvent::KeyboardInput { event, .. } = event {
+            if let Key::Named(NamedKey::Escape) = event.logical_key {
+                window_target.exit();
+            }
+        }
+
+        if let WindowEvent::MouseInput { device_id, state, button } = *event {
+            if button == winit::event::MouseButton::Right && state == winit::event::ElementState::Pressed {
+                window.set_cursor_visible(false);
+                //window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+            } else if button == winit::event::MouseButton::Right && state == winit::event::ElementState::Released {
+                //window.set_cursor_grab(CursorGrabMode::None);
+                window.set_cursor_visible(true);
+            }
         }
 
         return_value
     }
 
-    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _control_flow: &mut ControlFlow, context: &mut Context) -> bool
+    pub fn free_memory(&self) -> u64 
+    {
+        self.sysinfo.free_memory()
+    }
+
+    fn dispatch_gamepad_event(apps: &mut ModuleStack, event: &gilrs::Event, _window_target: &EventLoopWindowTarget<()>, context: &mut Context) -> bool
     {
         apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
     }

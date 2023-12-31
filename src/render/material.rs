@@ -1,6 +1,100 @@
-use crate::context::Context;
+use std::{borrow::Cow, rc::Rc, sync::Arc};
 
-pub struct Material {
+use crate::{
+    assets::{
+        buffer::UniformBuffer,
+        shader::ShaderVariant,
+        texture::{Sampler, TextureArray},
+    },
+    context::VisContext,
+    utils::Guid,
+};
+
+use super::types::{BindGroup, FragmentShader, Material, SplitCameraUniform, VertexShader};
+
+pub struct SkyboxMaterial {
+    //Shader
+    shader: ShaderVariant,
+
+    //Bind group layout and bind group
+    bind_layout: wgpu::BindGroupLayout,
+    bind_group: wgpu::BindGroup,
+
+    //Buffer and uniform
+    buffer: UniformBuffer,
+    uniform: SplitCameraUniform,
+}
+
+impl SkyboxMaterial {
+    pub fn new(context: &VisContext, shader: ShaderVariant, texture: Arc<TextureArray>) -> Self {
+        let uniform = SplitCameraUniform::default();
+        let buffer = UniformBuffer::new(context, std::mem::size_of::<SplitCameraUniform>());
+
+        let sampler = Sampler::new(context);
+
+        let bind_layout =
+            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[
+                    UniformBuffer::layout_entry(0),
+                    TextureArray::layout_entry(1),
+                    Sampler::layout_entry(2),
+                ],
+            });
+
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_layout,
+            entries: &[buffer.group_entry(0), texture.group_entry(1), sampler.group_entry(2)],
+        });
+
+        SkyboxMaterial { shader, bind_layout, bind_group, buffer, uniform }
+    }
+
+    pub fn update_buffer(
+        &mut self, context: &VisContext, view: [[f32; 4]; 4], projection: [[f32; 4]; 4],
+    ) {
+        self.uniform.view = view;
+        self.uniform.projection = projection;
+        self.buffer.update_buffer(context, bytemuck::cast_slice(&[self.uniform]));
+    }
+}
+
+impl Material for SkyboxMaterial {}
+
+impl BindGroup for SkyboxMaterial {
+    fn groups(&self) -> Cow<'_, [&wgpu::BindGroup]> {
+        //TODO: Find a way to avoid this heap allocation.
+        Cow::Owned(vec![&self.bind_group])
+    }
+
+    fn layouts(&self) -> Cow<'_, [&wgpu::BindGroupLayout]> {
+        //TODO: Find a way to avoid this heap allocation.
+        Cow::Owned(vec![&self.bind_layout])
+    }
+}
+
+impl FragmentShader for SkyboxMaterial {
+    fn guid(&self) -> Guid {
+        self.shader.fragment_guid()
+    }
+
+    fn module(&self) -> &wgpu::ShaderModule {
+        self.shader.fragment_module()
+    }
+}
+
+impl VertexShader for SkyboxMaterial {
+    fn guid(&self) -> Guid {
+        self.shader.vertex_guid()
+    }
+
+    fn module(&self) -> &wgpu::ShaderModule {
+        self.shader.vertex_module()
+    }
+}
+
+/*pub struct Material {
     name: String,
     texture_count: u32,
     bind_group: wgpu::BindGroup,
@@ -9,7 +103,7 @@ pub struct Material {
 
 impl Material {
     pub fn new(
-        context: &Context,
+        context: &VisContext,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
         name: &str,
@@ -28,7 +122,7 @@ impl Material {
 
     pub fn recreate_bind_group(
         &mut self,
-        context: &Context,
+        context: &VisContext,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
     ) {
@@ -37,7 +131,7 @@ impl Material {
     }
 
     fn create_bind_group(
-        context: &Context,
+        context: &VisContext,
         layout: &wgpu::BindGroupLayout,
         textures: Vec<&wgpu::TextureView>,
         sampler: &wgpu::Sampler,
@@ -67,11 +161,15 @@ impl Material {
             })
     }
 
-    pub fn recreate_layout(&mut self, context: &Context, texture_count: u32, name: &str) {
+    pub fn recreate_layout(&mut self, context: &VisContext, texture_count: u32, name: &str) {
         self.layout = Material::create_layout(context, texture_count, name);
     }
 
-    fn create_layout(context: &Context, texture_count: u32, name: &str) -> wgpu::BindGroupLayout {
+    fn create_layout(
+        context: &VisContext,
+        texture_count: u32,
+        name: &str,
+    ) -> wgpu::BindGroupLayout {
         let mut entries = Vec::<wgpu::BindGroupLayoutEntry>::new();
         entries.reserve((texture_count + 1) as usize);
 
@@ -110,4 +208,4 @@ impl Material {
     pub fn layout(&self) -> &wgpu::BindGroupLayout {
         &self.layout
     }
-}
+}*/
