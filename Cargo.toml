@@ -32,7 +32,7 @@ clap = { version = "4.3.10", features = ["derive"] }
 gltf = "1.2.0"
 glam = "0.24.1"
 egui_wgpu_backend = { git = "https://github.com/thomasw04/egui_wgpu_backend.git", features = ["web"] }
-egui_winit_platform = { path = "../egui_winit_platform", features = ["clipboard"]}
+egui_winit_platform = { git = "https://github.com/thomasw04/egui_winit_platform.git", features = ["clipboard"]}
 egui = "0.24.1"
 egui_demo_lib = "0.24.1"
 what = { git = "https://github.com/thomasw04/what.git" }
