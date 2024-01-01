@@ -14,9 +14,9 @@ pub mod render;
 pub mod sound;
 pub mod window;
 
-use std::{cell::Ref, fs::File, ops::Sub, panic::Location};
+use std::cell::Ref;
 
-use assets::manager::AssetManager;
+use assets::assets::Assets;
 use egui::lerp;
 use glam::Vec3;
 use input::InputState;
@@ -24,10 +24,7 @@ use input::InputState;
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{
-    assets::manager::StaticRegistry, context::Context, core::Application,
-    environment::config::Config, sound::AudioEngine,
-};
+use crate::{context::Context, core::Application, environment::config::Config, sound::AudioEngine};
 
 use event::{Event, EventSubscriber};
 use window::Window;
@@ -116,7 +113,7 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
     }
 
     fn gui_render(
-        &mut self, view: &wgpu::TextureView, context: &mut Context, gui_context: &egui::Context,
+        &mut self, _view: &wgpu::TextureView, _context: &mut Context, gui_context: &egui::Context,
     ) {
         self.demo_window.ui(gui_context);
     }
@@ -184,21 +181,17 @@ impl<'a> RustyRuntime<'a> {
 
         let loc = context.config.project_config().location.clone().map(what::Location::File);
 
-        if let Some(loc) = &loc {
-            if let what::Location::File(path) = loc {
-                log::warn!("Project: {:?}", path);
-            }
+        if let Some(what::Location::File(path)) = &loc {
+            log::warn!("Project: {:?}", path);
         }
 
-        let mut asset_manager =
-            AssetManager::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
-
-        let static_registry = StaticRegistry::new(&context.graphics);
+        let assets =
+            Assets::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
 
         let handler = RcCell::new(MyHandler::new(context));
         stack.subscribe(event::EventType::Layer, handler);
 
-        let renderer = RcCell::new(Renderer::new(context, asset_manager, static_registry));
+        let renderer = RcCell::new(Renderer::new(context, assets));
         stack.subscribe(event::EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(PerspectiveCamera::default());

@@ -228,7 +228,7 @@ impl<'a> Context {
             }
         }
 
-        if let WindowEvent::MouseInput { device_id, state, button } = *event {
+        if let WindowEvent::MouseInput { device_id: _, state, button } = *event {
             if button == winit::event::MouseButton::Right && state == winit::event::ElementState::Pressed {
                 window.set_cursor_visible(false);
                 //window.set_cursor_grab(CursorGrabMode::Confined).unwrap();

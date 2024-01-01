@@ -1,15 +1,10 @@
-use core::panic;
-use std::rc::Rc;
-
-use serde::de::IntoDeserializer;
 use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
-use what::ShaderStages;
 use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::{
-        manager::{AssetManager, AssetType, StaticRegistry},
-        shader::{Shader, ShaderVariant},
+        assets::{Assets, Ptr},
+        shader::ShaderVariant,
         texture::{Texture2D, TextureArray},
     },
     context::{Context, VisContext},
@@ -17,18 +12,14 @@ use crate::{
 };
 
 use super::{
-    camera::CameraBuffer,
-    factory::PipelineFactory,
-    framebuffer::Framebuffer,
-    mesh::GenericMesh,
-    types::{BindGroup, Mesh},
+    camera::CameraBuffer, factory::PipelineFactory, framebuffer::Framebuffer, mesh::GenericMesh,
+    types::BindGroup,
 };
 use super::{material::SkyboxMaterial, types::Vertex2D};
 
 pub struct Renderer {
     framebuffer: Framebuffer,
-    asset_manager: AssetManager,
-    static_registry: StaticRegistry,
+    assets: Assets,
     pipelines: PipelineFactory,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -70,9 +61,7 @@ impl EventSubscriber for Renderer {
 }
 
 impl Renderer {
-    pub fn new(
-        context: &Context, mut asset_manager: AssetManager, static_registry: StaticRegistry,
-    ) -> Self {
+    pub fn new(context: &Context, mut assets: Assets) -> Self {
         //Renderable setup
         let sample_count = 4;
 
@@ -87,23 +76,12 @@ impl Renderer {
         Material::new(&context.graphics, vec![texture.view()], texture.sampler(), "Quad");*/
 
         //TODO add capability to what for material asset type containing textures, shaders, etc.
-        let (sky_tex, _) = asset_manager.get_asset("data/skybox.fur", 0);
+        let sky_tex = assets.request_asset("data/skybox.fur", 0);
+        let sky_shader = assets.request_asset("static:skybox.wgsl", 0);
 
-        let mut skybox = None;
-
-        if let Some(AssetType::TextureArray(sky_tex)) = sky_tex {
-            if let Some(AssetType::Shader(sky_shader)) = static_registry.get("skybox.wgsl") {
-                skybox = Some(SkyboxMaterial::new(
-                    &context.graphics,
-                    ShaderVariant::Single(sky_shader),
-                    sky_tex,
-                ));
-            } else {
-                panic!("Failed to load skybox shader.")
-            }
-        } else {
-            panic!("Failed to load skybox texture.")
-        }
+        let skybox = assets.get(&sky_tex).map(|sky_tex| {
+            SkyboxMaterial::new(&context.graphics, ShaderVariant::Single(sky_shader), sky_tex)
+        });
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
@@ -136,8 +114,7 @@ impl Renderer {
 
         Renderer {
             framebuffer,
-            asset_manager,
-            static_registry,
+            assets,
             pipelines,
             vertex_buffer,
             index_buffer,
@@ -230,7 +207,7 @@ impl Renderer {
     pub fn render(
         &mut self, context: &mut Context, view: &TextureView, window: &winit::window::Window,
     ) {
-        let _ = self.asset_manager.update();
+        let _ = self.assets.update();
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
 
@@ -270,9 +247,11 @@ impl Renderer {
             if let Some(skybox) = &self.skybox {
                 let pipeline = self.pipelines.for_object(
                     &context.graphics,
+                    &mut self.assets,
                     skybox,
                     None::<&GenericMesh>,
                     None,
+                    true,
                 );
 
                 render_pass.set_pipeline(pipeline);

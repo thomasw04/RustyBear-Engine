@@ -133,7 +133,7 @@ impl FileUtils {
     }
 }
 
-#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Guid {
     id: u64,
 }
@@ -144,13 +144,14 @@ impl Guid {
     }
 }
 
+#[derive(Default)]
 pub struct GuidGenerator {
     used: HashSet<u64>,
 }
 
 impl GuidGenerator {
     pub fn new() -> GuidGenerator {
-        GuidGenerator { used: HashSet::new() }
+        Default::default()
     }
 
     pub fn generate(&mut self) -> Guid {

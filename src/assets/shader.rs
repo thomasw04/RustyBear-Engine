@@ -1,43 +1,25 @@
-use std::sync::Arc;
+use crate::context::VisContext;
 
-use crate::{
-    context::VisContext,
-    render::types::{FragmentShader, VertexShader},
-    utils::Guid,
-};
+use super::assets::Ptr;
 
 //Convience enum for handling assets that contain both a vertex and fragment shader or just one of them.
 pub enum ShaderVariant {
-    Single(Arc<Shader>),
-    Double(Arc<Shader>, Arc<Shader>),
+    Single(Ptr<Shader>),
+    Double(Ptr<Shader>, Ptr<Shader>),
 }
 
 impl ShaderVariant {
-    pub fn vertex_module(&self) -> &wgpu::ShaderModule {
+    pub fn vertex(&self) -> &Ptr<Shader> {
         match self {
-            ShaderVariant::Single(shader) => shader.module(),
-            ShaderVariant::Double(shader, _) => shader.module(),
+            ShaderVariant::Single(shader) => shader,
+            ShaderVariant::Double(shader, _) => shader,
         }
     }
 
-    pub fn fragment_module(&self) -> &wgpu::ShaderModule {
+    pub fn fragment(&self) -> &Ptr<Shader> {
         match self {
-            ShaderVariant::Single(shader) => shader.module(),
-            ShaderVariant::Double(_, shader) => shader.module(),
-        }
-    }
-
-    pub fn vertex_guid(&self) -> Guid {
-        match self {
-            ShaderVariant::Single(shader) => VertexShader::guid(shader.as_ref()),
-            ShaderVariant::Double(shader, _) => VertexShader::guid(shader.as_ref()),
-        }
-    }
-
-    pub fn fragment_guid(&self) -> Guid {
-        match self {
-            ShaderVariant::Single(shader) => FragmentShader::guid(shader.as_ref()),
-            ShaderVariant::Double(_, shader) => FragmentShader::guid(shader.as_ref()),
+            ShaderVariant::Single(shader) => shader,
+            ShaderVariant::Double(_, shader) => shader,
         }
     }
 }
@@ -45,18 +27,17 @@ impl ShaderVariant {
 pub struct Shader {
     module: wgpu::ShaderModule,
     stages: what::ShaderStages,
-    guid: Guid,
 }
 
 impl Shader {
     pub fn new(
-        context: &VisContext, guid: Guid, source: wgpu::ShaderSource, stages: what::ShaderStages,
+        context: &VisContext, source: wgpu::ShaderSource, stages: what::ShaderStages,
     ) -> Result<Self, String> {
         let module = context
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor { label: None, source });
 
-        Ok(Self { module, stages, guid })
+        Ok(Self { module, stages })
     }
 
     pub fn module(&self) -> &wgpu::ShaderModule {
@@ -65,27 +46,5 @@ impl Shader {
 
     pub fn stages(&self) -> what::ShaderStages {
         self.stages
-    }
-}
-
-impl VertexShader for Shader {
-    fn guid(&self) -> Guid {
-        self.guid
-    }
-
-    fn module(&self) -> &wgpu::ShaderModule {
-        //TODO maybe check if the shader is a vertex shader?
-        &self.module
-    }
-}
-
-impl FragmentShader for Shader {
-    fn guid(&self) -> Guid {
-        self.guid
-    }
-
-    fn module(&self) -> &wgpu::ShaderModule {
-        //TODO maybe check if the shader is a fragment shader?
-        &self.module
     }
 }

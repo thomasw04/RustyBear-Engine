@@ -1,15 +1,14 @@
-use crate::{context::VisContext, utils::Guid};
+use crate::context::VisContext;
 
 pub struct TextureArray {
     extend: wgpu::Extent3d,
     texture: wgpu::Texture,
     current_view: Option<wgpu::TextureView>,
     sampler: wgpu::Sampler,
-    guid: Guid,
 }
 
 impl TextureArray {
-    pub fn new(context: &VisContext, guid: Guid, size: u32, layers: u32) -> Self {
+    pub fn new(context: &VisContext, size: u32, layers: u32) -> Self {
         let extend = wgpu::Extent3d { width: size, height: size, depth_or_array_layers: layers };
 
         let texture = context.device.create_texture(&wgpu::TextureDescriptor {
@@ -33,7 +32,7 @@ impl TextureArray {
             ..Default::default()
         });
 
-        TextureArray { extend, texture, current_view: None, sampler, guid }
+        TextureArray { extend, texture, current_view: None, sampler }
     }
 
     pub fn upload_error_texture(&self, context: &VisContext, layer: u32) {
@@ -70,7 +69,7 @@ impl TextureArray {
         );
     }
 
-    pub fn finish_creation(&mut self, context: &VisContext) {
+    pub fn finish_creation(&mut self) {
         self.current_view = Some(self.texture.create_view(&wgpu::TextureViewDescriptor {
             label: None,
             format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
@@ -164,13 +163,11 @@ pub struct Texture2D {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
-    guid: Guid,
 }
 
 impl Texture2D {
     pub fn new(
-        context: &VisContext, guid: Guid, name: Option<&str>, bytes: &[u8],
-        format: image::ImageFormat,
+        context: &VisContext, name: Option<&str>, bytes: &[u8], format: image::ImageFormat,
     ) -> Result<Texture2D, Texture2D> {
         if let Ok(image) = image::load_from_memory_with_format(bytes, format) {
             //Potentially also support other color formats e.g. rgba16 (Need to do more research on this)
@@ -218,7 +215,7 @@ impl Texture2D {
                 ..Default::default()
             });
 
-            Ok(Texture2D { texture, view, sampler, guid })
+            Ok(Texture2D { texture, view, sampler })
         } else {
             log::error!(
                 "Failed to parse image {}. Did you choose a supported format?",
@@ -278,12 +275,7 @@ impl Texture2D {
                 ..Default::default()
             });
 
-            Texture2D {
-                texture,
-                view,
-                sampler,
-                guid: Guid::default(), //TODO think about something better
-            }
+            Texture2D { texture, view, sampler }
         } else {
             //For devs: Of course this can also happen while engine development. E.g. broken png in resources/
             panic!("Fatal. Error texture should always be loadable. This suggest you messed with the executable. Abort.");
