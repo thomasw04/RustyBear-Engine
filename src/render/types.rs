@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::utils::Guid;
+use crate::assets::{assets::Ptr, shader::Shader};
 
 #[repr(C)]
 #[derive(wgpu_macros::VertexLayout, Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -49,13 +49,11 @@ pub trait BindGroup {
 }
 
 pub trait VertexShader {
-    fn guid(&self) -> Guid;
-    fn module(&self) -> &wgpu::ShaderModule;
+    fn ptr(&self) -> &Ptr<Shader>;
 }
 
 pub trait FragmentShader {
-    fn guid(&self) -> Guid;
-    fn module(&self) -> &wgpu::ShaderModule;
+    fn ptr(&self) -> &Ptr<Shader>;
 }
 
 pub trait VertexBuffer {

@@ -1,13 +1,13 @@
-use std::{borrow::Cow, rc::Rc, sync::Arc};
+use std::borrow::Cow;
 
 use crate::{
     assets::{
+        assets::Ptr,
         buffer::UniformBuffer,
-        shader::ShaderVariant,
+        shader::{Shader, ShaderVariant},
         texture::{Sampler, TextureArray},
     },
     context::VisContext,
-    utils::Guid,
 };
 
 use super::types::{BindGroup, FragmentShader, Material, SplitCameraUniform, VertexShader};
@@ -26,7 +26,7 @@ pub struct SkyboxMaterial {
 }
 
 impl SkyboxMaterial {
-    pub fn new(context: &VisContext, shader: ShaderVariant, texture: Arc<TextureArray>) -> Self {
+    pub fn new(context: &VisContext, shader: ShaderVariant, texture: &TextureArray) -> Self {
         let uniform = SplitCameraUniform::default();
         let buffer = UniformBuffer::new(context, std::mem::size_of::<SplitCameraUniform>());
 
@@ -75,22 +75,14 @@ impl BindGroup for SkyboxMaterial {
 }
 
 impl FragmentShader for SkyboxMaterial {
-    fn guid(&self) -> Guid {
-        self.shader.fragment_guid()
-    }
-
-    fn module(&self) -> &wgpu::ShaderModule {
-        self.shader.fragment_module()
+    fn ptr(&self) -> &Ptr<Shader> {
+        self.shader.fragment()
     }
 }
 
 impl VertexShader for SkyboxMaterial {
-    fn guid(&self) -> Guid {
-        self.shader.vertex_guid()
-    }
-
-    fn module(&self) -> &wgpu::ShaderModule {
-        self.shader.vertex_module()
+    fn ptr(&self) -> &Ptr<Shader> {
+        self.shader.vertex()
     }
 }
 
