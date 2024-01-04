@@ -71,7 +71,7 @@ impl MyHandler {
 
 pub struct RustyRuntime<'a> {
     stack: ModuleStack<'a>,
-    renderer: RcCell<Renderer>,
+    renderer: RcCell<Renderer<'a>>,
     camera: RcCell<PerspectiveCamera>,
     demo_window: egui_demo_lib::DemoWindows,
 }

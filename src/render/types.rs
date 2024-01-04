@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::assets::{assets::Ptr, shader::Shader};
 
 #[repr(C)]
@@ -43,9 +41,14 @@ impl Default for PipelineBaseConfig {
     }
 }
 
+pub trait BindGroupEntry {
+    fn group_entry(&self, binding: u32) -> wgpu::BindGroupEntry;
+    fn layout_entry(&self, binding: u32) -> wgpu::BindGroupLayoutEntry;
+}
+
 pub trait BindGroup {
-    fn groups(&self) -> Cow<[&wgpu::BindGroup]>;
-    fn layouts(&self) -> Cow<[&wgpu::BindGroupLayout]>;
+    fn groups(&self) -> &[wgpu::BindGroup];
+    fn layouts(&self) -> &[wgpu::BindGroupLayout];
 }
 
 pub trait VertexShader {
