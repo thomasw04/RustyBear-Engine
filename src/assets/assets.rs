@@ -90,6 +90,21 @@ impl Assets {
             ),
         );
 
+        Self::add_static_asset(
+            &mut gpu_cache,
+            &mut path_cache,
+            &mut generator,
+            "static:default.wgsl".to_owned(),
+            AssetType::Shader(
+                Shader::new(
+                    &context,
+                    wgpu::ShaderSource::Wgsl(include_str!("default.wgsl").into()),
+                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
+                )
+                .unwrap(),
+            ),
+        );
+
         let (in_sender, in_receiver): InChannel = mpsc::channel();
         let (out_sender, out_receiver): OutChannel = mpsc::channel();
 

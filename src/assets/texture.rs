@@ -1,4 +1,4 @@
-use crate::context::VisContext;
+use crate::{context::VisContext, render::types::BindGroupEntry};
 
 pub struct TextureArray {
     extend: wgpu::Extent3d,
@@ -86,26 +86,6 @@ impl TextureArray {
         self.current_view.as_ref().unwrap()
     }
 
-    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
-        wgpu::BindGroupLayoutEntry {
-            binding: idx,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Texture {
-                sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                view_dimension: wgpu::TextureViewDimension::Cube,
-                multisampled: false,
-            },
-            count: None,
-        }
-    }
-
-    pub fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
-        wgpu::BindGroupEntry {
-            binding: idx,
-            resource: wgpu::BindingResource::TextureView(self.texture_view()),
-        }
-    }
-
     pub fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
     }
@@ -116,6 +96,28 @@ impl TextureArray {
 
     pub fn extend(&self) -> wgpu::Extent3d {
         self.extend
+    }
+}
+
+impl BindGroupEntry for TextureArray {
+    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::TextureView(self.texture_view()),
+        }
+    }
+
+    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::Cube,
+                multisampled: false,
+            },
+            count: None,
+        }
     }
 }
 
@@ -138,11 +140,34 @@ impl Sampler {
         Self { sampler }
     }
 
+    pub fn two_dim(context: &VisContext) -> Self {
+        let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+
+        Self { sampler }
+    }
+
     pub fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
     }
+}
 
-    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
+impl BindGroupEntry for Sampler {
+    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::Sampler(&self.sampler),
+        }
+    }
+
+    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -150,19 +175,11 @@ impl Sampler {
             count: None,
         }
     }
-
-    pub fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
-        wgpu::BindGroupEntry {
-            binding: idx,
-            resource: wgpu::BindingResource::Sampler(&self.sampler),
-        }
-    }
 }
 
 pub struct Texture2D {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    sampler: wgpu::Sampler,
 }
 
 impl Texture2D {
@@ -205,17 +222,7 @@ impl Texture2D {
 
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-            let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::Repeat,
-                address_mode_v: wgpu::AddressMode::Repeat,
-                address_mode_w: wgpu::AddressMode::Repeat,
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
-
-            Ok(Texture2D { texture, view, sampler })
+            Ok(Texture2D { texture, view })
         } else {
             log::error!(
                 "Failed to parse image {}. Did you choose a supported format?",
@@ -265,17 +272,7 @@ impl Texture2D {
 
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-            let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::Repeat,
-                address_mode_v: wgpu::AddressMode::Repeat,
-                address_mode_w: wgpu::AddressMode::Repeat,
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Nearest,
-                mipmap_filter: wgpu::FilterMode::Nearest,
-                ..Default::default()
-            });
-
-            Texture2D { texture, view, sampler }
+            Texture2D { texture, view }
         } else {
             //For devs: Of course this can also happen while engine development. E.g. broken png in resources/
             panic!("Fatal. Error texture should always be loadable. This suggest you messed with the executable. Abort.");
@@ -289,8 +286,26 @@ impl Texture2D {
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view
     }
+}
 
-    pub fn sampler(&self) -> &wgpu::Sampler {
-        &self.sampler
+impl BindGroupEntry for Texture2D {
+    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::TextureView(self.view()),
+        }
+    }
+
+    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        }
     }
 }

@@ -1,35 +1,39 @@
-use wgpu::{util::DeviceExt, BindGroupLayout, RenderPipeline, TextureView};
+use wgpu::TextureView;
 use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::{
-        assets::{Assets, Ptr},
+        assets::Assets,
+        buffer::{Indices, Vertices},
         shader::ShaderVariant,
-        texture::{Texture2D, TextureArray},
+        texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
     event::{self, EventSubscriber},
+    render::{material::GenericMaterial, types::BindGroupEntry},
 };
 
 use super::{
-    camera::CameraBuffer, factory::PipelineFactory, framebuffer::Framebuffer, mesh::GenericMesh,
-    types::BindGroup,
+    camera::CameraBuffer,
+    factory::PipelineFactory,
+    framebuffer::Framebuffer,
+    mesh::GenericMesh,
+    types::{BindGroup, IndexBuffer, VertexBuffer},
 };
 use super::{material::SkyboxMaterial, types::Vertex2D};
 
-pub struct Renderer {
+pub struct Renderer<'a> {
     framebuffer: Framebuffer,
     assets: Assets,
     pipelines: PipelineFactory,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
+    material: GenericMaterial,
+    mesh: GenericMesh<'a>,
     camera_buffer: CameraBuffer,
-    indices: u32,
     skybox: Option<SkyboxMaterial>,
     egui_render_pass: egui_wgpu_backend::RenderPass,
 }
 
-impl EventSubscriber for Renderer {
+impl<'a> EventSubscriber for Renderer<'a> {
     fn on_event(&mut self, event: &crate::event::Event, context: &mut Context) -> bool {
         match event {
             event::Event::Resized { width, height } => {
@@ -60,7 +64,7 @@ impl EventSubscriber for Renderer {
     }
 }
 
-impl Renderer {
+impl<'a> Renderer<'a> {
     pub fn new(context: &Context, mut assets: Assets) -> Self {
         //Renderable setup
         let sample_count = 4;
@@ -70,10 +74,7 @@ impl Renderer {
         let framebuffer = Framebuffer::new(context, sample_count);
 
         let texture = Texture2D::error_texture(&context.graphics);
-
-        /*TODO port to new system
-        let material =
-        Material::new(&context.graphics, vec![texture.view()], texture.sampler(), "Quad");*/
+        let sampler = Sampler::two_dim(&context.graphics);
 
         //TODO add capability to what for material asset type containing textures, shaders, etc.
         let sky_tex = assets.request_asset("data/skybox.fur", 0);
@@ -87,7 +88,12 @@ impl Renderer {
 
         let egui_render_pass = Renderer::recreate_gui(context, 1);
 
-        //TODO Pipeline creation
+        let material = GenericMaterial::new(
+            &context.graphics,
+            ShaderVariant::Single(assets.request_asset("static:default.wgsl", 0)),
+            &[texture.layout_entry(0), sampler.layout_entry(1)],
+            &[texture.group_entry(0), sampler.group_entry(1)],
+        );
 
         const VERTICES: &[Vertex2D] = &[
             Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
@@ -98,28 +104,24 @@ impl Renderer {
 
         const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
 
-        let vertex_buffer =
-            context.graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Default VertexBuffer"),
-                contents: bytemuck::cast_slice(VERTICES),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+        let vertices =
+            Vertices::new(&context.graphics, bytemuck::cast_slice(VERTICES), Vertex2D::LAYOUT);
 
-        let index_buffer =
-            context.graphics.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Default IndexBuffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsages::INDEX,
-            });
+        let indices = Indices::new(
+            &context.graphics,
+            bytemuck::cast_slice(INDICES),
+            wgpu::IndexFormat::Uint16,
+        );
+
+        let mesh = GenericMesh::new(vertices, indices, 6);
 
         Renderer {
             framebuffer,
             assets,
             pipelines,
-            vertex_buffer,
-            index_buffer,
+            material,
+            mesh,
             camera_buffer,
-            indices: INDICES.len() as u32,
             skybox,
             egui_render_pass,
         }
@@ -131,57 +133,6 @@ impl Renderer {
             context.surface_config.format,
             sample_count,
         )
-    }
-
-    fn recreate_pipeline(
-        context: &Context, sample_count: u32, bind_group_layouts: Vec<&BindGroupLayout>,
-    ) -> RenderPipeline {
-        let shader = context.graphics.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Default Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("default.wgsl").into()),
-        });
-
-        let pipeline_layout =
-            context.graphics.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Pipeline Layout"),
-                bind_group_layouts: &bind_group_layouts,
-                push_constant_ranges: &[],
-            });
-
-        context.graphics.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex2D::LAYOUT],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: sample_count,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: context.surface_config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview: None,
-        })
     }
 
     pub fn enable_msaa(&mut self, context: &mut Context, sample_count: u32) -> bool {
@@ -251,6 +202,7 @@ impl Renderer {
                     skybox,
                     None::<&GenericMesh>,
                     None,
+                    None,
                     true,
                 );
 
@@ -262,14 +214,47 @@ impl Renderer {
 
                 render_pass.draw(0..3, 0..1);
             }
+        }
 
-            //TODO port to new system.
-            /*render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, self.material.bind_group(), &[]);
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: match sample_count {
+                        1 => view,
+                        _ => &framebuffer_view,
+                    },
+                    resolve_target: match sample_count {
+                        1 => None,
+                        _ => Some(view),
+                    },
+                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+
+            let pipeline = self.pipelines.for_object(
+                &context.graphics,
+                &mut self.assets,
+                &self.material,
+                Some(&self.mesh),
+                None,
+                Some(self.camera_buffer.layout()),
+                true,
+            );
+
+            render_pass.set_pipeline(pipeline);
+
+            BindGroup::groups(&self.material).iter().enumerate().for_each(|(i, group)| {
+                render_pass.set_bind_group(i as u32, group, &[]);
+            });
+
             render_pass.set_bind_group(1, self.camera_buffer.bind_group(), &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.indices, 0, 0..1);*/
+            render_pass.set_vertex_buffer(0, VertexBuffer::buffer(&self.mesh).unwrap().slice(..));
+            let (buffer, format) = IndexBuffer::buffer(&self.mesh).unwrap();
+            render_pass.set_index_buffer(buffer.slice(..), format);
+            render_pass.draw_indexed(0..self.mesh.num_indices(), 0, 0..1);
         }
 
         {

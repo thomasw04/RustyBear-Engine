@@ -1,20 +1,36 @@
+use crate::assets::buffer::{Indices, Vertices};
+
 use super::types::{IndexBuffer, Mesh, VertexBuffer};
 
-pub struct GenericMesh {}
+pub struct GenericMesh<'a> {
+    vertices: Vertices<'a>,
+    indices: Indices,
+    num_indices: u32,
+}
 
-impl Mesh for GenericMesh {}
+impl<'a> GenericMesh<'a> {
+    pub fn new(vertices: Vertices<'a>, indices: Indices, num_indices: u32) -> Self {
+        Self { vertices, indices, num_indices }
+    }
 
-impl IndexBuffer for GenericMesh {
-    fn buffer(&self) -> Option<(&wgpu::Buffer, wgpu::IndexFormat)> {
-        todo!()
+    pub fn num_indices(&self) -> u32 {
+        self.num_indices
     }
 }
-impl VertexBuffer for GenericMesh {
+
+impl<'a> Mesh for GenericMesh<'a> {}
+
+impl<'a> IndexBuffer for GenericMesh<'a> {
+    fn buffer(&self) -> Option<(&wgpu::Buffer, wgpu::IndexFormat)> {
+        self.indices.buffer()
+    }
+}
+impl<'a> VertexBuffer for GenericMesh<'a> {
     fn layout(&self) -> &[wgpu::VertexBufferLayout] {
-        todo!()
+        self.vertices.layout()
     }
 
     fn buffer(&self) -> Option<&wgpu::Buffer> {
-        todo!()
+        self.vertices.buffer()
     }
 }
