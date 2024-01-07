@@ -86,9 +86,6 @@ impl ops::DivAssign<f64> for Timestep {
 pub struct FileUtils {}
 
 impl FileUtils {
-    pub fn pts(path: &Path) -> &str {
-        path.to_str().unwrap_or("ERR_NON_UTF8_PATH")
-    }
     pub fn find_ext_in_dir(root_dir: &Path, ext: &str) -> Option<PathBuf> {
         if !root_dir.is_dir() {
             return None;

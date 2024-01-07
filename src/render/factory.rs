@@ -113,19 +113,6 @@ impl PipelineFactory {
         Self { cache: HashMap::new(), lookup: HashMap::new() }
     }
 
-    pub fn for_object(
-        &mut self, context: &VisContext, assets: &mut Assets, material: &impl Material,
-        mesh: Option<&impl Mesh>, config: Option<PipelineBaseConfig>,
-        camera_layout: Option<&wgpu::BindGroupLayout>, wait: bool,
-    ) -> &wgpu::RenderPipeline {
-        self.get_for(
-            context,
-            assets,
-            &RenderPipelineConfig::new(material, mesh, config, camera_layout),
-            wait,
-        )
-    }
-
     pub fn get_for(
         &mut self, context: &VisContext, assets: &mut Assets, config: &RenderPipelineConfig,
         wait: bool,

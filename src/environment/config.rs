@@ -65,9 +65,7 @@ pub struct EngineConfiguration {
 
 impl Default for EngineConfiguration {
     fn default() -> Self {
-        EngineConfiguration {
-            project_file_extension: "rbe".to_string(),
-        }
+        EngineConfiguration { project_file_extension: "rbe".to_string() }
     }
 }
 
@@ -78,9 +76,7 @@ pub struct ThemeConfiguration {
 
 impl Default for ThemeConfiguration {
     fn default() -> Self {
-        ThemeConfiguration {
-            background_music: "default.mp3".to_string(),
-        }
+        ThemeConfiguration { background_music: "default.mp3".to_string() }
     }
 }
 
@@ -96,11 +92,7 @@ impl Config {
         let theme_config = Config::load_theme_config(&engine_config);
         let project_config = project_config.unwrap_or(ProjectConfiguration::new(None));
 
-        Config {
-            engine_config,
-            theme_config,
-            project_config,
-        }
+        Config { engine_config, theme_config, project_config }
     }
 
     pub fn exist_project(&self, path: &Path) -> bool {
@@ -166,10 +158,7 @@ impl Config {
         };
 
         if path.is_file() {
-            log::error!(
-                "Invalid path {}. Project path must be a folder.",
-                FileUtils::pts(path)
-            );
+            log::error!("Invalid path {}. Project path must be a folder.", path.display());
             return;
         }
 
@@ -181,7 +170,7 @@ impl Config {
         if FileUtils::find_ext_in_dir(path, self.engine_config.project_file_extension.as_str())
             .is_some()
         {
-            log::error!("Project {} already exists.", FileUtils::pts(path));
+            log::error!("Project {} already exists.", path.display());
             return;
         }
 
@@ -200,11 +189,7 @@ impl Config {
                 file_path.clone(),
                 serde_json::to_string(&self.project_config).unwrap_or("{}".to_string()),
             ) {
-                log::error!(
-                    "Could not create {}. {}",
-                    FileUtils::pts(file_path.as_path()),
-                    e
-                );
+                log::error!("Could not create {}. {}", file_path.display(), e);
             }
         }
     }
@@ -226,10 +211,7 @@ impl Config {
         let config = config_folder.join("config.json");
 
         if let Err(e) = std::fs::create_dir_all(config_folder) {
-            log::error!(
-                "Could not create config directory. Message: {}. Defaulting... ",
-                e
-            );
+            log::error!("Could not create config directory. Message: {}. Defaulting... ", e);
             return EngineConfiguration::default();
         }
 
@@ -277,10 +259,7 @@ impl Config {
         let themes_config = themes_folder.join("config.json");
 
         if let Err(e) = std::fs::create_dir_all(themes_folder) {
-            log::error!(
-                "Could not create themes directory. Message: {}. Defaulting... ",
-                e
-            );
+            log::error!("Could not create themes directory. Message: {}. Defaulting... ", e);
             return ThemeConfiguration::default();
         }
 
