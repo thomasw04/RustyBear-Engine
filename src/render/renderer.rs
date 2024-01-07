@@ -15,7 +15,7 @@ use crate::{
 
 use super::{
     camera::CameraBuffer,
-    factory::PipelineFactory,
+    factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
     mesh::GenericMesh,
     types::{BindGroup, IndexBuffer, VertexBuffer},
@@ -158,14 +158,16 @@ impl<'a> Renderer<'a> {
     pub fn render(
         &mut self, context: &mut Context, view: &TextureView, window: &winit::window::Window,
     ) {
-        let _ = self.assets.update();
+        let gpu = &context.graphics;
+        let assets = &mut self.assets;
+
+        let _ = assets.update();
         let framebuffer_view: TextureView = (&self.framebuffer).into();
         let sample_count = self.framebuffer.sample_count();
 
-        let mut encoder =
-            context.graphics.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
 
         let output = context.egui.end_frame(Some(window));
         let paint_jobs = context
@@ -196,17 +198,11 @@ impl<'a> Renderer<'a> {
             });
 
             if let Some(skybox) = &self.skybox {
-                let pipeline = self.pipelines.for_object(
-                    &context.graphics,
-                    &mut self.assets,
-                    skybox,
-                    None::<&GenericMesh>,
-                    None,
-                    None,
-                    true,
-                );
+                let sky_config =
+                    RenderPipelineConfig::new(skybox, None::<&GenericMesh>, None, None);
+                let skybox_pipeline = self.pipelines.get_for(gpu, assets, &sky_config, true);
 
-                render_pass.set_pipeline(pipeline);
+                render_pass.set_pipeline(skybox_pipeline);
 
                 BindGroup::groups(skybox).iter().enumerate().for_each(|(i, group)| {
                     render_pass.set_bind_group(i as u32, group, &[]);
@@ -234,15 +230,14 @@ impl<'a> Renderer<'a> {
                 ..Default::default()
             });
 
-            let pipeline = self.pipelines.for_object(
-                &context.graphics,
-                &mut self.assets,
+            let config = RenderPipelineConfig::new(
                 &self.material,
                 Some(&self.mesh),
                 None,
                 Some(self.camera_buffer.layout()),
-                true,
             );
+
+            let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
 
             render_pass.set_pipeline(pipeline);
 
@@ -265,12 +260,12 @@ impl<'a> Renderer<'a> {
             };
 
             self.egui_render_pass
-                .add_textures(&context.graphics.device, &context.graphics.queue, &texture_delta)
+                .add_textures(&gpu.device, &gpu.queue, &texture_delta)
                 .expect("[EGUI] Failed to add textures.");
 
             self.egui_render_pass.update_buffers(
-                &context.graphics.device,
-                &context.graphics.queue,
+                &gpu.device,
+                &gpu.queue,
                 &paint_jobs,
                 &screen_descriptor,
             );
@@ -280,6 +275,6 @@ impl<'a> Renderer<'a> {
                 .unwrap();
         }
 
-        context.graphics.queue.submit(std::iter::once(encoder.finish()));
+        gpu.queue.submit(std::iter::once(encoder.finish()));
     }
 }

@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Mat4, Vec2, Vec3, Vec4};
 use wgpu::util::DeviceExt;
 
 use crate::{
@@ -9,6 +9,164 @@ use crate::{
 };
 
 use super::types::CameraUniform;
+
+#[rustfmt::skip]
+pub const OPENGL_TO_WGPU: glam::Mat4 = glam::mat4
+(
+    Vec4::new(1.0, 0.0, 0.0, 0.0),
+    Vec4::new(0.0, 1.0, 0.0, 0.0),
+    Vec4::new(0.0, 0.0, 0.5, 0.5),
+    Vec4::new(0.0, 0.0, 0.0, 1.5),
+);
+
+pub struct OrthographicCamera {
+    position: Vec2,
+    rotation: f32,
+    aspect_ratio: f32,
+    zoom_level: f32,
+    near: f32,
+    far: f32,
+    view: Mat4,
+    projection: Mat4,
+    dirty: bool,
+}
+
+impl Default for OrthographicCamera {
+    fn default() -> Self {
+        OrthographicCamera {
+            position: Vec2::new(0.0, 0.0),
+            rotation: 0.0,
+            aspect_ratio: 1280.0 / 720.0,
+            zoom_level: 1.0,
+            near: 0.1,
+            far: 100.0,
+            view: glam::Mat4::IDENTITY,
+            projection: glam::Mat4::IDENTITY,
+            dirty: true,
+        }
+    }
+}
+
+impl EventSubscriber for OrthographicCamera {
+    fn on_event(&mut self, event: &crate::event::Event, _context: &mut Context) -> bool {
+        match event {
+            event::Event::Resized { width, height } => {
+                self.aspect_ratio = *width as f32 / *height as f32;
+                self.dirty = true;
+                false
+            }
+            _ => false,
+        }
+    }
+}
+
+impl OrthographicCamera {
+    pub fn view_projection(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        OPENGL_TO_WGPU * self.projection * self.view
+    }
+
+    pub fn projection(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.projection
+    }
+
+    pub fn view(&mut self) -> Mat4 {
+        if self.dirty {
+            self.calc_view_projection();
+        }
+
+        self.view
+    }
+
+    fn calc_view_projection(&mut self) {
+        self.set_projection(self.aspect_ratio, self.zoom_level, self.near, self.far);
+        self.set_view(self.position, self.rotation);
+        self.dirty = false;
+    }
+
+    pub fn set_projection(&mut self, aspect_ratio: f32, zoom_level: f32, near: f32, far: f32) {
+        self.projection = glam::Mat4::orthographic_rh(
+            -aspect_ratio * zoom_level,
+            aspect_ratio * zoom_level,
+            -zoom_level,
+            zoom_level,
+            near,
+            far,
+        )
+    }
+
+    pub fn set_view(&mut self, position: Vec2, rotation: f32) {
+        let rotation = glam::Mat4::from_rotation_z(rotation * PI / 180.0);
+        self.view = rotation * glam::Mat4::from_translation(Vec3::new(position.x, position.y, 1.0));
+        self.view = self.view.inverse();
+    }
+
+    pub fn position(&self) -> Vec2 {
+        self.position
+    }
+
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position;
+        self.dirty = true;
+    }
+
+    pub fn rotation(&self) -> f32 {
+        self.rotation
+    }
+
+    pub fn set_rotation(&mut self, rotation: f32) {
+        self.rotation = rotation;
+        self.dirty = true;
+    }
+
+    pub fn far(&self) -> f32 {
+        self.far
+    }
+
+    pub fn set_far(&mut self, far: f32) {
+        self.far = far;
+        self.dirty = true;
+    }
+
+    pub fn near(&self) -> f32 {
+        self.near
+    }
+
+    pub fn set_near(&mut self, near: f32) {
+        self.near = near;
+        self.dirty = true;
+    }
+
+    pub fn aspect_ratio(&self) -> f32 {
+        self.aspect_ratio
+    }
+
+    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
+        self.aspect_ratio = aspect_ratio;
+        self.dirty = true;
+    }
+
+    pub fn zoom_level(&self) -> f32 {
+        self.zoom_level
+    }
+
+    pub fn set_zoom_level(&mut self, zoom_level: f32) {
+        self.zoom_level = zoom_level;
+        self.dirty = true;
+    }
+
+    pub fn inc_pos(&mut self, size: Vec2) {
+        self.position += size;
+        self.dirty = true;
+    }
+}
 
 pub struct PerspectiveCamera {
     position: Vec3,
@@ -36,15 +194,6 @@ impl EventSubscriber for PerspectiveCamera {
         }
     }
 }
-
-#[rustfmt::skip]
-pub const OPENGL_TO_WGPU: glam::Mat4 = glam::mat4
-(
-    Vec4::new(1.0, 0.0, 0.0, 0.0),
-    Vec4::new(0.0, 1.0, 0.0, 0.0),
-    Vec4::new(0.0, 0.0, 0.5, 0.5),
-    Vec4::new(0.0, 0.0, 0.0, 1.5),
-);
 
 impl Default for PerspectiveCamera {
     fn default() -> Self {
