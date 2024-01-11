@@ -5,6 +5,7 @@ pub mod utils;
 pub mod core;
 pub mod assets;
 pub mod context;
+pub mod entity;
 pub mod entry;
 pub mod environment;
 pub mod event;
