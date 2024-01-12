@@ -12,8 +12,9 @@ For the asset management of the engine see [thomasw04/what](https://github.com/t
 - Native Metal (macOS), Vulkan (Linux + Windows) and DirectX 12 (Windows) support. Thanks to wgpu.
 - Thus runs out of the box on all three platforms.
 - Easy to use event/input handling system + game controller support.
-- First triangle.
 - Camera controller, Textures, Quad.
+- Skybox.
+- Pipeline hashing.
 - Egui for simple gui creation.
 - WASM support. (Can be a little bit behind)
 
