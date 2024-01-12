@@ -3,12 +3,14 @@ use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::{
+        self,
         assets::Assets,
         buffer::{Indices, Vertices},
         shader::ShaderVariant,
         texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
+    entity::entities::{self, Worlds},
     event::{self, EventSubscriber},
     render::{material::GenericMaterial, types::BindGroupEntry},
 };
@@ -21,6 +23,65 @@ use super::{
     types::{BindGroup, IndexBuffer, VertexBuffer},
 };
 use super::{material::SkyboxMaterial, types::Vertex2D};
+
+pub struct RenderData<'a> {
+    ctx: &'a Context,
+    view: &'a TextureView,
+    window: &'a winit::window::Window,
+}
+
+pub struct Renderer2D {
+    framebuffer: Framebuffer,
+    assets: Assets,
+    pipelines: PipelineFactory,
+}
+
+impl Renderer2D {
+    pub fn new(context: &Context, mut assets: Assets) -> Self {
+        //Renderable setup
+        let sample_count = 4;
+        let pipelines = PipelineFactory::new();
+        let framebuffer = Framebuffer::new(context, sample_count);
+
+        Renderer2D { framebuffer, assets, pipelines }
+    }
+
+    pub fn render<'a>(&mut self, data: RenderData<'a>, assets: &mut Assets, worlds: &mut Worlds) {
+        let gpu = &data.ctx.graphics;
+        let assets = &mut self.assets;
+        let fbo = &self.framebuffer;
+        let fbo_view: TextureView = (&self.framebuffer).into();
+
+        let _ = assets.update();
+
+        let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Renderer2D Render Encoder"),
+        });
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("World Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: match fbo.sample_count() {
+                        1 => data.view,
+                        _ => &fbo_view,
+                    },
+                    resolve_target: match fbo.sample_count() {
+                        1 => None,
+                        _ => Some(data.view),
+                    },
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.3, g: 0.7, b: 0.3, a: 1.0 }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                ..Default::default()
+            });
+
+            if let Some(world) = worlds.get() {}
+        }
+    }
+}
 
 pub struct Renderer<'a> {
     framebuffer: Framebuffer,

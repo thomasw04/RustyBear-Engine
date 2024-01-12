@@ -1,0 +1,7 @@
+{
+    "project_name":"Two Dimensions",
+    "author":"Thomas Wachter",
+    "version":"0.1.0",
+    "data_folder":"data",
+    "code_folder":"code"
+}
