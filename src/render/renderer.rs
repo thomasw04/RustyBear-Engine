@@ -1,3 +1,4 @@
+use gltf::scene::Transform;
 use wgpu::TextureView;
 use winit::{event::ElementState, keyboard::KeyCode};
 
@@ -10,7 +11,10 @@ use crate::{
         texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
-    entity::entities::{self, Worlds},
+    entity::{
+        components::Sprite,
+        entities::{self, Worlds},
+    },
     event::{self, EventSubscriber},
     render::{material::GenericMaterial, types::BindGroupEntry},
 };
@@ -30,10 +34,12 @@ pub struct RenderData<'a> {
     window: &'a winit::window::Window,
 }
 
-pub struct Renderer2D {
+/*pub struct Renderer2D {
     framebuffer: Framebuffer,
     assets: Assets,
     pipelines: PipelineFactory,
+    bind_group_cache: HashMap<assets::Guid, BindGroup>,
+    sprite_material: GenericMaterial,
 }
 
 impl Renderer2D {
@@ -42,6 +48,13 @@ impl Renderer2D {
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
+
+        let material = GenericMaterial::new(
+            &context.graphics,
+            ShaderVariant::Single(assets.request_asset("static:default.wgsl", 0)),
+            &[],
+            &[],
+        );
 
         Renderer2D { framebuffer, assets, pipelines }
     }
@@ -78,10 +91,38 @@ impl Renderer2D {
                 ..Default::default()
             });
 
-            if let Some(world) = worlds.get() {}
+            if let Some(world) = worlds.get() {
+                let mut renderables = world.query::<(&Transform, &Sprite)>();
+
+                for renderable in renderables.iter() {
+                    let material = assets.get(&renderable.material).unwrap();
+                    let mesh = assets.get(&renderable.mesh).unwrap();
+
+                    let config = RenderPipelineConfig::new(
+                        material,
+                        Some(mesh),
+                        None,
+                        Some(renderable.camera_buffer),
+                    );
+
+                    let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
+
+                    render_pass.set_pipeline(pipeline);
+
+                    BindGroup::groups(material).iter().enumerate().for_each(|(i, group)| {
+                        render_pass.set_bind_group(i as u32, group, &[]);
+                    });
+
+                    render_pass.set_bind_group(1, renderable.camera_buffer, &[]);
+                    render_pass.set_vertex_buffer(0, VertexBuffer::buffer(mesh).unwrap().slice(..));
+                    let (buffer, format) = IndexBuffer::buffer(mesh).unwrap();
+                    render_pass.set_index_buffer(buffer.slice(..), format);
+                    render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
+                }
+            }
         }
     }
-}
+}*/
 
 pub struct Renderer<'a> {
     framebuffer: Framebuffer,

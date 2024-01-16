@@ -6,6 +6,7 @@ use rayon::prelude::*;
 
 use crate::context::VisContext;
 use crate::logging;
+use crate::render::types::BindGroupEntry;
 use crate::utils::{Guid, GuidGenerator};
 
 use std::any::Any;
@@ -13,13 +14,16 @@ use std::hash::Hash;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
 
+use super::buffer::UniformBuffer;
 use super::shader::Shader;
-use super::texture::{Texture2D, TextureArray};
+use super::texture::{Sampler, Texture2D, TextureArray};
 
 pub enum AssetType {
     TextureArray(TextureArray),
     Texture2D(Texture2D),
     Shader(Shader),
+    Uniforms(UniformBuffer),
+    Sampler(Sampler),
 }
 
 static LOADING_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
@@ -31,6 +35,17 @@ static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template("{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m {spinner} {wide_msg}")
         .unwrap()
 });
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub struct GenPtr {
+    guid: Guid,
+}
+
+impl<T> From<Ptr<T>> for GenPtr {
+    fn from(ptr: Ptr<T>) -> Self {
+        GenPtr { guid: ptr.guid }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Ptr<T> {
@@ -45,7 +60,7 @@ impl<T> Hash for Ptr<T> {
 }
 
 impl<T> Ptr<T> {
-    fn new(guid: Guid) -> Self {
+    pub fn new(guid: Guid) -> Self {
         Ptr { guid, phantom: std::marker::PhantomData }
     }
 
@@ -162,6 +177,15 @@ impl Assets {
         }
     }
 
+    /*Register an already created asset in the asset manager. This is necessary when you need to reference assets via a Ptr<T>. */
+    pub fn consume_asset<S: Into<String> + AsRef<str>, T>(
+        &mut self, asset: AssetType, path: S,
+    ) -> Ptr<T> {
+        let guid = self.request_id(path);
+        self.gpu_cache.insert(guid, asset);
+        Ptr::new(guid)
+    }
+
     pub fn asset_path(&self, id: Guid) -> Option<&String> {
         self.path_cache.get_by_left(&id)
     }
@@ -221,7 +245,7 @@ impl Assets {
     }
 
     //This currently does expend the lifetime of the mutable borrow to the lifetime of the returned reference.
-    //Won't get fixed until polonios is stable.
+    //Won't get fixed until polonius is stable.
     //Use wait_for() instead.
     pub fn get<T: 'static>(&mut self, ptr: &Ptr<T>) -> Option<&T> {
         let here = self.gpu_cache.contains_key(&ptr.guid);
@@ -236,6 +260,8 @@ impl Assets {
             }
             AssetType::Texture2D(texture) => (texture as &dyn Any).downcast_ref::<T>(),
             AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
+            AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
+            AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
         })
     }
 
@@ -246,6 +272,18 @@ impl Assets {
             }
             AssetType::Texture2D(texture) => (texture as &dyn Any).downcast_ref::<T>(),
             AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
+            AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
+            AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
+        })
+    }
+
+    pub fn try_get_entry(&self, ptr: &GenPtr) -> Option<&dyn BindGroupEntry> {
+        self.gpu_cache.get(&ptr.guid).and_then(|asset| match asset {
+            AssetType::TextureArray(texture_array) => Some(texture_array as &dyn BindGroupEntry),
+            AssetType::Texture2D(texture) => Some(texture as &dyn BindGroupEntry),
+            AssetType::Shader(_shader) => None,
+            AssetType::Uniforms(uniforms) => Some(uniforms as &dyn BindGroupEntry),
+            AssetType::Sampler(sampler) => Some(sampler as &dyn BindGroupEntry),
         })
     }
 

@@ -3,12 +3,16 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use crate::assets::assets::Assets;
+use crate::assets::assets::GenPtr;
 use crate::assets::assets::Ptr;
 use crate::assets::shader::Shader;
 use crate::context::VisContext;
 use crate::utils::Guid;
+use bimap::hash;
 use hashbrown::HashMap;
+use wgpu::BindGroupLayout;
 
+use super::types::BindGroupEntry;
 use super::types::{
     FragmentShader, Material, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader,
 };
@@ -243,5 +247,85 @@ impl PipelineFactory {
             }
         }
         false
+    }
+}
+
+pub struct BindGroupConfig<'a> {
+    layout: &'a wgpu::BindGroupLayout,
+    entries: &'a [GenPtr],
+}
+
+pub struct BindGroupFactory {
+    cache: HashMap<u64, Vec<wgpu::BindGroup>>,
+    lookup: HashMap<u64, Vec<Vec<GenPtr>>>,
+}
+
+impl Default for BindGroupFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BindGroupFactory {
+    pub fn new() -> Self {
+        Self { cache: HashMap::new(), lookup: HashMap::new() }
+    }
+
+    fn is_compatible(&self, target: &[GenPtr], config: &BindGroupConfig) -> bool {
+        if target.len() != config.entries.len() {
+            return false;
+        }
+
+        for (idx, entry) in config.entries.iter().enumerate() {
+            if target[idx] != *entry {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    fn create(
+        &self, context: &VisContext, assets: &Assets, config: &BindGroupConfig,
+    ) -> Option<wgpu::BindGroup> {
+        let mut bind_groups = Vec::with_capacity(config.entries.len());
+
+        for (i, entry) in config.entries.iter().enumerate() {
+            if let Some(asset) = assets.try_get_entry(entry) {
+                bind_groups.push(asset.group_entry(i as u32));
+            }
+        }
+
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: config.layout,
+            entries: &bind_groups,
+        });
+
+        Some(bind_group)
+    }
+
+    pub fn get_for(
+        &mut self, context: &VisContext, assets: &mut Assets, config: &BindGroupConfig,
+    ) -> &wgpu::BindGroup {
+        let mut hasher = DefaultHasher::new();
+        config.entries.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        if let Some(bind_groups) = self.lookup.get(&hash) {
+            for (idx, bind_group) in bind_groups.iter().enumerate() {
+                if self.is_compatible(bind_group.as_slice(), config) {
+                    return self.cache.get(&hash).unwrap().get(idx).unwrap();
+                }
+            }
+        }
+
+        let bind_group = self.create(context, assets, config);
+
+        if let Some(bind_group) = bind_group {
+            self.cache.entry(hash).or_default().push(bind_group);
+        }
+
+        self.cache.get(&hash).unwrap().last().unwrap()
     }
 }
