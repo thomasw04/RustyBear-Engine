@@ -10,6 +10,7 @@ use crate::context::VisContext;
 use crate::utils::Guid;
 use bimap::hash;
 use hashbrown::HashMap;
+use smallvec::SmallVec;
 use wgpu::BindGroupLayout;
 
 use super::types::BindGroupEntry;
@@ -288,7 +289,7 @@ impl BindGroupFactory {
     fn create(
         &self, context: &VisContext, assets: &Assets, config: &BindGroupConfig,
     ) -> Option<wgpu::BindGroup> {
-        let mut bind_groups = Vec::with_capacity(config.entries.len());
+        let mut bind_groups = SmallVec::<[wgpu::BindGroupEntry; 16]>::new();
 
         for (i, entry) in config.entries.iter().enumerate() {
             if let Some(asset) = assets.try_get_entry(entry) {
