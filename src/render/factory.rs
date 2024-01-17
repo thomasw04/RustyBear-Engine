@@ -8,15 +8,11 @@ use crate::assets::assets::Ptr;
 use crate::assets::shader::Shader;
 use crate::context::VisContext;
 use crate::utils::Guid;
-use bimap::hash;
 use hashbrown::HashMap;
 use smallvec::SmallVec;
-use wgpu::BindGroupLayout;
 
-use super::types::BindGroupEntry;
-use super::types::{
-    FragmentShader, Material, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader,
-};
+use super::types::MaterialLayout;
+use super::types::{FragmentShader, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader};
 
 pub struct RenderPipelineConfig<'a> {
     pub vertex_shader: &'a Ptr<Shader>,
@@ -29,7 +25,7 @@ pub struct RenderPipelineConfig<'a> {
 impl<'a> RenderPipelineConfig<'a> {
     //TODO: make additional bind groups as the camera more generic.
     pub fn new(
-        material: &'a impl Material, mesh: Option<&'a impl Mesh>,
+        material: &'a impl MaterialLayout, mesh: Option<&'a impl Mesh>,
         config: Option<PipelineBaseConfig>, camera_layout: Option<&'a wgpu::BindGroupLayout>,
     ) -> Self {
         let vertex_layout = mesh.map(|m| VertexBuffer::layout(m)).unwrap_or(&[]);
@@ -252,8 +248,13 @@ impl PipelineFactory {
 }
 
 pub struct BindGroupConfig<'a> {
-    layout: &'a wgpu::BindGroupLayout,
     entries: &'a [GenPtr],
+}
+
+impl<'a> BindGroupConfig<'a> {
+    pub fn new(layout: &wgpu::BindGroupLayout, entries: &[GenPtr]) -> Self {
+        Self { entries }
+    }
 }
 
 pub struct BindGroupFactory {
@@ -289,18 +290,25 @@ impl BindGroupFactory {
     fn create(
         &self, context: &VisContext, assets: &Assets, config: &BindGroupConfig,
     ) -> Option<wgpu::BindGroup> {
-        let mut bind_groups = SmallVec::<[wgpu::BindGroupEntry; 16]>::new();
+        let mut layout_entries = SmallVec::<[wgpu::BindGroupLayoutEntry; 16]>::new();
+        let mut group_entries = SmallVec::<[wgpu::BindGroupEntry; 16]>::new();
 
         for (i, entry) in config.entries.iter().enumerate() {
             if let Some(asset) = assets.try_get_entry(entry) {
-                bind_groups.push(asset.group_entry(i as u32));
+                group_entries.push(asset.group_entry(i as u32));
+                layout_entries.push(asset.layout_entry(i as u32));
             }
         }
 
+        let layout = context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            entries: &layout_entries,
+        });
+
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: config.layout,
-            entries: &bind_groups,
+            layout: &layout,
+            entries: &group_entries,
         });
 
         Some(bind_group)

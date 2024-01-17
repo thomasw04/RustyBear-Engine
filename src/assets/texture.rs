@@ -97,17 +97,8 @@ impl TextureArray {
     pub fn extend(&self) -> wgpu::Extent3d {
         self.extend
     }
-}
 
-impl BindGroupEntry for TextureArray {
-    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
-        wgpu::BindGroupEntry {
-            binding: idx,
-            resource: wgpu::BindingResource::TextureView(self.texture_view()),
-        }
-    }
-
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -118,6 +109,19 @@ impl BindGroupEntry for TextureArray {
             },
             count: None,
         }
+    }
+}
+
+impl BindGroupEntry for TextureArray {
+    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::TextureView(self.texture_view()),
+        }
+    }
+
+    fn layout_entry(&self, binding: u32) -> wgpu::BindGroupLayoutEntry {
+        Self::layout_entry(binding)
     }
 }
 
@@ -157,6 +161,15 @@ impl Sampler {
     pub fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
     }
+
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        }
+    }
 }
 
 impl BindGroupEntry for Sampler {
@@ -168,12 +181,7 @@ impl BindGroupEntry for Sampler {
     }
 
     fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
-        wgpu::BindGroupLayoutEntry {
-            binding: idx,
-            visibility: wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-            count: None,
-        }
+        Self::layout_entry(idx)
     }
 }
 
@@ -286,17 +294,8 @@ impl Texture2D {
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view
     }
-}
 
-impl BindGroupEntry for Texture2D {
-    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
-        wgpu::BindGroupEntry {
-            binding: idx,
-            resource: wgpu::BindingResource::TextureView(self.view()),
-        }
-    }
-
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -307,5 +306,18 @@ impl BindGroupEntry for Texture2D {
             },
             count: None,
         }
+    }
+}
+
+impl BindGroupEntry for Texture2D {
+    fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
+        wgpu::BindGroupEntry {
+            binding: idx,
+            resource: wgpu::BindingResource::TextureView(self.view()),
+        }
+    }
+
+    fn layout_entry(&self, binding: u32) -> wgpu::BindGroupLayoutEntry {
+        Self::layout_entry(binding)
     }
 }
