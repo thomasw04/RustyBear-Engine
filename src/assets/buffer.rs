@@ -49,7 +49,7 @@ impl BindGroupEntry for UniformBuffer {
         }
     }
 
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,

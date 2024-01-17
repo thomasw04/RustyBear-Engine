@@ -107,7 +107,7 @@ impl BindGroupEntry for TextureArray {
         }
     }
 
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -167,7 +167,7 @@ impl BindGroupEntry for Sampler {
         }
     }
 
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,
@@ -296,7 +296,7 @@ impl BindGroupEntry for Texture2D {
         }
     }
 
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
+    fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
             binding: idx,
             visibility: wgpu::ShaderStages::FRAGMENT,

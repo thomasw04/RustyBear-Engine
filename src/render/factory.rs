@@ -8,14 +8,11 @@ use crate::assets::assets::Ptr;
 use crate::assets::shader::Shader;
 use crate::context::VisContext;
 use crate::utils::Guid;
-use bimap::hash;
 use hashbrown::HashMap;
-use wgpu::BindGroupLayout;
+use wgpu::BindGroupLayoutEntry;
 
-use super::types::BindGroupEntry;
-use super::types::{
-    FragmentShader, Material, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader,
-};
+use super::types::MaterialLayout;
+use super::types::{FragmentShader, Mesh, PipelineBaseConfig, VertexBuffer, VertexShader};
 
 pub struct RenderPipelineConfig<'a> {
     pub vertex_shader: &'a Ptr<Shader>,
@@ -28,7 +25,7 @@ pub struct RenderPipelineConfig<'a> {
 impl<'a> RenderPipelineConfig<'a> {
     //TODO: make additional bind groups as the camera more generic.
     pub fn new(
-        material: &'a impl Material, mesh: Option<&'a impl Mesh>,
+        material: &'a impl MaterialLayout, mesh: Option<&'a impl Mesh>,
         config: Option<PipelineBaseConfig>, camera_layout: Option<&'a wgpu::BindGroupLayout>,
     ) -> Self {
         let vertex_layout = mesh.map(|m| VertexBuffer::layout(m)).unwrap_or(&[]);
@@ -253,6 +250,12 @@ impl PipelineFactory {
 pub struct BindGroupConfig<'a> {
     layout: &'a wgpu::BindGroupLayout,
     entries: &'a [GenPtr],
+}
+
+impl<'a> BindGroupConfig<'a> {
+    pub fn new(layout: &wgpu::BindGroupLayout, entries: &[GenPtr]) -> Self {
+        Self { layout, entries }
+    }
 }
 
 pub struct BindGroupFactory {

@@ -43,12 +43,17 @@ impl Default for PipelineBaseConfig {
 
 pub trait BindGroupEntry {
     fn group_entry(&self, binding: u32) -> wgpu::BindGroupEntry;
-    fn layout_entry(&self, binding: u32) -> wgpu::BindGroupLayoutEntry;
+    fn layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry
+    where
+        Self: Sized;
 }
 
-pub trait BindGroup {
-    fn groups(&self) -> &[wgpu::BindGroup];
+pub trait BindLayout {
     fn layouts(&self) -> &[wgpu::BindGroupLayout];
+}
+
+pub trait BindGroup: BindLayout {
+    fn groups(&self) -> &[wgpu::BindGroup];
 }
 
 pub trait VertexShader {
@@ -68,7 +73,9 @@ pub trait IndexBuffer {
     fn buffer(&self) -> Option<(&wgpu::Buffer, wgpu::IndexFormat)>;
 }
 
-pub trait Material: VertexShader + FragmentShader + BindGroup {}
+pub trait MaterialLayout: VertexShader + FragmentShader + BindLayout {}
+pub trait Material: MaterialLayout + BindGroup {}
+
 pub trait Mesh: VertexBuffer + IndexBuffer {}
 
 impl Default for CameraUniform {

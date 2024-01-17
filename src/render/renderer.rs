@@ -21,10 +21,11 @@ use crate::{
 
 use super::{
     camera::CameraBuffer,
-    factory::{PipelineFactory, RenderPipelineConfig},
+    factory::{BindGroupFactory, PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
+    material::GenericMaterialLayout,
     mesh::GenericMesh,
-    types::{BindGroup, IndexBuffer, VertexBuffer},
+    types::{BindGroup, IndexBuffer, MaterialLayout, VertexBuffer},
 };
 use super::{material::SkyboxMaterial, types::Vertex2D};
 
@@ -34,12 +35,14 @@ pub struct RenderData<'a> {
     window: &'a winit::window::Window,
 }
 
-/*pub struct Renderer2D {
+pub struct Renderer2D {
     framebuffer: Framebuffer,
     assets: Assets,
     pipelines: PipelineFactory,
-    bind_group_cache: HashMap<assets::Guid, BindGroup>,
-    sprite_material: GenericMaterial,
+    bind_groups: BindGroupFactory,
+    sprite_layout: GenericMaterialLayout,
+    sprite_mesh: GenericMesh<'static>,
+    camera_buffer: CameraBuffer,
 }
 
 impl Renderer2D {
@@ -47,16 +50,46 @@ impl Renderer2D {
         //Renderable setup
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
+        let bind_groups = BindGroupFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
 
-        let material = GenericMaterial::new(
+        let sprite_layout = GenericMaterialLayout::new(
             &context.graphics,
             ShaderVariant::Single(assets.request_asset("static:default.wgsl", 0)),
-            &[],
-            &[],
+            &[Texture2D::layout_entry(0), Sampler::layout_entry(1)],
         );
 
-        Renderer2D { framebuffer, assets, pipelines }
+        const VERTICES: &[Vertex2D] = &[
+            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
+            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
+            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
+        ];
+
+        const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
+
+        let vertices =
+            Vertices::new(&context.graphics, bytemuck::cast_slice(VERTICES), Vertex2D::LAYOUT);
+
+        let indices = Indices::new(
+            &context.graphics,
+            bytemuck::cast_slice(INDICES),
+            wgpu::IndexFormat::Uint16,
+        );
+
+        let sprite_mesh = GenericMesh::new(vertices, indices, 6);
+
+        let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
+
+        Renderer2D {
+            framebuffer,
+            assets,
+            pipelines,
+            bind_groups,
+            sprite_layout,
+            sprite_mesh,
+            camera_buffer,
+        }
     }
 
     pub fn render<'a>(&mut self, data: RenderData<'a>, assets: &mut Assets, worlds: &mut Worlds) {
@@ -95,14 +128,11 @@ impl Renderer2D {
                 let mut renderables = world.query::<(&Transform, &Sprite)>();
 
                 for renderable in renderables.iter() {
-                    let material = assets.get(&renderable.material).unwrap();
-                    let mesh = assets.get(&renderable.mesh).unwrap();
-
                     let config = RenderPipelineConfig::new(
-                        material,
-                        Some(mesh),
+                        &self.sprite_layout,
+                        Some(&self.sprite_mesh),
                         None,
-                        Some(renderable.camera_buffer),
+                        Some(&self.camera_buffer.layout()),
                     );
 
                     let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
@@ -122,7 +152,7 @@ impl Renderer2D {
             }
         }
     }
-}*/
+}
 
 pub struct Renderer<'a> {
     framebuffer: Framebuffer,
@@ -193,7 +223,7 @@ impl<'a> Renderer<'a> {
         let material = GenericMaterial::new(
             &context.graphics,
             ShaderVariant::Single(assets.request_asset("static:default.wgsl", 0)),
-            &[texture.layout_entry(0), sampler.layout_entry(1)],
+            &[Texture2D::layout_entry(0), Sampler::layout_entry(1)],
             &[texture.group_entry(0), sampler.group_entry(1)],
         );
 
