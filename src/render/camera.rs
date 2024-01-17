@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
 use glam::{Mat4, Vec2, Vec3, Vec4};
+use once_cell::sync::OnceCell;
 use wgpu::util::DeviceExt;
 
 use crate::{
@@ -334,7 +335,6 @@ impl PerspectiveCamera {
 pub struct CameraBuffer {
     name: String,
     bind_group: wgpu::BindGroup,
-    layout: wgpu::BindGroupLayout,
     camera_buffer: wgpu::Buffer,
     uniform: CameraUniform,
 }
@@ -348,7 +348,7 @@ impl CameraBuffer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        let layout = CameraBuffer::create_layout(context, name);
+        let layout = CameraBuffer::layout(context);
 
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(name),
@@ -359,23 +359,7 @@ impl CameraBuffer {
             }],
         });
 
-        CameraBuffer { name: String::from(name), bind_group, layout, camera_buffer, uniform }
-    }
-
-    fn create_layout(context: &VisContext, name: &str) -> wgpu::BindGroupLayout {
-        context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some(name),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        })
+        CameraBuffer { name: String::from(name), bind_group, camera_buffer, uniform }
     }
 
     //TODO: Use some kind of staging buffer, for performance
@@ -392,7 +376,23 @@ impl CameraBuffer {
         &self.bind_group
     }
 
-    pub fn layout(&self) -> &wgpu::BindGroupLayout {
-        &self.layout
+    pub fn layout(context: &VisContext) -> &'static wgpu::BindGroupLayout {
+        static LAYOUT: OnceCell<wgpu::BindGroupLayout> = OnceCell::new();
+
+        LAYOUT.get_or_init(|| {
+            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Camera Buffer Layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            })
+        })
     }
 }

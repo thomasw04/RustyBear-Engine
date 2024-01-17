@@ -98,6 +98,19 @@ impl<'a> RenderPipelineBuilder<'a> {
     }
 }
 
+pub struct PipelineResult<'a>(
+    Result<&'a wgpu::RenderPipeline, (&'a mut PipelineFactory, &'a RenderPipelineConfig<'a>)>,
+);
+
+impl<'a> PipelineResult<'a> {
+    pub fn or_create(self, context: &VisContext, assets: &mut Assets) -> &'a wgpu::RenderPipeline {
+        match self.0 {
+            Ok(pipeline) => pipeline,
+            Err((factory, config)) => factory.insert(context, assets, &config),
+        }
+    }
+}
+
 pub struct PipelineFactory {
     cache: HashMap<u64, Vec<wgpu::RenderPipeline>>,
     lookup: HashMap<u64, Vec<(Guid, Guid, PipelineBaseConfig)>>,
@@ -114,46 +127,42 @@ impl PipelineFactory {
         Self { cache: HashMap::new(), lookup: HashMap::new() }
     }
 
-    pub fn get_for(
-        &mut self, context: &VisContext, assets: &mut Assets, config: &RenderPipelineConfig,
-        wait: bool,
-    ) -> &wgpu::RenderPipeline {
+    pub fn get(&self, config: &RenderPipelineConfig) -> PipelineResult {
         let hash = Self::hash_pipeline(config);
 
-        //Weird implementation because of: https://github.com/rust-lang/rfcs/blob/master/text/2094-nll.md#problem-case-3-conditional-control-flow-across-functions
-        let mut index = None;
-
         if let Some(pipelines) = self.cache.get(&hash) {
-            for (idx, _) in pipelines.iter().enumerate() {
+            for (idx, pipeline) in pipelines.iter().enumerate() {
                 if !self.compatible_pipeline(hash, idx, config) {
                     continue;
                 }
 
-                index = Some(idx);
-                break;
+                return PipelineResult(Ok(pipeline));
             }
         }
 
-        if index.is_none() {
-            //Create a new pipeline if there are no compatible pipelines in the cache.
-            let pipeline = self.create(context, assets, config, wait);
+        PipelineResult(Err(config))
+    }
 
-            //Add the pipeline to the cache and lookup table.
-            if let Some(pipeline) = pipeline {
-                self.lookup.entry(hash).or_default().push((
-                    config.vertex_shader.inner(),
-                    config.fragment_shader.inner(),
-                    config.base_config,
-                ));
+    pub fn insert(
+        &mut self, context: &VisContext, assets: &mut Assets, config: &RenderPipelineConfig,
+    ) -> &wgpu::RenderPipeline {
+        let hash = Self::hash_pipeline(config);
+        //Create a new pipeline if there are no compatible pipelines in the cache.
+        let pipeline = self.create(context, assets, config, true);
 
-                self.cache.entry(hash).or_default().push(pipeline);
-            }
+        //Add the pipeline to the cache and lookup table.
+        if let Some(pipeline) = pipeline {
+            self.lookup.entry(hash).or_default().push((
+                config.vertex_shader.inner(),
+                config.fragment_shader.inner(),
+                config.base_config,
+            ));
 
-            //Return the newly created pipeline.
-            self.cache.get(&hash).unwrap().last().unwrap()
-        } else {
-            self.cache.get(&hash).unwrap().get(index.unwrap()).unwrap()
+            self.cache.entry(hash).or_default().push(pipeline);
         }
+
+        //Return the newly created pipeline.
+        self.cache.get(&hash).unwrap().last().unwrap()
     }
 
     //Create a new pipeline. Returns None if not all assets where loaded.
@@ -252,7 +261,7 @@ pub struct BindGroupConfig<'a> {
 }
 
 impl<'a> BindGroupConfig<'a> {
-    pub fn new(layout: &wgpu::BindGroupLayout, entries: &[GenPtr]) -> Self {
+    pub fn new(entries: &[GenPtr]) -> Self {
         Self { entries }
     }
 }

@@ -10,7 +10,7 @@ use crate::{
         shader::ShaderVariant,
         texture::{Sampler, Texture2D},
     },
-    context::{Context, VisContext},
+    context::{self, Context, VisContext},
     entity::{
         components::Sprite,
         entities::{self, Worlds},
@@ -21,7 +21,7 @@ use crate::{
 
 use super::{
     camera::CameraBuffer,
-    factory::{BindGroupFactory, PipelineFactory, RenderPipelineConfig},
+    factory::{BindGroupConfig, BindGroupFactory, PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
     material::GenericMaterialLayout,
     mesh::GenericMesh,
@@ -93,7 +93,7 @@ impl Renderer2D {
     }
 
     pub fn render<'a>(&mut self, data: RenderData<'a>, assets: &mut Assets, worlds: &mut Worlds) {
-        let gpu = &data.ctx.graphics;
+        let gpu = data.ctx.graphics.as_ref();
         let assets = &mut self.assets;
         let fbo = &self.framebuffer;
         let fbo_view: TextureView = (&self.framebuffer).into();
@@ -125,42 +125,53 @@ impl Renderer2D {
             });
 
             if let Some(world) = worlds.get() {
-                let mut renderables = world.query::<(&Transform, &Sprite)>();
+                if let Some(camera) = &self.camera_buffer {
+                    let camera_layout = Some(CameraBuffer::layout(&gpu));
+                    let mesh = &self.sprite_mesh;
 
-                for renderable in renderables.iter() {
-                    let config = RenderPipelineConfig::new(
-                        &self.sprite_layout,
-                        Some(&self.sprite_mesh),
-                        None,
-                        self.camera_buffer.as_ref().map(|c| c.layout()),
-                    );
+                    let mut renderables = world.query::<(&Transform, &Sprite)>();
 
-                    let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
+                    for renderable in renderables.iter() {
+                        let (transform, sprite) = renderable.1;
 
-                    render_pass.set_pipeline(pipeline);
-
-                    let (transform, sprite) = renderable.1;
-
-                    let bind_group = self.bind_groups.get_for(
-                        &gpu,
-                        assets,
-                        &MaterialLayout::new(
+                        //Pipline config for our quad.
+                        let config = RenderPipelineConfig::new(
                             &self.sprite_layout,
-                            &[BindGroupEntry::Texture2D(0), BindGroupEntry::Sampler(1)],
-                            &[sprite.texture.group_entry(0), sprite.tint.group_entry(1)],
-                        ),
-                        true,
-                    );
+                            Some(mesh),
+                            None,
+                            camera_layout,
+                        );
 
-                    BindGroup::groups(material).iter().enumerate().for_each(|(i, group)| {
-                        render_pass.set_bind_group(i as u32, group, &[]);
-                    });
+                        //Create/Get pipeline for our quad.
+                        let pipeline =
+                            self.pipelines.get(&config).or_create(&mut self.pipelines, gpu, assets);
 
-                    render_pass.set_bind_group(1, renderable.camera_buffer, &[]);
-                    render_pass.set_vertex_buffer(0, VertexBuffer::buffer(mesh).unwrap().slice(..));
-                    let (buffer, format) = IndexBuffer::buffer(mesh).unwrap();
-                    render_pass.set_index_buffer(buffer.slice(..), format);
-                    render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
+                        //Create bind group for the texture
+                        let bind_group = self.bind_groups.get_for(
+                            gpu,
+                            assets,
+                            &BindGroupConfig::new(&[sprite.texture.into()]),
+                        );
+
+                        render_pass.set_pipeline(pipeline);
+
+                        //Set material
+                        render_pass.set_bind_group(0, bind_group, &[]);
+
+                        //Set camera buffer
+                        render_pass.set_bind_group(1, camera.bind_group(), &[]);
+
+                        //Set vertex buffer
+                        render_pass
+                            .set_vertex_buffer(0, VertexBuffer::buffer(mesh).unwrap().slice(..));
+
+                        //Set index buffer
+                        let (buffer, format) = IndexBuffer::buffer(mesh).unwrap();
+                        render_pass.set_index_buffer(buffer.slice(..), format);
+
+                        //Draw the quad.
+                        render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
+                    }
                 }
             }
         }
@@ -303,7 +314,7 @@ impl<'a> Renderer<'a> {
     pub fn render(
         &mut self, context: &mut Context, view: &TextureView, window: &winit::window::Window,
     ) {
-        let gpu = &context.graphics;
+        let gpu = context.graphics.as_ref();
         let assets = &mut self.assets;
 
         let _ = assets.update();
@@ -345,7 +356,9 @@ impl<'a> Renderer<'a> {
             if let Some(skybox) = &self.skybox {
                 let sky_config =
                     RenderPipelineConfig::new(skybox, None::<&GenericMesh>, None, None);
-                let skybox_pipeline = self.pipelines.get_for(gpu, assets, &sky_config, true);
+
+                let skybox_pipeline =
+                    self.pipelines.get(&sky_config).or_create(&mut self.pipelines, gpu, assets);
 
                 render_pass.set_pipeline(skybox_pipeline);
 
@@ -379,10 +392,10 @@ impl<'a> Renderer<'a> {
                 &self.material,
                 Some(&self.mesh),
                 None,
-                Some(self.camera_buffer.layout()),
+                Some(CameraBuffer::layout(&gpu)),
             );
 
-            let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
+            let pipeline = self.pipelines.get(&config).or_create(&mut self.pipelines, gpu, assets);
 
             render_pass.set_pipeline(pipeline);
 
