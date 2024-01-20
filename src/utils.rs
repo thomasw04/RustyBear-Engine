@@ -1,5 +1,6 @@
 use instant::Instant;
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::ops;
 use std::path::{Path, PathBuf};
 
@@ -130,7 +131,7 @@ impl FileUtils {
     }
 }
 
-#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Guid {
     id: u64,
 }
@@ -138,6 +139,10 @@ pub struct Guid {
 impl Guid {
     pub fn new(id: u64) -> Guid {
         Guid { id }
+    }
+
+    pub fn dead() -> Guid {
+        Guid { id: 0 }
     }
 }
 

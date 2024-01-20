@@ -2,7 +2,7 @@ use std::num::NonZeroU64;
 
 use crate::{
     context::VisContext,
-    render::types::{BindGroupEntry, IndexBuffer, VertexBuffer},
+    render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout},
 };
 
 use wgpu::util::DeviceExt;
@@ -86,11 +86,13 @@ impl<'a> Vertices<'a> {
     }
 }
 
-impl<'a> VertexBuffer for Vertices<'a> {
+impl<'a> VertexLayout for Vertices<'a> {
     fn layout(&self) -> &[wgpu::VertexBufferLayout] {
         &self.layout
     }
+}
 
+impl<'a> VertexBuffer for Vertices<'a> {
     fn buffer(&self) -> Option<&wgpu::Buffer> {
         Some(&self.buffer)
     }

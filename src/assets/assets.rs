@@ -11,6 +11,7 @@ use crate::utils::{Guid, GuidGenerator};
 
 use std::any::Any;
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
 
@@ -47,7 +48,7 @@ impl<T> From<Ptr<T>> for GenPtr {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Ptr<T> {
     guid: Guid,
     phantom: std::marker::PhantomData<T>,
@@ -58,6 +59,14 @@ impl<T> Hash for Ptr<T> {
         self.guid.hash(state);
     }
 }
+
+impl<T> Clone for Ptr<T> {
+    fn clone(&self) -> Self {
+        Ptr { guid: self.guid, phantom: PhantomData }
+    }
+}
+
+impl<T> Copy for Ptr<T> {}
 
 impl<T> Ptr<T> {
     pub fn new(guid: Guid) -> Self {
@@ -86,39 +95,9 @@ impl Assets {
             Receiver<(Guid, Result<AssetType, String>)>,
         );
 
-        let mut gpu_cache = HashMap::new();
-        let mut path_cache = BiMap::new();
-        let mut generator = GuidGenerator::new();
-
-        Self::add_static_asset(
-            &mut gpu_cache,
-            &mut path_cache,
-            &mut generator,
-            "static:skybox.wgsl".to_owned(),
-            AssetType::Shader(
-                Shader::new(
-                    &context,
-                    wgpu::ShaderSource::Wgsl(include_str!("skybox.wgsl").into()),
-                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
-                )
-                .unwrap(),
-            ),
-        );
-
-        Self::add_static_asset(
-            &mut gpu_cache,
-            &mut path_cache,
-            &mut generator,
-            "static:default.wgsl".to_owned(),
-            AssetType::Shader(
-                Shader::new(
-                    &context,
-                    wgpu::ShaderSource::Wgsl(include_str!("default.wgsl").into()),
-                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
-                )
-                .unwrap(),
-            ),
-        );
+        let gpu_cache = HashMap::new();
+        let path_cache = BiMap::new();
+        let generator = GuidGenerator::new();
 
         let (in_sender, in_receiver): InChannel = mpsc::channel();
         let (out_sender, out_receiver): OutChannel = mpsc::channel();
@@ -182,7 +161,26 @@ impl Assets {
         &mut self, asset: AssetType, path: S,
     ) -> Ptr<T> {
         let guid = self.request_id(path);
-        self.gpu_cache.insert(guid, asset);
+
+        match asset {
+            AssetType::TextureArray(texture_array) => {
+                self.gpu_cache.insert(guid, AssetType::TextureArray(texture_array));
+            }
+            AssetType::Texture2D(texture) => {
+                self.gpu_cache.insert(guid, AssetType::Texture2D(texture));
+            }
+            AssetType::Shader(mut shader) => {
+                shader.change_guid(guid);
+                self.gpu_cache.insert(guid, AssetType::Shader(shader));
+            }
+            AssetType::Uniforms(uniforms) => {
+                self.gpu_cache.insert(guid, AssetType::Uniforms(uniforms));
+            }
+            AssetType::Sampler(sampler) => {
+                self.gpu_cache.insert(guid, AssetType::Sampler(sampler));
+            }
+        }
+
         Ptr::new(guid)
     }
 
@@ -291,7 +289,7 @@ impl Assets {
         self.gpu_cache.remove(&guid);
     }
 
-    fn load_asset(context: &VisContext, asset: what::Asset, _guid: Guid) -> AssetType {
+    fn load_asset(context: &VisContext, asset: what::Asset, guid: Guid) -> AssetType {
         match asset {
             what::Asset::Texture(texture) => {
                 let texture_data = image::load_from_memory(&texture.data);
@@ -345,6 +343,7 @@ impl Assets {
             what::Asset::Shader(shader) => {
                 if let Ok(shader) = Shader::new(
                     context,
+                    guid,
                     wgpu::ShaderSource::SpirV(shader.data.into()),
                     shader.stages,
                 ) {

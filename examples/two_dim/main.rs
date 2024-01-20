@@ -2,7 +2,8 @@
 
 use std::{cell::Ref, path::Path};
 
-use glam::Vec2;
+use glam::{Vec2, Vec4};
+use hecs::World;
 use rccell::RcCell;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -11,18 +12,27 @@ use RustyBear_Engine::{
     assets::assets::Assets,
     context::Context,
     core::{Application, ModuleStack},
+    entity::{
+        components::{Sprite, Transformation},
+        entities::Worlds,
+    },
     environment::config::Config,
     event::{Event, EventType},
     input::InputState,
     logging,
-    render::{camera::OrthographicCamera, renderer::Renderer},
+    render::{
+        camera::OrthographicCamera,
+        renderer::{RenderData, Renderer2D},
+    },
     utils::Timestep,
     window::Window,
 };
 
 pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
-    renderer: RcCell<Renderer<'a>>,
+    assets: Assets,
+    worlds: Worlds,
+    renderer: RcCell<Renderer2D>,
     camera: RcCell<OrthographicCamera>,
 }
 
@@ -42,12 +52,9 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
-            let view_matrix = self.camera.borrow_mut().view().to_cols_array_2d();
-            let projection = self.camera.borrow_mut().projection().inverse().to_cols_array_2d();
+            let render_data = RenderData { ctx: &context, view, window };
 
-            renderer.update_skybox_buffer(&context.graphics, view_matrix, projection);
-
-            renderer.render(context, view, window);
+            renderer.render(render_data, &mut self.assets, &mut self.worlds);
         }
     }
 
@@ -95,11 +102,20 @@ impl<'a> TwoDimApp<'a> {
             log::warn!("Project: {:?}", path);
         }
 
-        let assets =
+        let mut assets =
             Assets::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
 
-        let renderer = RcCell::new(Renderer::new(context, assets));
-        stack.subscribe(EventType::Layer, renderer.clone());
+        let worlds = Worlds::new();
+
+        let mut default = World::new();
+
+        let default_texture = assets.request_asset("data/default.fur", 0);
+        default.spawn((
+            Transformation::default(),
+            Sprite { texture: default_texture, tint: Vec4::ONE },
+        ));
+
+        let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
 
         let camera = RcCell::new(OrthographicCamera::default());
         stack.subscribe(EventType::Layer, camera.clone());
@@ -108,7 +124,7 @@ impl<'a> TwoDimApp<'a> {
             context.surface_config.width as f32 / context.surface_config.height as f32,
         );
 
-        TwoDimApp { stack, renderer, camera }
+        TwoDimApp { stack, assets, worlds, renderer, camera }
     }
 }
 

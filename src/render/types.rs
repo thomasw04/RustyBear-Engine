@@ -62,8 +62,11 @@ pub trait FragmentShader {
     fn ptr(&self) -> &Ptr<Shader>;
 }
 
-pub trait VertexBuffer {
+pub trait VertexLayout {
     fn layout(&self) -> &[wgpu::VertexBufferLayout];
+}
+
+pub trait VertexBuffer: VertexLayout {
     fn buffer(&self) -> Option<&wgpu::Buffer>;
 }
 
@@ -71,7 +74,9 @@ pub trait IndexBuffer {
     fn buffer(&self) -> Option<(&wgpu::Buffer, wgpu::IndexFormat)>;
 }
 
-pub trait MaterialLayout: VertexShader + FragmentShader + BindLayout {}
+pub trait MaterialLayout: VertexShader + FragmentShader + BindLayout {
+    fn base_config(&self) -> Option<PipelineBaseConfig>;
+}
 pub trait Material: MaterialLayout + BindGroup {}
 
 pub trait Mesh: VertexBuffer + IndexBuffer {}

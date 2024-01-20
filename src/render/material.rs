@@ -4,20 +4,21 @@ use crate::{
     assets::{
         assets::Ptr,
         buffer::UniformBuffer,
-        shader::{Shader, ShaderVariant},
+        shader::Shader,
         texture::{Sampler, TextureArray},
     },
     context::VisContext,
 };
 
 use super::types::{
-    BindGroup, BindLayout, FragmentShader, Material, MaterialLayout, SplitCameraUniform,
-    VertexShader,
+    BindGroup, BindLayout, FragmentShader, Material, MaterialLayout, PipelineBaseConfig,
+    SplitCameraUniform, VertexShader,
 };
 
 pub struct SkyboxMaterial {
     //Shader
-    shader: ShaderVariant,
+    vertex: Ptr<Shader>,
+    fragment: Ptr<Shader>,
 
     //Bind group layout and bind group
     bind_layout: [wgpu::BindGroupLayout; 1],
@@ -29,7 +30,9 @@ pub struct SkyboxMaterial {
 }
 
 impl SkyboxMaterial {
-    pub fn new(context: &VisContext, shader: ShaderVariant, texture: &TextureArray) -> Self {
+    pub fn new(
+        context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>, texture: &TextureArray,
+    ) -> Self {
         let uniform = SplitCameraUniform::default();
         let buffer = UniformBuffer::new(context, std::mem::size_of::<SplitCameraUniform>());
 
@@ -52,7 +55,8 @@ impl SkyboxMaterial {
         });
 
         SkyboxMaterial {
-            shader,
+            vertex,
+            fragment,
             bind_layout: [bind_layout],
             bind_group: [bind_group],
             buffer,
@@ -69,7 +73,12 @@ impl SkyboxMaterial {
     }
 }
 
-impl MaterialLayout for SkyboxMaterial {}
+impl MaterialLayout for SkyboxMaterial {
+    fn base_config(&self) -> Option<super::types::PipelineBaseConfig> {
+        None
+    }
+}
+
 impl Material for SkyboxMaterial {}
 
 impl BindLayout for SkyboxMaterial {
@@ -86,19 +95,20 @@ impl BindGroup for SkyboxMaterial {
 
 impl FragmentShader for SkyboxMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.fragment()
+        &self.fragment
     }
 }
 
 impl VertexShader for SkyboxMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.vertex()
+        &self.vertex
     }
 }
 
 pub struct GenericMaterialLayout {
     //Shader
-    shader: ShaderVariant,
+    vertex: Ptr<Shader>,
+    fragment: Ptr<Shader>,
 
     //Bind group layout and bind group
     bind_layout: [wgpu::BindGroupLayout; 1],
@@ -106,13 +116,14 @@ pub struct GenericMaterialLayout {
 
 impl GenericMaterialLayout {
     pub fn new(
-        context: &VisContext, shader: ShaderVariant, entries: &[wgpu::BindGroupLayoutEntry],
+        context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>,
+        entries: &[wgpu::BindGroupLayoutEntry],
     ) -> Self {
         let bind_layout = context
             .device
             .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: None, entries });
 
-        GenericMaterialLayout { shader, bind_layout: [bind_layout] }
+        GenericMaterialLayout { vertex, fragment, bind_layout: [bind_layout] }
     }
 }
 
@@ -124,21 +135,26 @@ impl BindLayout for GenericMaterialLayout {
 
 impl FragmentShader for GenericMaterialLayout {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.fragment()
+        &self.fragment
     }
 }
 
 impl VertexShader for GenericMaterialLayout {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.vertex()
+        &self.vertex
     }
 }
 
-impl MaterialLayout for GenericMaterialLayout {}
+impl MaterialLayout for GenericMaterialLayout {
+    fn base_config(&self) -> Option<PipelineBaseConfig> {
+        None
+    }
+}
 
 pub struct GenericMaterial {
     //Shader
-    shader: ShaderVariant,
+    vertex: Ptr<Shader>,
+    fragment: Ptr<Shader>,
 
     //Bind group layout and bind group
     bind_layout: [wgpu::BindGroupLayout; 1],
@@ -147,8 +163,8 @@ pub struct GenericMaterial {
 
 impl GenericMaterial {
     pub fn new(
-        context: &VisContext, shader: ShaderVariant, entries: &[wgpu::BindGroupLayoutEntry],
-        groups: &[wgpu::BindGroupEntry],
+        context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>,
+        entries: &[wgpu::BindGroupLayoutEntry], groups: &[wgpu::BindGroupEntry],
     ) -> Self {
         //TODO: Maybe find a better way to split the BindGroupEntries in layout and group entries. We dont want to allocate two new vectors for each material.
         let bind_layout = context
@@ -161,11 +177,16 @@ impl GenericMaterial {
             entries: groups,
         });
 
-        GenericMaterial { shader, bind_layout: [bind_layout], bind_group: [bind_group] }
+        GenericMaterial { vertex, fragment, bind_layout: [bind_layout], bind_group: [bind_group] }
     }
 }
 
-impl MaterialLayout for GenericMaterial {}
+impl MaterialLayout for GenericMaterial {
+    fn base_config(&self) -> Option<PipelineBaseConfig> {
+        None
+    }
+}
+
 impl Material for GenericMaterial {}
 
 impl BindLayout for GenericMaterial {
@@ -182,12 +203,12 @@ impl BindGroup for GenericMaterial {
 
 impl FragmentShader for GenericMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.fragment()
+        &self.fragment
     }
 }
 
 impl VertexShader for GenericMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        self.shader.vertex()
+        &self.vertex
     }
 }
