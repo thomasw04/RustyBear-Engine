@@ -1,5 +1,6 @@
 use bimap::BiMap;
 use hashbrown::HashMap;
+use image::GenericImageView;
 use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use rayon::prelude::*;
@@ -201,7 +202,7 @@ impl Assets {
         Ok(())
     }
 
-    pub fn wait_for<T>(&mut self, ptr: &Ptr<T>) {
+    pub fn wait_for(&mut self, ptr: &GenPtr) {
         let spinner = logging::install_bar(ProgressBar::new_spinner()).unwrap();
         spinner.set_style(LOADING_SPINNER_STYLE.clone());
         spinner.set_message(format!("Loading asset: {}", self.asset_path(ptr.guid).unwrap()));
@@ -249,7 +250,7 @@ impl Assets {
         let here = self.gpu_cache.contains_key(&ptr.guid);
 
         if !here {
-            self.wait_for(ptr);
+            self.wait_for(&(*ptr).into());
         }
 
         self.gpu_cache.get(&ptr.guid).and_then(|asset| match asset {
@@ -294,18 +295,24 @@ impl Assets {
             what::Asset::Texture(texture) => {
                 let texture_data = image::load_from_memory(&texture.data);
 
-                if let Ok(image) = texture_data {
-                    let rgba = image.to_rgba8();
+                match texture_data {
+                    Ok(image) => {
+                        let rgba = image.to_rgba8();
 
-                    match Texture2D::new(context, None, &rgba, image::ImageFormat::Png) {
-                        Ok(texture) => AssetType::Texture2D(texture),
-                        Err(texture) => {
-                            log::error!("Failed to load texture. Loading error texture instead.");
-                            AssetType::Texture2D(texture)
-                        }
+                        AssetType::Texture2D(Texture2D::new(
+                            context,
+                            None,
+                            image.dimensions(),
+                            &rgba,
+                        ))
                     }
-                } else {
-                    AssetType::Texture2D(Texture2D::error_texture(context))
+                    Err(e) => {
+                        log::error!(
+                            "Failed to load texture. Error: {}. Loading error texture instead...",
+                            e
+                        );
+                        AssetType::Texture2D(Texture2D::error_texture(context))
+                    }
                 }
             }
             what::Asset::TextureArray(texture_array) => {

@@ -8,9 +8,31 @@ pub struct Vertex2D {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct SpriteUniform {
+    pub transform: [[f32; 4]; 4],
+    pub color: [f32; 4],
+}
+
+impl Default for SpriteUniform {
+    fn default() -> Self {
+        SpriteUniform {
+            transform: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            color: [1.0, 1.0, 1.0, 1.0],
+        }
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     pub view_projection: [[f32; 4]; 4],
+}
+
+impl Default for CameraUniform {
+    fn default() -> Self {
+        CameraUniform { view_projection: glam::Mat4::IDENTITY.to_cols_array_2d() }
+    }
 }
 
 #[repr(C)]
@@ -18,6 +40,15 @@ pub struct CameraUniform {
 pub struct SplitCameraUniform {
     pub view: [[f32; 4]; 4],
     pub projection: [[f32; 4]; 4],
+}
+
+impl Default for SplitCameraUniform {
+    fn default() -> Self {
+        SplitCameraUniform {
+            view: glam::Mat4::IDENTITY.to_cols_array_2d(),
+            projection: glam::Mat4::IDENTITY.to_cols_array_2d(),
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -34,7 +65,7 @@ impl Default for PipelineBaseConfig {
         Self {
             cull: true,
             polygon_mode: wgpu::PolygonMode::Fill,
-            blend: Some(wgpu::BlendState::REPLACE),
+            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
             write_mask: wgpu::ColorWrites::ALL,
             samples: 4,
         }
@@ -80,18 +111,3 @@ pub trait MaterialLayout: VertexShader + FragmentShader + BindLayout {
 pub trait Material: MaterialLayout + BindGroup {}
 
 pub trait Mesh: VertexBuffer + IndexBuffer {}
-
-impl Default for CameraUniform {
-    fn default() -> Self {
-        CameraUniform { view_projection: glam::Mat4::IDENTITY.to_cols_array_2d() }
-    }
-}
-
-impl Default for SplitCameraUniform {
-    fn default() -> Self {
-        SplitCameraUniform {
-            view: glam::Mat4::IDENTITY.to_cols_array_2d(),
-            projection: glam::Mat4::IDENTITY.to_cols_array_2d(),
-        }
-    }
-}

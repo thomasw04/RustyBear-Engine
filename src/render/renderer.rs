@@ -1,16 +1,18 @@
-use gltf::scene::Transform;
 use wgpu::TextureView;
 use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::{
         assets::{AssetType, Assets, Ptr},
-        buffer::{Indices, Vertices},
+        buffer::{Indices, UniformBuffer, Vertices},
         shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
-    entity::{components::Sprite, entities::Worlds},
+    entity::{
+        components::{Sprite, Transformation},
+        entities::Worlds,
+    },
     event::{self, EventSubscriber},
     render::{material::GenericMaterial, types::BindGroupEntry},
     utils::Guid,
@@ -37,9 +39,22 @@ pub struct Renderer2D {
     pipelines: PipelineFactory,
     bind_groups: BindGroupFactory,
     sprite_shader: Ptr<Shader>,
+    sprite_sampler: Ptr<Sampler>,
     sprite_layout: GenericMaterialLayout,
     sprite_mesh: GenericMesh<'static>,
     camera_buffer: Option<CameraBuffer>,
+}
+
+impl EventSubscriber for Renderer2D {
+    fn on_event(&mut self, event: &crate::event::Event, context: &mut Context) -> bool {
+        match event {
+            event::Event::Resized { width, height } => {
+                self.framebuffer.resize(context, *width, *height);
+                false
+            }
+            _ => false,
+        }
+    }
 }
 
 impl Renderer2D {
@@ -55,19 +70,24 @@ impl Renderer2D {
                 Shader::new(
                     &context.graphics,
                     Guid::dead(),
-                    wgpu::ShaderSource::Wgsl(include_str!("../assets/default.wgsl").into()),
+                    wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
                 .unwrap(),
             ),
-            "static:default.wgsl",
+            "static:sprite.wgsl",
+        );
+
+        let sprite_sampler = assets.consume_asset(
+            AssetType::Sampler(Sampler::two_dim(&context.graphics)),
+            "static:default.sampler",
         );
 
         let sprite_layout = GenericMaterialLayout::new(
             &context.graphics,
             sprite_shader,
             sprite_shader,
-            &[Texture2D::layout_entry(0), Sampler::layout_entry(1)],
+            &[UniformBuffer::layout_entry(0), Texture2D::layout_entry(1), Sampler::layout_entry(2)],
         );
 
         const VERTICES: &[Vertex2D] = &[
@@ -97,6 +117,7 @@ impl Renderer2D {
             pipelines,
             bind_groups,
             sprite_shader,
+            sprite_sampler,
             sprite_layout,
             sprite_mesh,
             camera_buffer,
@@ -142,11 +163,24 @@ impl Renderer2D {
 
             if let Some(world) = worlds.get() {
                 if let Some(camera) = &self.camera_buffer {
-                    let camera_layout = CameraBuffer::layout(&gpu);
+                    let camera_layout = CameraBuffer::layout(gpu);
                     let mesh = &self.sprite_mesh;
 
-                    let mut renderables = world.query::<(&Transform, &Sprite)>();
+                    let mut renderables = world.query::<(&Transformation, &Sprite)>();
 
+                    //Create everything necessary to render the quad.
+                    for (_entity, (_transform, sprite)) in renderables.iter() {
+                        self.bind_groups.prepare(
+                            gpu,
+                            assets,
+                            &BindGroupConfig::new(&[
+                                sprite.texture.into(),
+                                self.sprite_sampler.into(),
+                            ]),
+                        );
+                    }
+
+                    //Now only request things.
                     let sprite_shader =
                         ShaderVariant::Single(assets.try_get(&self.sprite_shader).unwrap());
 
@@ -158,14 +192,6 @@ impl Renderer2D {
                         &[camera_layout],
                     );
 
-                    for (_entity, (_transform, sprite)) in renderables.iter() {
-                        self.bind_groups.prepare(
-                            gpu,
-                            assets,
-                            &BindGroupConfig::new(&[sprite.texture.into()]),
-                        );
-                    }
-
                     //Create/Get pipeline for our quad.
                     let pipeline = self.pipelines.get_or_create(gpu, &config);
 
@@ -173,9 +199,11 @@ impl Renderer2D {
                         let (_transform, sprite) = renderable.1;
 
                         //Get bind group for the texture
-                        if let Some(bind_group) = self
-                            .bind_groups
-                            .try_get(&BindGroupConfig::new(&[sprite.texture.into()]))
+                        if let Some(bind_group) =
+                            self.bind_groups.try_get(&BindGroupConfig::new(&[
+                                sprite.texture.into(),
+                                self.sprite_sampler.into(),
+                            ]))
                         {
                             render_pass.set_pipeline(pipeline);
 
@@ -202,6 +230,8 @@ impl Renderer2D {
                 }
             }
         }
+
+        gpu.queue.submit(std::iter::once(encoder.finish()));
     }
 }
 
@@ -223,25 +253,6 @@ impl<'a> EventSubscriber for Renderer<'a> {
                 self.framebuffer.resize(context, *width, *height);
                 false
             }
-            event::Event::KeyboardInput { keycode, state } => match keycode {
-                KeyCode::ArrowLeft => {
-                    if *state == ElementState::Pressed {
-                        self.enable_msaa(context, self.framebuffer.sample_count() * 2);
-                    }
-                    false
-                }
-                KeyCode::ArrowRight => {
-                    if *state == ElementState::Pressed {
-                        let new_count = self.framebuffer.sample_count() / 2;
-
-                        if new_count != 0 {
-                            self.enable_msaa(context, new_count);
-                        }
-                    }
-                    false
-                }
-                _ => false,
-            },
             _ => false,
         }
     }
@@ -261,12 +272,12 @@ impl<'a> Renderer<'a> {
                 Shader::new(
                     &context.graphics,
                     Guid::dead(),
-                    wgpu::ShaderSource::Wgsl(include_str!("../assets/default.wgsl").into()),
+                    wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
                 .unwrap(),
             ),
-            "static:default.wgsl",
+            "static:sprite.wgsl",
         );
 
         let sky_shader = assets.consume_asset(

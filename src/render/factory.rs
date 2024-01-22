@@ -223,15 +223,21 @@ impl BindGroupFactory {
     }
 
     fn create(
-        &self, context: &VisContext, assets: &Assets, config: &BindGroupConfig,
+        &self, context: &VisContext, assets: &mut Assets, config: &BindGroupConfig,
     ) -> Option<wgpu::BindGroup> {
         let mut layout_entries = SmallVec::<[wgpu::BindGroupLayoutEntry; 16]>::new();
         let mut group_entries = SmallVec::<[wgpu::BindGroupEntry; 16]>::new();
+
+        for entry in config.entries.iter() {
+            assets.wait_for(entry);
+        }
 
         for (i, entry) in config.entries.iter().enumerate() {
             if let Some(asset) = assets.try_get_entry(entry) {
                 group_entries.push(asset.group_entry(i as u32));
                 layout_entries.push(asset.layout_entry(i as u32));
+            } else {
+                return None;
             }
         }
 
@@ -249,7 +255,7 @@ impl BindGroupFactory {
         Some(bind_group)
     }
 
-    pub fn prepare(&mut self, context: &VisContext, assets: &Assets, config: &BindGroupConfig) {
+    pub fn prepare(&mut self, context: &VisContext, assets: &mut Assets, config: &BindGroupConfig) {
         let _ = self.get(context, assets, config);
     }
 
@@ -270,7 +276,7 @@ impl BindGroupFactory {
     }
 
     pub fn get(
-        &mut self, context: &VisContext, assets: &Assets, config: &BindGroupConfig,
+        &mut self, context: &VisContext, assets: &mut Assets, config: &BindGroupConfig,
     ) -> &wgpu::BindGroup {
         let mut hasher = DefaultHasher::new();
         config.entries.hash(&mut hasher);
@@ -288,6 +294,9 @@ impl BindGroupFactory {
 
         if let Some(bind_group) = bind_group {
             self.cache.entry(hash).or_default().push(bind_group);
+            self.lookup.entry(hash).or_default().push(config.entries.to_vec());
+        } else {
+            panic!("Failed to create bind group");
         }
 
         self.cache.get(&hash).unwrap().last().unwrap()

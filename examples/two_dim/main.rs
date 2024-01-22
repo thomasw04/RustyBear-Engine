@@ -21,6 +21,7 @@ use RustyBear_Engine::{
     input::InputState,
     logging,
     render::{
+        self,
         camera::OrthographicCamera,
         renderer::{RenderData, Renderer2D},
     },
@@ -105,17 +106,21 @@ impl<'a> TwoDimApp<'a> {
         let mut assets =
             Assets::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
 
-        let worlds = Worlds::new();
+        let mut worlds = Worlds::new();
 
         let mut default = World::new();
 
-        let default_texture = assets.request_asset("data/default.fur", 0);
+        let default_texture = assets.request_asset("data/barrel.fur", 0);
         default.spawn((
             Transformation::default(),
             Sprite { texture: default_texture, tint: Vec4::ONE },
         ));
 
+        let default = worlds.add_world(default);
+        worlds.start_world(default);
+
         let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
+        stack.subscribe(EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(OrthographicCamera::default());
         stack.subscribe(EventType::Layer, camera.clone());

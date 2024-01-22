@@ -352,7 +352,7 @@ impl CameraBuffer {
 
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some(name),
-            layout: &layout,
+            layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),

@@ -192,53 +192,40 @@ pub struct Texture2D {
 
 impl Texture2D {
     pub fn new(
-        context: &VisContext, name: Option<&str>, bytes: &[u8], format: image::ImageFormat,
-    ) -> Result<Texture2D, Texture2D> {
-        if let Ok(image) = image::load_from_memory_with_format(bytes, format) {
-            //Potentially also support other color formats e.g. rgba16 (Need to do more research on this)
-            let rgba = image.to_rgba8();
-            let dim = rgba.dimensions();
+        context: &VisContext, name: Option<&str>, dim: (u32, u32), bytes: &[u8],
+    ) -> Texture2D {
+        let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
 
-            let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
+        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
+            label: name,
+            size: extend,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
 
-            let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-                label: name,
-                size: extend,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
+        context.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytes,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * dim.0),
+                rows_per_image: Some(dim.1),
+            },
+            extend,
+        );
 
-            context.queue.write_texture(
-                wgpu::ImageCopyTexture {
-                    texture: &texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                &rgba,
-                wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(4 * dim.0),
-                    rows_per_image: Some(dim.1),
-                },
-                extend,
-            );
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-            Ok(Texture2D { texture, view })
-        } else {
-            log::error!(
-                "Failed to parse image {}. Did you choose a supported format?",
-                name.unwrap_or("[UNKNOWN_IMAGE]")
-            );
-
-            Err(Texture2D::error_texture(context))
-        }
+        Texture2D { texture, view }
     }
 
     pub fn error_texture(context: &VisContext) -> Texture2D {
