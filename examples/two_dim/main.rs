@@ -12,18 +12,14 @@ use RustyBear_Engine::{
     assets::assets::Assets,
     context::Context,
     core::{Application, ModuleStack},
-    entity::{
-        components::{Sprite, Transformation},
-        entities::Worlds,
-    },
+    entity::{desc::Transform2D, entities::Worlds},
     environment::config::Config,
     event::{Event, EventType},
     input::InputState,
     logging,
     render::{
-        self,
         camera::OrthographicCamera,
-        renderer::{RenderData, Renderer2D},
+        render2d::{RenderData, Renderer2D, SpriteDesc, Transform2DDesc},
     },
     utils::Timestep,
     window::Window,
@@ -111,9 +107,10 @@ impl<'a> TwoDimApp<'a> {
         let mut default = World::new();
 
         let default_texture = assets.request_asset("data/barrel.fur", 0);
+
         default.spawn((
-            Transformation::default(),
-            Sprite { texture: default_texture, tint: Vec4::ONE },
+            Transform2DDesc::new(Transform2D::default()),
+            SpriteDesc::new(default_texture, Vec4::ONE, None),
         ));
 
         let default = worlds.add_world(default);

@@ -141,6 +141,10 @@ impl Guid {
         Guid { id }
     }
 
+    pub fn is_dead(&self) -> bool {
+        self.id == 0
+    }
+
     pub fn dead() -> Guid {
         Guid { id: 0 }
     }

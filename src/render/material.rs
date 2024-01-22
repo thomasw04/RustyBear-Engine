@@ -166,18 +166,27 @@ impl GenericMaterial {
         context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>,
         entries: &[wgpu::BindGroupLayoutEntry], groups: &[wgpu::BindGroupEntry],
     ) -> Self {
-        //TODO: Maybe find a better way to split the BindGroupEntries in layout and group entries. We dont want to allocate two new vectors for each material.
-        let bind_layout = context
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: None, entries });
+        let bind_layout =
+            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &entries,
+            });
 
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_layout,
-            entries: groups,
+            entries: &groups,
         });
 
         GenericMaterial { vertex, fragment, bind_layout: [bind_layout], bind_group: [bind_group] }
+    }
+
+    pub fn update_group(&mut self, context: &VisContext, group: &[wgpu::BindGroupEntry]) {
+        self.bind_group[0] = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.bind_layout[0],
+            entries: group,
+        });
     }
 }
 

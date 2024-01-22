@@ -7,6 +7,7 @@ use rayon::prelude::*;
 
 use crate::context::VisContext;
 use crate::logging;
+use crate::render::material::GenericMaterial;
 use crate::render::types::BindGroupEntry;
 use crate::utils::{Guid, GuidGenerator};
 
@@ -26,6 +27,7 @@ pub enum AssetType {
     Shader(Shader),
     Uniforms(UniformBuffer),
     Sampler(Sampler),
+    GenericMaterial(GenericMaterial),
 }
 
 static LOADING_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
@@ -49,7 +51,7 @@ impl<T> From<Ptr<T>> for GenPtr {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub struct Ptr<T> {
     guid: Guid,
     phantom: std::marker::PhantomData<T>,
@@ -69,13 +71,29 @@ impl<T> Clone for Ptr<T> {
 
 impl<T> Copy for Ptr<T> {}
 
+impl<T> PartialEq for Ptr<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.guid == other.guid
+    }
+}
+
+impl<T> Eq for Ptr<T> {}
+
 impl<T> Ptr<T> {
     pub fn new(guid: Guid) -> Self {
         Ptr { guid, phantom: std::marker::PhantomData }
     }
 
+    pub fn is_dead(&self) -> bool {
+        self.guid.is_dead()
+    }
+
     pub fn inner(&self) -> Guid {
         self.guid
+    }
+
+    pub fn dead() -> Self {
+        Ptr { guid: Guid::dead(), phantom: std::marker::PhantomData }
     }
 }
 
@@ -159,9 +177,10 @@ impl Assets {
 
     /*Register an already created asset in the asset manager. This is necessary when you need to reference assets via a Ptr<T>. */
     pub fn consume_asset<S: Into<String> + AsRef<str>, T>(
-        &mut self, asset: AssetType, path: S,
+        &mut self, asset: AssetType, path: Option<S>,
     ) -> Ptr<T> {
-        let guid = self.request_id(path);
+        let guid =
+            if let Some(path) = path { self.request_id(path) } else { self.generator.generate() };
 
         match asset {
             AssetType::TextureArray(texture_array) => {
@@ -179,6 +198,9 @@ impl Assets {
             }
             AssetType::Sampler(sampler) => {
                 self.gpu_cache.insert(guid, AssetType::Sampler(sampler));
+            }
+            AssetType::GenericMaterial(material) => {
+                self.gpu_cache.insert(guid, AssetType::GenericMaterial(material));
             }
         }
 
@@ -261,6 +283,20 @@ impl Assets {
             AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
             AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
             AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
+            AssetType::GenericMaterial(material) => (material as &dyn Any).downcast_ref::<T>(),
+        })
+    }
+
+    pub fn try_get_mut<T: 'static>(&mut self, ptr: &Ptr<T>) -> Option<&mut T> {
+        self.gpu_cache.get_mut(&ptr.guid).and_then(|asset| match asset {
+            AssetType::TextureArray(texture_array) => {
+                (texture_array as &mut dyn Any).downcast_mut::<T>()
+            }
+            AssetType::Texture2D(texture) => (texture as &mut dyn Any).downcast_mut::<T>(),
+            AssetType::Shader(shader) => (shader as &mut dyn Any).downcast_mut::<T>(),
+            AssetType::Uniforms(uniforms) => (uniforms as &mut dyn Any).downcast_mut::<T>(),
+            AssetType::Sampler(sampler) => (sampler as &mut dyn Any).downcast_mut::<T>(),
+            AssetType::GenericMaterial(material) => (material as &mut dyn Any).downcast_mut::<T>(),
         })
     }
 
@@ -273,6 +309,7 @@ impl Assets {
             AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
             AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
             AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
+            AssetType::GenericMaterial(material) => (material as &dyn Any).downcast_ref::<T>(),
         })
     }
 
@@ -283,6 +320,7 @@ impl Assets {
             AssetType::Shader(_shader) => None,
             AssetType::Uniforms(uniforms) => Some(uniforms as &dyn BindGroupEntry),
             AssetType::Sampler(sampler) => Some(sampler as &dyn BindGroupEntry),
+            AssetType::GenericMaterial(_) => None,
         })
     }
 

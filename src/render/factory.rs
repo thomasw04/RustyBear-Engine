@@ -59,6 +59,10 @@ impl<'a> RenderPipelineConfig<'a> {
     pub fn set_config(&mut self, base_config: PipelineBaseConfig) {
         self.key.base_config = base_config
     }
+
+    pub fn key(&self) -> PipelineConfigKey {
+        self.key
+    }
 }
 
 pub struct RenderPipelineBuilder<'a> {
@@ -125,6 +129,14 @@ impl PipelineFactory {
 
     pub fn get(&self, config: &RenderPipelineConfig) -> Option<&wgpu::RenderPipeline> {
         self.cache.get(&config.key)
+    }
+
+    pub fn get_key(&self, key: &PipelineConfigKey) -> Option<&wgpu::RenderPipeline> {
+        self.cache.get(key)
+    }
+
+    pub fn prepare(&mut self, context: &VisContext, config: &RenderPipelineConfig) {
+        let _ = self.get_or_create(context, config);
     }
 
     pub fn get_or_create(
