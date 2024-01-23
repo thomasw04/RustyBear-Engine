@@ -269,7 +269,7 @@ impl Renderer2D {
                     let renderables =
                         world.query_mut::<(&mut Transform2DDesc, &mut SpriteDesc)>().into_iter();
 
-                    //let mut config_keys = Vec::with_capacity(renderables.len());
+                    let mut config_keys = Vec::with_capacity(renderables.len());
 
                     //Create everything necessary to render the quad.
                     for (_entity, (transform, sprite)) in renderables {
@@ -289,9 +289,12 @@ impl Renderer2D {
                         );
 
                         self.pipelines.prepare(context, &config);
+                        config_keys.push(config.key());
                     }
 
-                    /*for (i, renderable) in renderables. {
+                    let mut renderables = world.query::<(&Transform2DDesc, &SpriteDesc)>();
+
+                    for (i, renderable) in renderables.iter().enumerate() {
                         let (_transform, sprite) = renderable.1;
 
                         let material = assets.try_get(&sprite.material).unwrap();
@@ -321,7 +324,7 @@ impl Renderer2D {
 
                         //Draw the quad.
                         render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
-                    }*/
+                    }
                 }
             }
         }

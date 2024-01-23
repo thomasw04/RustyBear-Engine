@@ -15,7 +15,7 @@ use super::types::PipelineBaseConfig;
 use super::types::VertexLayout;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, Hash)]
-struct PipelineConfigKey {
+pub struct PipelineConfigKey {
     vertex: Guid,
     fragment: Guid,
     base_config: PipelineBaseConfig,
