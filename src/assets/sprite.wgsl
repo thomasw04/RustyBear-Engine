@@ -1,15 +1,11 @@
 
-struct SpriteUniform {
-   transform: mat4x4<f32>,
-   color: vec4<f32>,
-};
 
 struct CameraUniform {
     view_projection: mat4x4<f32>,
 };
 
 @group(0) @binding(0)
-var<uniform> sprite: SpriteUniform;
+var<uniform> transform: mat4x4<f32>;
 
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
@@ -31,16 +27,19 @@ fn vertex_main(
 ) -> VertexOutput {
     var out: VertexOutput;
     out.texture_coords = mesh.texture_coords;
-    out.clip_position = camera.view_projection * sprite.transform * vec4<f32>(mesh.position, 1.0);
+    out.clip_position = camera.view_projection * transform * vec4<f32>(mesh.position, 1.0);
     return out;
 }
 
 @group(0) @binding(1)
-var texture: texture_2d<f32>;
+var<uniform> color: vec4<f32>;
+
 @group(0) @binding(2)
+var texture: texture_2d<f32>;
+@group(0) @binding(3)
 var texture_sampler: sampler;
 
 @fragment
 fn fragment_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(texture, texture_sampler, in.texture_coords) * sprite.color;
+    return textureSample(texture, texture_sampler, in.texture_coords) * color;
 }

@@ -2,21 +2,23 @@ use std::mem::size_of;
 
 use glam::{Vec2, Vec3, Vec4};
 use wgpu::TextureView;
+use what::ShaderStages;
 
 use crate::{
     assets::{
-        assets::{AssetType, Assets, Ptr},
+        assets::{AssetType, Assets, GenPtr, Ptr},
         buffer::{Indices, UniformBuffer, Vertices},
-        shader::ShaderVariant,
+        shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
     entity::{desc::Transform2D, entities::Worlds},
     event::{self, EventSubscriber},
     render::material::GenericMaterial,
+    utils::Guid,
 };
 
-use super::types::{BindGroup, BindLayout, FragmentShader, Vertex2D, VertexShader};
+use super::types::{BindGroup, BindGroupEntry, BindLayout, FragmentShader, Vertex2D, VertexShader};
 use super::{
     camera::CameraBuffer,
     factory::{BindGroupConfig, BindGroupFactory, PipelineFactory, RenderPipelineConfig},
@@ -28,13 +30,13 @@ use super::{
 //Descriptors for this system.
 pub struct Transform2DDesc {
     transform: Transform2D,
-    uniform: Ptr<UniformBuffer>,
+    uniform: Option<UniformBuffer>,
     dirty: bool,
 }
 
 impl Transform2DDesc {
     pub fn new(transform: Transform2D) -> Self {
-        Self { transform, uniform: Ptr::dead(), dirty: true }
+        Self { transform, uniform: None, dirty: true }
     }
 
     pub fn set_transform(&mut self, transform: Transform2D) {
@@ -86,7 +88,8 @@ pub struct SpriteDesc {
     texture: Ptr<Texture2D>,
     sampler: Ptr<Sampler>,
     tint: Vec4,
-    material: Ptr<GenericMaterial>,
+    buffer: Option<UniformBuffer>,
+    material: Option<GenericMaterial>,
     dirty: bool,
 }
 
@@ -96,7 +99,8 @@ impl SpriteDesc {
             texture,
             sampler: sampler.unwrap_or(Ptr::dead()),
             tint,
-            material: Ptr::dead(),
+            buffer: None,
+            material: None,
             dirty: true,
         }
     }
@@ -146,7 +150,7 @@ pub struct RenderData<'a> {
 pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,
-    bind_groups: BindGroupFactory,
+    sprite_shader: Ptr<Shader>,
     sprite_mesh: GenericMesh<'static>,
     camera_buffer: Option<CameraBuffer>,
 }
@@ -168,7 +172,6 @@ impl Renderer2D {
         //Renderable setup
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
-        let bind_groups = BindGroupFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
 
         const VERTICES: &[Vertex2D] = &[
@@ -191,9 +194,22 @@ impl Renderer2D {
 
         let sprite_mesh = GenericMesh::new(vertices, indices, 6);
 
+        let sprite_shader = assets.consume_asset(
+            AssetType::Shader(
+                Shader::new(
+                    &context.graphics,
+                    Guid::dead(),
+                    wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
+                    ShaderStages::FRAGMENT | ShaderStages::VERTEX,
+                )
+                .unwrap(),
+            ),
+            None::<&str>,
+        );
+
         let camera_buffer = Some(CameraBuffer::new(&context.graphics, "Default Camera"));
 
-        Renderer2D { framebuffer, pipelines, bind_groups, sprite_mesh, camera_buffer }
+        Renderer2D { framebuffer, pipelines, sprite_shader, sprite_mesh, camera_buffer }
     }
 
     pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
@@ -202,15 +218,13 @@ impl Renderer2D {
         }
     }
 
-    fn update_transform(context: &VisContext, desc: &mut Transform2DDesc, assets: &mut Assets) {
-        let uniform = if let Some(uniform) = assets.try_get_mut(&desc.uniform) {
+    fn update_transform(context: &VisContext, desc: &mut Transform2DDesc) {
+        let uniform = if let Some(uniform) = desc.uniform.as_mut() {
             uniform
         } else {
-            desc.uniform = assets.consume_asset(
-                AssetType::Uniforms(UniformBuffer::new(context, size_of::<Transform2D>())),
-                None::<&str>,
-            );
-            assets.try_get_mut(&desc.uniform).unwrap()
+            desc.uniform = Some(UniformBuffer::new(context, size_of::<[[f32; 4]; 4]>()));
+            desc.dirty = true;
+            return;
         };
 
         if desc.dirty {
@@ -226,8 +240,49 @@ impl Renderer2D {
         }
     }
 
-    fn update_material(context: &VisContext, desc: &mut SpriteDesc, assets: &mut Assets) {
-        todo!("Update material")
+    fn update_material(
+        &self, context: &VisContext, transform: &UniformBuffer, desc: &mut SpriteDesc,
+        assets: &mut Assets,
+    ) {
+        if !assets.exist(&GenPtr::from(desc.sampler)) {
+            desc.sampler =
+                assets.consume_asset(AssetType::Sampler(Sampler::two_dim(context)), None::<&str>);
+        }
+
+        let texture = assets.try_get(&desc.texture);
+        let sampler = assets.try_get(&desc.sampler);
+
+        if desc.buffer.is_none() {
+            desc.buffer = Some(UniformBuffer::new(context, size_of::<[f32; 4]>()));
+            desc.dirty = true;
+        }
+
+        if desc.material.is_none() || desc.dirty {
+            if let (Some(texture), Some(sampler), Some(buffer)) =
+                (texture, sampler, &mut desc.buffer)
+            {
+                buffer.update_buffer(context, bytemuck::cast_slice(&desc.tint.to_array()));
+
+                desc.material = Some(GenericMaterial::new(
+                    context,
+                    self.sprite_shader,
+                    self.sprite_shader,
+                    &[
+                        UniformBuffer::layout_entry(0),
+                        UniformBuffer::layout_entry(1),
+                        Texture2D::layout_entry(2),
+                        Sampler::layout_entry(3),
+                    ],
+                    &[
+                        transform.group_entry(0),
+                        buffer.group_entry(1),
+                        texture.group_entry(2),
+                        sampler.group_entry(3),
+                    ],
+                ));
+                desc.dirty = false;
+            }
+        }
     }
 
     pub fn render(&mut self, data: RenderData, assets: &mut Assets, worlds: &mut Worlds) {
@@ -237,67 +292,70 @@ impl Renderer2D {
 
         let _ = assets.update();
 
-        let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Renderer2D Render Encoder"),
-        });
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("World Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: match fbo.sample_count() {
-                        1 => data.view,
-                        _ => &fbo_view,
-                    },
-                    resolve_target: match fbo.sample_count() {
-                        1 => None,
-                        _ => Some(data.view),
-                    },
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.3, g: 0.7, b: 0.3, a: 1.0 }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                ..Default::default()
-            });
+        if let Some(world) = worlds.get_mut() {
+            let mut config_keys = Vec::new();
 
-            if let Some(world) = worlds.get_mut() {
+            for (_entity, (transform, sprite)) in
+                world.query_mut::<(&mut Transform2DDesc, &mut SpriteDesc)>()
+            {
+                Self::update_transform(context, transform);
+                self.update_material(context, transform.uniform.as_ref().unwrap(), sprite, assets);
+
+                let material = sprite.material.as_ref().unwrap();
+                let vertex = assets.try_get(VertexShader::ptr(material)).unwrap();
+                let fragment = assets.try_get(FragmentShader::ptr(material)).unwrap();
+                let shader = ShaderVariant::Double(vertex, fragment);
+
+                let config = RenderPipelineConfig::new(
+                    &shader,
+                    Some(&self.sprite_mesh),
+                    material,
+                    &[CameraBuffer::layout(context)],
+                );
+
+                self.pipelines.prepare(context, &config);
+                config_keys.push(config.key());
+            }
+
+            let mut encoder =
+                context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Renderer2D Render Encoder"),
+                });
+            {
+                let mut renderables = world.query::<(&Transform2DDesc, &SpriteDesc)>();
+
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("World Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: match fbo.sample_count() {
+                            1 => data.view,
+                            _ => &fbo_view,
+                        },
+                        resolve_target: match fbo.sample_count() {
+                            1 => None,
+                            _ => Some(data.view),
+                        },
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.3,
+                                g: 0.7,
+                                b: 0.3,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    ..Default::default()
+                });
+
                 if let Some(camera) = &self.camera_buffer {
-                    let camera_layout = CameraBuffer::layout(context);
                     let mesh = &self.sprite_mesh;
 
-                    let renderables =
-                        world.query_mut::<(&mut Transform2DDesc, &mut SpriteDesc)>().into_iter();
-
-                    let mut config_keys = Vec::with_capacity(renderables.len());
-
-                    //Create everything necessary to render the quad.
-                    for (_entity, (transform, sprite)) in renderables {
-                        Self::update_transform(context, transform, assets);
-                        Self::update_material(context, sprite, assets);
-
-                        let material = assets.try_get(&sprite.material).unwrap();
-                        let vertex = assets.try_get(VertexShader::ptr(material)).unwrap();
-                        let fragment = assets.try_get(FragmentShader::ptr(material)).unwrap();
-                        let shader = ShaderVariant::Double(vertex, fragment);
-
-                        let config = RenderPipelineConfig::new(
-                            &shader,
-                            Some(&self.sprite_mesh),
-                            material,
-                            &[camera_layout],
-                        );
-
-                        self.pipelines.prepare(context, &config);
-                        config_keys.push(config.key());
-                    }
-
-                    let mut renderables = world.query::<(&Transform2DDesc, &SpriteDesc)>();
-
-                    for (i, renderable) in renderables.iter().enumerate() {
+                    for (i, renderable) in renderables.into_iter().enumerate() {
                         let (_transform, sprite) = renderable.1;
 
-                        let material = assets.try_get(&sprite.material).unwrap();
+                        let material = sprite.material.as_ref().unwrap();
 
                         let pipeline = self
                             .pipelines
@@ -327,8 +385,7 @@ impl Renderer2D {
                     }
                 }
             }
+            context.queue.submit(std::iter::once(encoder.finish()));
         }
-
-        context.queue.submit(std::iter::once(encoder.finish()));
     }
 }

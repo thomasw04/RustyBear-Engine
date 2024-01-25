@@ -49,7 +49,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
-            let render_data = RenderData { ctx: &context, view, window };
+            let render_data = RenderData { ctx: context, view, window };
 
             renderer.render(render_data, &mut self.assets, &mut self.worlds);
         }
@@ -110,7 +110,7 @@ impl<'a> TwoDimApp<'a> {
 
         default.spawn((
             Transform2DDesc::new(Transform2D::default()),
-            SpriteDesc::new(default_texture, Vec4::ONE, None),
+            SpriteDesc::new(default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
         ));
 
         let default = worlds.add_world(default);

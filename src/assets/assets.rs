@@ -156,15 +156,6 @@ impl Assets {
         }
     }
 
-    fn add_static_asset(
-        cache: &mut HashMap<Guid, AssetType>, path_cache: &mut BiMap<Guid, String>,
-        gen: &mut GuidGenerator, path: String, asset: AssetType,
-    ) {
-        let guid = gen.generate();
-        cache.insert(guid, asset);
-        path_cache.insert(guid, path);
-    }
-
     fn request_id<S: Into<String> + AsRef<str>>(&mut self, path: S) -> Guid {
         if let Some(guid) = self.path_cache.get_by_right(path.as_ref()) {
             *guid
@@ -173,6 +164,10 @@ impl Assets {
             self.path_cache.insert(id, path.into());
             id
         }
+    }
+
+    pub fn exist(&self, ptr: &GenPtr) -> bool {
+        self.gpu_cache.contains_key(&ptr.guid)
     }
 
     /*Register an already created asset in the asset manager. This is necessary when you need to reference assets via a Ptr<T>. */
