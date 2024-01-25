@@ -44,6 +44,7 @@ once_cell = "1.19.0"
 lazy_static = "1.4.0"
 hashbrown = "0.14.3"
 smallvec = { version = "1.11.2", features = ["const_new", "union", "const_generics"] }
+hecs = "0.10.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"

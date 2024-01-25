@@ -1,16 +1,16 @@
 use wgpu::TextureView;
-use winit::{event::ElementState, keyboard::KeyCode};
 
 use crate::{
     assets::{
-        assets::Assets,
+        assets::{AssetType, Assets},
         buffer::{Indices, Vertices},
-        shader::ShaderVariant,
+        shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
     },
     context::{Context, VisContext},
     event::{self, EventSubscriber},
     render::{material::GenericMaterial, types::BindGroupEntry},
+    utils::Guid,
 };
 
 use super::{
@@ -18,7 +18,7 @@ use super::{
     factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
     mesh::GenericMesh,
-    types::{BindGroup, IndexBuffer, VertexBuffer},
+    types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader},
 };
 use super::{material::SkyboxMaterial, types::Vertex2D};
 
@@ -40,25 +40,6 @@ impl<'a> EventSubscriber for Renderer<'a> {
                 self.framebuffer.resize(context, *width, *height);
                 false
             }
-            event::Event::KeyboardInput { keycode, state } => match keycode {
-                KeyCode::ArrowLeft => {
-                    if *state == ElementState::Pressed {
-                        self.enable_msaa(context, self.framebuffer.sample_count() * 2);
-                    }
-                    false
-                }
-                KeyCode::ArrowRight => {
-                    if *state == ElementState::Pressed {
-                        let new_count = self.framebuffer.sample_count() / 2;
-
-                        if new_count != 0 {
-                            self.enable_msaa(context, new_count);
-                        }
-                    }
-                    false
-                }
-                _ => false,
-            },
             _ => false,
         }
     }
@@ -73,16 +54,41 @@ impl<'a> Renderer<'a> {
 
         let framebuffer = Framebuffer::new(context, sample_count);
 
+        let default_shader = assets.consume_asset(
+            AssetType::Shader(
+                Shader::new(
+                    &context.graphics,
+                    Guid::dead(),
+                    wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
+                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
+                )
+                .unwrap(),
+            ),
+            None::<&str>,
+        );
+
+        let sky_shader = assets.consume_asset(
+            AssetType::Shader(
+                Shader::new(
+                    &context.graphics,
+                    Guid::dead(),
+                    wgpu::ShaderSource::Wgsl(include_str!("../assets/skybox.wgsl").into()),
+                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
+                )
+                .unwrap(),
+            ),
+            None::<&str>,
+        );
+
         let texture = Texture2D::error_texture(&context.graphics);
         let sampler = Sampler::two_dim(&context.graphics);
 
         //TODO add capability to what for material asset type containing textures, shaders, etc.
         let sky_tex = assets.request_asset("data/skybox.fur", 0);
-        let sky_shader = assets.request_asset("static:skybox.wgsl", 0);
 
-        let skybox = assets.get(&sky_tex).map(|sky_tex| {
-            SkyboxMaterial::new(&context.graphics, ShaderVariant::Single(sky_shader), sky_tex)
-        });
+        let skybox = assets
+            .get(&sky_tex)
+            .map(|sky_tex| SkyboxMaterial::new(&context.graphics, sky_shader, sky_shader, sky_tex));
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
@@ -90,8 +96,9 @@ impl<'a> Renderer<'a> {
 
         let material = GenericMaterial::new(
             &context.graphics,
-            ShaderVariant::Single(assets.request_asset("static:default.wgsl", 0)),
-            &[texture.layout_entry(0), sampler.layout_entry(1)],
+            default_shader,
+            default_shader,
+            &[Texture2D::layout_entry(0), Sampler::layout_entry(1)],
             &[texture.group_entry(0), sampler.group_entry(1)],
         );
 
@@ -158,7 +165,7 @@ impl<'a> Renderer<'a> {
     pub fn render(
         &mut self, context: &mut Context, view: &TextureView, window: &winit::window::Window,
     ) {
-        let gpu = &context.graphics;
+        let gpu = context.graphics.as_ref();
         let assets = &mut self.assets;
 
         let _ = assets.update();
@@ -198,11 +205,15 @@ impl<'a> Renderer<'a> {
             });
 
             if let Some(skybox) = &self.skybox {
-                let sky_config =
-                    RenderPipelineConfig::new(skybox, None::<&GenericMesh>, None, None);
-                let skybox_pipeline = self.pipelines.get_for(gpu, assets, &sky_config, true);
+                let shader = ShaderVariant::Double(
+                    assets.try_get(VertexShader::ptr(skybox)).unwrap(),
+                    assets.try_get(FragmentShader::ptr(skybox)).unwrap(),
+                );
 
-                render_pass.set_pipeline(skybox_pipeline);
+                let sky_config = RenderPipelineConfig::new(&shader, None::<&Vertices>, skybox, &[]);
+                let sky_pipeline = self.pipelines.get_or_create(gpu, &sky_config);
+
+                render_pass.set_pipeline(sky_pipeline);
 
                 BindGroup::groups(skybox).iter().enumerate().for_each(|(i, group)| {
                     render_pass.set_bind_group(i as u32, group, &[]);
@@ -230,14 +241,19 @@ impl<'a> Renderer<'a> {
                 ..Default::default()
             });
 
-            let config = RenderPipelineConfig::new(
-                &self.material,
-                Some(&self.mesh),
-                None,
-                Some(self.camera_buffer.layout()),
+            let shader = ShaderVariant::Double(
+                assets.try_get(VertexShader::ptr(&self.material)).unwrap(),
+                assets.try_get(FragmentShader::ptr(&self.material)).unwrap(),
             );
 
-            let pipeline = self.pipelines.get_for(&gpu, assets, &config, true);
+            let config = RenderPipelineConfig::new(
+                &shader,
+                Some(&self.mesh),
+                &self.material,
+                &[CameraBuffer::layout(gpu)],
+            );
+
+            let pipeline = self.pipelines.get_or_create(gpu, &config);
 
             render_pass.set_pipeline(pipeline);
 

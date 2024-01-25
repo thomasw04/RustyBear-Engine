@@ -1,6 +1,6 @@
 use crate::assets::buffer::{Indices, Vertices};
 
-use super::types::{IndexBuffer, Mesh, VertexBuffer};
+use super::types::{IndexBuffer, Mesh, VertexBuffer, VertexLayout};
 
 pub struct GenericMesh<'a> {
     vertices: Vertices<'a>,
@@ -25,11 +25,14 @@ impl<'a> IndexBuffer for GenericMesh<'a> {
         self.indices.buffer()
     }
 }
-impl<'a> VertexBuffer for GenericMesh<'a> {
+
+impl<'a> VertexLayout for GenericMesh<'a> {
     fn layout(&self) -> &[wgpu::VertexBufferLayout] {
         self.vertices.layout()
     }
+}
 
+impl<'a> VertexBuffer for GenericMesh<'a> {
     fn buffer(&self) -> Option<&wgpu::Buffer> {
         self.vertices.buffer()
     }

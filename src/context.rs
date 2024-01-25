@@ -189,7 +189,7 @@ impl<'a> Context {
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.egui.begin_frame();
+        //self.egui.begin_frame();
         app.gui_render(&view, self, &self.egui.context());
 
         app.render(&view, self, window);

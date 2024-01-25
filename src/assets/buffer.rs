@@ -2,7 +2,7 @@ use std::num::NonZeroU64;
 
 use crate::{
     context::VisContext,
-    render::types::{BindGroupEntry, IndexBuffer, VertexBuffer},
+    render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout},
 };
 
 use wgpu::util::DeviceExt;
@@ -35,6 +35,19 @@ impl UniformBuffer {
     pub fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
+
+    pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
+        wgpu::BindGroupLayoutEntry {
+            binding: idx,
+            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }
+    }
 }
 
 impl BindGroupEntry for UniformBuffer {
@@ -49,17 +62,8 @@ impl BindGroupEntry for UniformBuffer {
         }
     }
 
-    fn layout_entry(&self, idx: u32) -> wgpu::BindGroupLayoutEntry {
-        wgpu::BindGroupLayoutEntry {
-            binding: idx,
-            visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-            ty: wgpu::BindingType::Buffer {
-                ty: wgpu::BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }
+    fn layout_entry(&self, binding: u32) -> wgpu::BindGroupLayoutEntry {
+        Self::layout_entry(binding)
     }
 }
 
@@ -82,11 +86,13 @@ impl<'a> Vertices<'a> {
     }
 }
 
-impl<'a> VertexBuffer for Vertices<'a> {
+impl<'a> VertexLayout for Vertices<'a> {
     fn layout(&self) -> &[wgpu::VertexBufferLayout] {
         &self.layout
     }
+}
 
+impl<'a> VertexBuffer for Vertices<'a> {
     fn buffer(&self) -> Option<&wgpu::Buffer> {
         Some(&self.buffer)
     }
