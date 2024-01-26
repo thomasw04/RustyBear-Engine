@@ -92,7 +92,7 @@ impl<'a> Renderer<'a> {
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
-        let egui_render_pass = Renderer::recreate_gui(context, 1);
+        let egui_renderer = Renderer::recreate_gui(context, 1);
 
         let material = GenericMaterial::new(
             &context.graphics,
@@ -130,7 +130,7 @@ impl<'a> Renderer<'a> {
             mesh,
             camera_buffer,
             skybox,
-            egui_renderer: egui_render_pass,
+            egui_renderer,
         }
     }
 
