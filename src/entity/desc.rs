@@ -192,6 +192,17 @@ impl<'a> Sprite<'a> {
         )
     }
 
+    pub fn set_coords(&mut self, context: &VisContext, coords: &[f32]) {
+        let vertices = vec![
+            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [coords[0], coords[1]] },
+            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [coords[2], coords[3]] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [coords[4], coords[5]] },
+            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [coords[6], coords[7]] },
+        ];
+
+        self.mesh.update_vertices(context, bytemuck::cast_slice(&vertices));
+    }
+
     pub fn set_texture(&mut self, texture: Ptr<Texture2D>) {
         if self.texture != texture {
             self.texture = texture;

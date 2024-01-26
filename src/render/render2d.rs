@@ -1,25 +1,20 @@
 use wgpu::TextureView;
 
 use crate::{
-    assets::{
-        assets::Assets,
-        buffer::{Indices, Vertices},
-        shader::ShaderVariant,
-    },
+    assets::{assets::Assets, shader::ShaderVariant},
     context::{Context, VisContext},
     entity::{
         desc::{Sprite, Transform2D},
-        entities::{self, Worlds},
+        entities::Worlds,
     },
     event::{self, EventSubscriber},
 };
 
-use super::types::{BindGroup, FragmentShader, Vertex2D, VertexShader};
+use super::types::{BindGroup, FragmentShader, VertexShader};
 use super::{
     camera::CameraBuffer,
     factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
-    mesh::GenericMesh,
     types::{IndexBuffer, VertexBuffer},
 };
 
@@ -36,7 +31,6 @@ pub struct RenderData<'a> {
 pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,
-    sprite_mesh: GenericMesh<'static>,
     camera_buffer: Option<CameraBuffer>,
 }
 
@@ -58,29 +52,9 @@ impl Renderer2D {
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
-
-        const VERTICES: &[Vertex2D] = &[
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
-        ];
-
-        const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
-
-        let vertices =
-            Vertices::new(&context.graphics, bytemuck::cast_slice(VERTICES), Vertex2D::LAYOUT);
-
-        let indices = Indices::new(
-            &context.graphics,
-            bytemuck::cast_slice(INDICES),
-            wgpu::IndexFormat::Uint16,
-        );
-
-        let sprite_mesh = GenericMesh::new(vertices, indices, 6);
         let camera_buffer = Some(CameraBuffer::new(&context.graphics, "Default Camera"));
 
-        Renderer2D { framebuffer, pipelines, sprite_mesh, camera_buffer }
+        Renderer2D { framebuffer, pipelines, camera_buffer }
     }
 
     pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
