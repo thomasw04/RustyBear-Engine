@@ -4,10 +4,11 @@ use crate::{
     assets::{assets::Assets, shader::ShaderVariant},
     context::{Context, VisContext},
     entity::{
-        desc::{Sprite, Transform2D},
+        desc::{Animation2D, Sprite, Transform2D},
         entities::Worlds,
     },
     event::{self, EventSubscriber},
+    utils::Timestep,
 };
 
 use super::types::{BindGroup, FragmentShader, VertexShader};
@@ -60,6 +61,18 @@ impl Renderer2D {
     pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         if let Some(camera_buffer) = &mut self.camera_buffer {
             camera_buffer.update_buffer(context, camera);
+        }
+    }
+
+    pub fn update_animations(
+        &mut self, context: &VisContext, delta: &Timestep, worlds: &mut Worlds,
+    ) {
+        if let Some(world) = worlds.get_mut() {
+            for (_entity, (sprite, animation)) in
+                world.query_mut::<(&mut Sprite, &mut Animation2D)>()
+            {
+                animation.update(context, delta, sprite);
+            }
         }
     }
 

@@ -12,7 +12,7 @@ use winit::keyboard::KeyCode;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entity::desc::{Sprite, Transform2D};
+use RustyBear_Engine::entity::desc::{Animation2D, Sprite, Transform2D};
 use RustyBear_Engine::entity::entities::Worlds;
 use RustyBear_Engine::entity::script::{Scriptable, Scripts};
 use RustyBear_Engine::environment::config::Config;
@@ -34,7 +34,9 @@ pub struct AnimatedApp<'a> {
 }
 
 impl<'a> Application<'a> for AnimatedApp<'a> {
-    fn on_event(&mut self, _event: &Event, _context: &mut Context) -> bool { false }
+    fn on_event(&mut self, _event: &Event, _context: &mut Context) -> bool {
+        false
+    }
 
     fn render(
         &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
@@ -59,6 +61,9 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
     }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
+        let mut renderer = self.renderer.borrow_mut();
+        renderer.update_animations(&context.graphics, delta, &mut self.worlds);
+
         if let Some(world) = self.worlds.get_mut() {
             self.scripts.tick(&context.graphics, delta, world);
         }
@@ -84,41 +89,39 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
 
     fn quit(&mut self) {}
 
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> { &mut self.stack }
+    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
+        &mut self.stack
+    }
 }
 
-struct Animator {
-    delta: f64,
-
-    total_frames: usize,
-    current_frame: usize,
-    fps: usize,
+struct Player {
+    dir: f32,
 }
 
-impl Scriptable for Animator {
+impl Scriptable for Player {
     fn on_spawn(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
 
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
         world: &mut hecs::World,
     ) {
-        if let Ok(mut sprite) = world.get::<&mut Sprite>(entity) {
-            if self.delta > 1000.0 / self.fps as f64 {
-                sprite.set_coords_quad(
-                    context,
-                    Vec2::new((1.0 / self.total_frames as f32) * (self.current_frame as f32), 0.0),
-                    Vec2::new(
-                        (1.0 / self.total_frames as f32) * (self.current_frame as f32 + 1.0),
-                        1.0,
-                    ),
-                );
-
-                self.current_frame = (self.current_frame + 1) % self.total_frames;
-
-                self.delta = 0.0;
+        if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
+            let add = if self.dir == 0.0 {
+                Vec3::new(0.01 * delta.norm(), 0.0, 0.0)
             } else {
-                self.delta += delta.millis();
+                Vec3::new(-0.01 * delta.norm(), 0.0, 0.0)
+            };
+            transform.add_pos(context, add);
+
+            if transform.position().x > 2.0 {
+                self.dir = 1.0;
+            } else if transform.position().x < -2.0 {
+                self.dir = 0.0;
             }
+        }
+
+        if let Ok(mut anim) = world.get::<&mut Animation2D>(entity) {
+            anim.set_mirrored(self.dir == 1.0);
         }
     }
 
@@ -145,14 +148,18 @@ impl<'a> AnimatedApp<'a> {
 
         let mut default = World::new();
 
-        let default_texture = assets.request_asset("data/amogus.fur", 0);
-        let player_script = Animator { delta: 0.0, total_frames: 60, current_frame: 0, fps: 30 };
+        let default_texture = assets.request_asset("data/broom.fur", 0);
+        let player_script = Player { dir: 0.0 };
         let player_script = scripts.add_script(Box::new(player_script));
 
-        let trans = Transform2D::new(&context.graphics, Vec3::new(0.0, 0.0, 1.0), 0.0, Vec2::ONE);
+        let trans = Transform2D::new(&context.graphics, Vec3::new(-2.0, 0.0, 1.0), 0.0, Vec2::ONE);
+        let anim = Animation2D::new(default_texture, 30, 12, false, true);
 
-        let player = default
-            .spawn((trans, Sprite::new(&context.graphics, default_texture, Vec4::ONE, None)));
+        let player = default.spawn((
+            trans,
+            anim,
+            Sprite::new(&context.graphics, default_texture, Vec4::ONE, None, None),
+        ));
 
         scripts.attach(player_script, player);
 

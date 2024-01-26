@@ -141,7 +141,13 @@ impl<'a> TwoDimApp<'a> {
 
         let player = default.spawn((
             trans,
-            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
+            Sprite::new(
+                &context.graphics,
+                default_texture,
+                Vec4::new(1.0, 0.3, 1.0, 1.0),
+                None,
+                None,
+            ),
         ));
 
         scripts.attach(player_script, player);
@@ -150,7 +156,13 @@ impl<'a> TwoDimApp<'a> {
 
         default.spawn((
             trans,
-            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
+            Sprite::new(
+                &context.graphics,
+                default_texture,
+                Vec4::new(1.0, 0.3, 1.0, 1.0),
+                None,
+                None,
+            ),
         ));
 
         let default = worlds.add_world(default);

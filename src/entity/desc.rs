@@ -1,6 +1,8 @@
 use std::mem::size_of;
 
+use env_logger::fmt::Timestamp;
 use glam::{Vec2, Vec3, Vec4};
+use wgpu::naga::back::msl::sampler;
 
 use crate::assets::assets::{Ptr, SPRITE_SHADER};
 use crate::assets::buffer::{Indices, UniformBuffer, Vertices};
@@ -10,6 +12,7 @@ use crate::context::VisContext;
 use crate::render::material::GenericMaterial;
 use crate::render::mesh::GenericMesh;
 use crate::render::types::{BindGroupEntry, Vertex2D};
+use crate::utils::Timestep;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transform3D {
@@ -66,25 +69,35 @@ impl Transform2D {
         self.uniform.update_buffer(context, bytemuck::cast_slice(&transform));
     }
 
-    pub fn group(&self) -> &wgpu::BindGroup { &self.group }
+    pub fn group(&self) -> &wgpu::BindGroup {
+        &self.group
+    }
 
-    pub fn layout(&self) -> &wgpu::BindGroupLayout { &self.layout }
+    pub fn layout(&self) -> &wgpu::BindGroupLayout {
+        &self.layout
+    }
 
-    pub fn position(&self) -> Vec3 { self.position }
+    pub fn position(&self) -> Vec3 {
+        self.position
+    }
 
     pub fn set_position(&mut self, context: &VisContext, position: Vec3) {
         self.position = position;
         self.update(context);
     }
 
-    pub fn rotation(&self) -> f32 { self.rotation }
+    pub fn rotation(&self) -> f32 {
+        self.rotation
+    }
 
     pub fn set_rotation(&mut self, context: &VisContext, rotation: f32) {
         self.rotation = rotation;
         self.update(context);
     }
 
-    pub fn scale(&self) -> Vec2 { self.scale }
+    pub fn scale(&self) -> Vec2 {
+        self.scale
+    }
 
     pub fn set_scale(&mut self, context: &VisContext, scale: Vec2) {
         self.scale = scale;
@@ -120,11 +133,11 @@ pub struct Sprite<'a> {
 impl<'a> Sprite<'a> {
     pub fn new_custom(
         context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>, texture: Ptr<Texture2D>,
-        tint: Vec4, coords: Option<&[f32]>,
+        tint: Vec4, coords: Option<&[f32]>, sampler: Option<Sampler>,
     ) -> Self {
         let mut buffer = UniformBuffer::new(context, size_of::<[f32; 4]>());
         buffer.update_buffer(context, bytemuck::cast_slice(&tint.to_array()));
-        let sampler = Sampler::two_dim(context);
+        let sampler = sampler.unwrap_or(Sampler::two_dim(context));
 
         let vertices = if let Some(coords) = coords {
             vec![
@@ -165,6 +178,7 @@ impl<'a> Sprite<'a> {
 
     pub fn new(
         context: &VisContext, texture: Ptr<Texture2D>, tint: Vec4, coords: Option<&[f32]>,
+        sampler: Option<Sampler>,
     ) -> Self {
         Self::new_custom(
             context,
@@ -173,6 +187,7 @@ impl<'a> Sprite<'a> {
             texture,
             tint,
             coords,
+            sampler,
         )
     }
 
@@ -212,9 +227,13 @@ impl<'a> Sprite<'a> {
         }
     }
 
-    pub fn texture(&self) -> &Ptr<Texture2D> { &self.texture }
+    pub fn texture(&self) -> &Ptr<Texture2D> {
+        &self.texture
+    }
 
-    pub fn tint(&self) -> &Vec4 { &self.tint }
+    pub fn tint(&self) -> &Vec4 {
+        &self.tint
+    }
 
     pub fn update(&mut self, context: &VisContext, texture: &Texture2D) {
         if self.waiting {
@@ -226,7 +245,73 @@ impl<'a> Sprite<'a> {
         }
     }
 
-    pub fn material(&self) -> &GenericMaterial { &self.material }
+    pub fn material(&self) -> &GenericMaterial {
+        &self.material
+    }
 
-    pub fn mesh(&self) -> &GenericMesh<'a> { &self.mesh }
+    pub fn mesh(&self) -> &GenericMesh<'a> {
+        &self.mesh
+    }
+}
+
+pub struct Animation2D {
+    frames: Ptr<Texture2D>,
+    frames_per_second: f64,
+    current_frame: f32,
+    total_frames: f32,
+    mirrored: bool,
+    looped: bool,
+    delta: f64,
+}
+
+impl Animation2D {
+    pub fn new(
+        frames: Ptr<Texture2D>, frames_per_second: u32, total_frames: u32, mirrored: bool,
+        looped: bool,
+    ) -> Self {
+        Self {
+            frames,
+            frames_per_second: frames_per_second as f64,
+            total_frames: total_frames as f32,
+            current_frame: 0.0,
+            mirrored,
+            looped,
+            delta: 0.0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.current_frame = 0.0;
+        self.delta = 0.0;
+    }
+
+    pub fn set_mirrored(&mut self, mirrored: bool) {
+        self.mirrored = mirrored;
+    }
+
+    pub fn update(&mut self, context: &VisContext, delta: &Timestep, sprite: &mut Sprite) {
+        if !self.looped && self.current_frame >= self.total_frames {
+            return;
+        }
+
+        sprite.set_texture(self.frames);
+
+        if self.delta > 1000.0 / self.frames_per_second {
+            let mirror_value = if self.mirrored { 1.0 } else { 0.0 };
+
+            sprite.set_coords_quad(
+                context,
+                Vec2::new((1.0 / self.total_frames) * (self.current_frame + mirror_value), 0.0),
+                Vec2::new(
+                    (1.0 / self.total_frames) * (self.current_frame + 1.0 - mirror_value),
+                    1.0,
+                ),
+            );
+
+            self.current_frame = (self.current_frame + 1.0) % self.total_frames;
+            self.delta = 0.0;
+        } else {
+            self.delta += delta.millis();
+        }
+    }
 }
