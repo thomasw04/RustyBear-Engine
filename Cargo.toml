@@ -2,7 +2,7 @@
 name = "RustyBear-Engine"
 version = "0.1.0"
 edition = "2021"
-author = "Thomas Wachter"
+authors = ["Thomas Wachter"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -32,7 +32,7 @@ clap = { version = "4.3.10", features = ["derive"] }
 gltf = "1.2.0"
 glam = "0.24.1"
 egui_wgpu_backend = { git = "https://github.com/thomasw04/egui_wgpu_backend.git", features = ["web"] }
-egui_winit_platform = { git = "https://github.com/thomasw04/egui_winit_platform.git", features = ["clipboard"]}
+egui_winit_platform = { git = "https://github.com/thomasw04/egui_winit_platform.git", features = ["clipboard"] }
 egui = "0.24.1"
 egui_demo_lib = "0.24.1"
 what = { git = "https://github.com/thomasw04/what.git" }
@@ -49,12 +49,12 @@ hecs = "0.10.4"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
 console_log = "1.0"
-wgpu = { version = "0.18.0", features = ["webgl"]}
+wgpu = { version = "0.18.0", features = ["webgl"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4.30"
 web-sys = { version = "0.3", features = [
     "Document",
     "Window",
     "Element",
-]}
-instant = { version = "0.1", features = [ "wasm-bindgen" ] }
+] }
+instant = { version = "0.1", features = ["wasm-bindgen"] }
