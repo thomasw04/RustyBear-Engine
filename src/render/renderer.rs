@@ -1,8 +1,8 @@
-use wgpu::TextureView;
+use wgpu::{RenderPassDescriptor, TextureView};
 
 use crate::{
     assets::{
-        assets::{AssetType, Assets},
+        assets::{Assets, AssetType},
         buffer::{Indices, Vertices},
         shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
@@ -30,11 +30,11 @@ pub struct Renderer<'a> {
     mesh: GenericMesh<'a>,
     camera_buffer: CameraBuffer,
     skybox: Option<SkyboxMaterial>,
-    egui_render_pass: egui_wgpu_backend::RenderPass,
+    egui_renderer: egui_wgpu::Renderer,
 }
 
 impl<'a> EventSubscriber for Renderer<'a> {
-    fn on_event(&mut self, event: &crate::event::Event, context: &mut Context) -> bool {
+    fn on_event(&mut self, event: &event::Event, context: &mut Context) -> bool {
         match event {
             event::Event::Resized { width, height } => {
                 self.framebuffer.resize(context, *width, *height);
@@ -62,7 +62,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                .unwrap(),
+                    .unwrap(),
             ),
             None::<&str>,
         );
@@ -75,7 +75,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/skybox.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                .unwrap(),
+                    .unwrap(),
             ),
             None::<&str>,
         );
@@ -130,14 +130,15 @@ impl<'a> Renderer<'a> {
             mesh,
             camera_buffer,
             skybox,
-            egui_render_pass,
+            egui_renderer: egui_render_pass,
         }
     }
 
-    fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu_backend::RenderPass {
-        egui_wgpu_backend::RenderPass::new(
+    fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu::Renderer {
+        egui_wgpu::Renderer::new(
             &context.graphics.device,
             context.surface_config.format,
+            Some(wgpu::TextureFormat::Rgba8UnormSrgb),
             sample_count,
         )
     }
@@ -269,26 +270,31 @@ impl<'a> Renderer<'a> {
         }
 
         {
-            let screen_descriptor = egui_wgpu_backend::ScreenDescriptor {
-                physical_width: context.surface_config.width,
-                physical_height: context.surface_config.height,
-                scale_factor: window.scale_factor() as f32,
+            let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+                size_in_pixels: [context.surface_config.width, context.surface_config.height],
+                pixels_per_point: window.scale_factor() as f32,
             };
 
-            self.egui_render_pass
-                .add_textures(&gpu.device, &gpu.queue, &texture_delta)
-                .expect("[EGUI] Failed to add textures.");
+            for (id, delta) in texture_delta.set {
+                self.egui_renderer.update_texture(&gpu.device, &gpu.queue, id, &delta);
+            }
 
-            self.egui_render_pass.update_buffers(
+            self.egui_renderer.update_buffers(
                 &gpu.device,
                 &gpu.queue,
+                &mut encoder,
                 &paint_jobs,
                 &screen_descriptor,
             );
 
-            self.egui_render_pass
-                .execute(&mut encoder, view, &paint_jobs, &screen_descriptor, None)
-                .unwrap();
+            {
+                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor::default());
+                self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
+            }
+
+            for id in texture_delta.free {
+                self.egui_renderer.free_texture(&id);
+            }
         }
 
         gpu.queue.submit(std::iter::once(encoder.finish()));

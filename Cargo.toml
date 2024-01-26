@@ -31,11 +31,10 @@ rayon = "1.7.0"
 clap = { version = "4.3.10", features = ["derive"] }
 gltf = "1.2.0"
 glam = "0.25.0"
-egui_wgpu_backend = { git = "https://github.com/thomasw04/egui_wgpu_backend.git", features = ["web"] }
 egui_winit_platform = { git = "https://github.com/thomasw04/egui_winit_platform.git", features = ["clipboard"] }
 egui = "0.24.1"
 egui-wgpu = { version = "0.24.1", features = ["winit"] }
-egui-winit = { version = "0.24.1", features = ["clipboard"]}
+egui-winit = { version = "0.24.1", features = ["clipboard"] }
 egui_demo_lib = "0.24.1"
 what = { git = "https://github.com/thomasw04/what.git" }
 sysinfo = "0.29.11"
