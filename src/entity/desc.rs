@@ -2,20 +2,14 @@ use std::mem::size_of;
 
 use glam::{Vec2, Vec3, Vec4};
 
-use crate::{
-    assets::{
-        assets::{Ptr, SPRITE_SHADER},
-        buffer::{Indices, UniformBuffer, Vertices},
-        shader::Shader,
-        texture::{Sampler, Texture2D},
-    },
-    context::VisContext,
-    render::{
-        material::GenericMaterial,
-        mesh::GenericMesh,
-        types::{BindGroupEntry, Vertex2D},
-    },
-};
+use crate::assets::assets::{Ptr, SPRITE_SHADER};
+use crate::assets::buffer::{Indices, UniformBuffer, Vertices};
+use crate::assets::shader::Shader;
+use crate::assets::texture::{Sampler, Texture2D};
+use crate::context::VisContext;
+use crate::render::material::GenericMaterial;
+use crate::render::mesh::GenericMesh;
+use crate::render::types::{BindGroupEntry, Vertex2D};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transform3D {
@@ -72,35 +66,25 @@ impl Transform2D {
         self.uniform.update_buffer(context, bytemuck::cast_slice(&transform));
     }
 
-    pub fn group(&self) -> &wgpu::BindGroup {
-        &self.group
-    }
+    pub fn group(&self) -> &wgpu::BindGroup { &self.group }
 
-    pub fn layout(&self) -> &wgpu::BindGroupLayout {
-        &self.layout
-    }
+    pub fn layout(&self) -> &wgpu::BindGroupLayout { &self.layout }
 
-    pub fn position(&self) -> Vec3 {
-        self.position
-    }
+    pub fn position(&self) -> Vec3 { self.position }
 
     pub fn set_position(&mut self, context: &VisContext, position: Vec3) {
         self.position = position;
         self.update(context);
     }
 
-    pub fn rotation(&self) -> f32 {
-        self.rotation
-    }
+    pub fn rotation(&self) -> f32 { self.rotation }
 
     pub fn set_rotation(&mut self, context: &VisContext, rotation: f32) {
         self.rotation = rotation;
         self.update(context);
     }
 
-    pub fn scale(&self) -> Vec2 {
-        self.scale
-    }
+    pub fn scale(&self) -> Vec2 { self.scale }
 
     pub fn set_scale(&mut self, context: &VisContext, scale: Vec2) {
         self.scale = scale;
@@ -203,6 +187,17 @@ impl<'a> Sprite<'a> {
         self.mesh.update_vertices(context, bytemuck::cast_slice(&vertices));
     }
 
+    pub fn set_coords_quad(&mut self, context: &VisContext, min: Vec2, max: Vec2) {
+        let vertices = vec![
+            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [min.x, max.y] },
+            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [max.x, min.y] },
+            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [min.x, min.y] },
+            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [max.x, max.y] },
+        ];
+
+        self.mesh.update_vertices(context, bytemuck::cast_slice(&vertices));
+    }
+
     pub fn set_texture(&mut self, texture: Ptr<Texture2D>) {
         if self.texture != texture {
             self.texture = texture;
@@ -217,13 +212,9 @@ impl<'a> Sprite<'a> {
         }
     }
 
-    pub fn texture(&self) -> &Ptr<Texture2D> {
-        &self.texture
-    }
+    pub fn texture(&self) -> &Ptr<Texture2D> { &self.texture }
 
-    pub fn tint(&self) -> &Vec4 {
-        &self.tint
-    }
+    pub fn tint(&self) -> &Vec4 { &self.tint }
 
     pub fn update(&mut self, context: &VisContext, texture: &Texture2D) {
         if self.waiting {
@@ -235,11 +226,7 @@ impl<'a> Sprite<'a> {
         }
     }
 
-    pub fn material(&self) -> &GenericMaterial {
-        &self.material
-    }
+    pub fn material(&self) -> &GenericMaterial { &self.material }
 
-    pub fn mesh(&self) -> &GenericMesh<'a> {
-        &self.mesh
-    }
+    pub fn mesh(&self) -> &GenericMesh<'a> { &self.mesh }
 }

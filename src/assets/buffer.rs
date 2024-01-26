@@ -1,9 +1,7 @@
 use std::num::NonZeroU64;
 
-use crate::{
-    context::VisContext,
-    render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout},
-};
+use crate::context::VisContext;
+use crate::render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout};
 
 use wgpu::util::DeviceExt;
 
@@ -29,13 +27,9 @@ impl UniformBuffer {
         context.queue.write_buffer(&self.buffer, 0, data);
     }
 
-    pub fn size(&self) -> usize {
-        self.size
-    }
+    pub fn size(&self) -> usize { self.size }
 
-    pub fn buffer(&self) -> &wgpu::Buffer {
-        &self.buffer
-    }
+    pub fn buffer(&self) -> &wgpu::Buffer { &self.buffer }
 
     pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
@@ -80,7 +74,7 @@ impl<'a> Vertices<'a> {
         let buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents,
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         Self { buffer, layout: [layout] }
@@ -92,15 +86,11 @@ impl<'a> Vertices<'a> {
 }
 
 impl<'a> VertexLayout for Vertices<'a> {
-    fn layout(&self) -> &[wgpu::VertexBufferLayout] {
-        &self.layout
-    }
+    fn layout(&self) -> &[wgpu::VertexBufferLayout] { &self.layout }
 }
 
 impl<'a> VertexBuffer for Vertices<'a> {
-    fn buffer(&self) -> Option<&wgpu::Buffer> {
-        Some(&self.buffer)
-    }
+    fn buffer(&self) -> Option<&wgpu::Buffer> { Some(&self.buffer) }
 }
 
 pub struct Indices {
