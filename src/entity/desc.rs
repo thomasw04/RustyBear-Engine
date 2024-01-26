@@ -1,8 +1,5 @@
-use std::mem::size_of;
-
-use env_logger::fmt::Timestamp;
 use glam::{Vec2, Vec3, Vec4};
-use wgpu::naga::back::msl::sampler;
+use std::mem::size_of;
 
 use crate::assets::assets::{Ptr, SPRITE_SHADER};
 use crate::assets::buffer::{Indices, UniformBuffer, Vertices};
