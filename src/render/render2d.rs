@@ -1,25 +1,21 @@
 use wgpu::TextureView;
 
 use crate::{
-    assets::{
-        assets::Assets,
-        buffer::{Indices, Vertices},
-        shader::ShaderVariant,
-    },
+    assets::{assets::Assets, shader::ShaderVariant},
     context::{Context, VisContext},
     entity::{
-        desc::{Sprite, Transform2D},
+        desc::{Animation2D, Sprite, Transform2D},
         entities::Worlds,
     },
     event::{self, EventSubscriber},
+    utils::Timestep,
 };
 
-use super::types::{BindGroup, FragmentShader, Vertex2D, VertexShader};
+use super::types::{BindGroup, FragmentShader, VertexShader};
 use super::{
     camera::CameraBuffer,
     factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
-    mesh::GenericMesh,
     types::{IndexBuffer, VertexBuffer},
 };
 
@@ -36,7 +32,6 @@ pub struct RenderData<'a> {
 pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,
-    sprite_mesh: GenericMesh<'static>,
     camera_buffer: Option<CameraBuffer>,
 }
 
@@ -58,34 +53,26 @@ impl Renderer2D {
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
-
-        const VERTICES: &[Vertex2D] = &[
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
-        ];
-
-        const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
-
-        let vertices =
-            Vertices::new(&context.graphics, bytemuck::cast_slice(VERTICES), Vertex2D::LAYOUT);
-
-        let indices = Indices::new(
-            &context.graphics,
-            bytemuck::cast_slice(INDICES),
-            wgpu::IndexFormat::Uint16,
-        );
-
-        let sprite_mesh = GenericMesh::new(vertices, indices, 6);
         let camera_buffer = Some(CameraBuffer::new(&context.graphics, "Default Camera"));
 
-        Renderer2D { framebuffer, pipelines, sprite_mesh, camera_buffer }
+        Renderer2D { framebuffer, pipelines, camera_buffer }
     }
 
     pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         if let Some(camera_buffer) = &mut self.camera_buffer {
             camera_buffer.update_buffer(context, camera);
+        }
+    }
+
+    pub fn update_animations(
+        &mut self, context: &VisContext, delta: &Timestep, worlds: &mut Worlds,
+    ) {
+        if let Some(world) = worlds.get_mut() {
+            for (_entity, (sprite, animation)) in
+                world.query_mut::<(&mut Sprite, &mut Animation2D)>()
+            {
+                animation.update(context, delta, sprite);
+            }
         }
     }
 
@@ -113,7 +100,7 @@ impl Renderer2D {
 
                 let config = RenderPipelineConfig::new(
                     &shader,
-                    Some(&self.sprite_mesh),
+                    Some(sprite.mesh()),
                     material,
                     &[transform.layout(), CameraBuffer::layout(context)],
                 );
@@ -128,6 +115,15 @@ impl Renderer2D {
                 });
             {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
+                let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
+                    renderables.iter().collect();
+                entities.sort_by(|a, b| {
+                    a.1 .0
+                        .position()
+                        .z
+                        .partial_cmp(&b.1 .0.position().z)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("World Render Pass"),
@@ -155,9 +151,7 @@ impl Renderer2D {
                 });
 
                 if let Some(camera) = &self.camera_buffer {
-                    let mesh = &self.sprite_mesh;
-
-                    for (i, renderable) in renderables.into_iter().enumerate() {
+                    for (i, renderable) in entities.iter().enumerate() {
                         let (transform, sprite) = renderable.1;
 
                         let material = sprite.material();
@@ -181,15 +175,17 @@ impl Renderer2D {
                         render_pass.set_bind_group(2, camera.bind_group(), &[]);
 
                         //Set vertex buffer
-                        render_pass
-                            .set_vertex_buffer(0, VertexBuffer::buffer(mesh).unwrap().slice(..));
+                        render_pass.set_vertex_buffer(
+                            0,
+                            VertexBuffer::buffer(sprite.mesh()).unwrap().slice(..),
+                        );
 
                         //Set index buffer
-                        let (buffer, format) = IndexBuffer::buffer(mesh).unwrap();
+                        let (buffer, format) = IndexBuffer::buffer(sprite.mesh()).unwrap();
                         render_pass.set_index_buffer(buffer.slice(..), format);
 
                         //Draw the quad.
-                        render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
+                        render_pass.draw_indexed(0..sprite.mesh().num_indices(), 0, 0..1);
                     }
                 }
             }

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
-use std::{cell::Ref, path::Path};
+use std::cell::Ref;
+use std::path::Path;
 
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
@@ -8,28 +9,22 @@ use rccell::RcCell;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use winit::keyboard::KeyCode;
-use RustyBear_Engine::{
-    assets::assets::Assets,
-    context::{Context, VisContext},
-    core::{Application, ModuleStack},
-    entity::{
-        desc::{Sprite, Transform2D},
-        entities::Worlds,
-        script::{Scriptable, Scripts},
-    },
-    environment::config::Config,
-    event::{Event, EventType},
-    input::InputState,
-    logging,
-    render::{
-        camera::OrthographicCamera,
-        render2d::{RenderData, Renderer2D},
-    },
-    utils::Timestep,
-    window::Window,
-};
+use RustyBear_Engine::assets::assets::Assets;
+use RustyBear_Engine::context::{Context, VisContext};
+use RustyBear_Engine::core::{Application, ModuleStack};
+use RustyBear_Engine::entity::desc::{Animation2D, Sprite, Transform2D};
+use RustyBear_Engine::entity::entities::Worlds;
+use RustyBear_Engine::entity::script::{Scriptable, Scripts};
+use RustyBear_Engine::environment::config::Config;
+use RustyBear_Engine::event::{Event, EventType};
+use RustyBear_Engine::input::InputState;
+use RustyBear_Engine::logging;
+use RustyBear_Engine::render::camera::OrthographicCamera;
+use RustyBear_Engine::render::render2d::{RenderData, Renderer2D};
+use RustyBear_Engine::utils::Timestep;
+use RustyBear_Engine::window::Window;
 
-pub struct TwoDimApp<'a> {
+pub struct AnimatedApp<'a> {
     stack: ModuleStack<'a>,
     assets: Assets,
     worlds: Worlds,
@@ -38,7 +33,7 @@ pub struct TwoDimApp<'a> {
     camera: RcCell<OrthographicCamera>,
 }
 
-impl<'a> Application<'a> for TwoDimApp<'a> {
+impl<'a> Application<'a> for AnimatedApp<'a> {
     fn on_event(&mut self, _event: &Event, _context: &mut Context) -> bool {
         false
     }
@@ -66,6 +61,9 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
+        let mut renderer = self.renderer.borrow_mut();
+        renderer.update_animations(&context.graphics, delta, &mut self.worlds);
+
         if let Some(world) = self.worlds.get_mut() {
             self.scripts.tick(&context.graphics, delta, world);
         }
@@ -96,7 +94,9 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 }
 
-struct Player {}
+struct Player {
+    dir: f32,
+}
 
 impl Scriptable for Player {
     fn on_spawn(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
@@ -106,14 +106,29 @@ impl Scriptable for Player {
         world: &mut hecs::World,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
-            transform.add_pos(context, Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
+            let add = if self.dir == 0.0 {
+                Vec3::new(0.01 * delta.norm(), 0.0, 0.0)
+            } else {
+                Vec3::new(-0.01 * delta.norm(), 0.0, 0.0)
+            };
+            transform.add_pos(context, add);
+
+            if transform.position().x > 2.0 {
+                self.dir = 1.0;
+            } else if transform.position().x < -2.0 {
+                self.dir = 0.0;
+            }
+        }
+
+        if let Ok(mut anim) = world.get::<&mut Animation2D>(entity) {
+            anim.set_mirrored(self.dir == 1.0);
         }
     }
 
     fn on_destroy(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
 }
 
-impl<'a> TwoDimApp<'a> {
+impl<'a> AnimatedApp<'a> {
     pub fn new(context: &Context) -> Self {
         log::info!("Init Application");
 
@@ -133,37 +148,20 @@ impl<'a> TwoDimApp<'a> {
 
         let mut default = World::new();
 
-        let default_texture = assets.request_asset("data/red-among-us.fur", 0);
-        let player_script = Player {};
+        let default_texture = assets.request_asset("data/broom.fur", 0);
+        let player_script = Player { dir: 0.0 };
         let player_script = scripts.add_script(Box::new(player_script));
 
         let trans = Transform2D::new(&context.graphics, Vec3::new(-2.0, 0.0, 1.0), 0.0, Vec2::ONE);
+        let anim = Animation2D::new(default_texture, 30, 12, false, true);
 
         let player = default.spawn((
             trans,
-            Sprite::new(
-                &context.graphics,
-                default_texture,
-                Vec4::new(1.0, 0.3, 1.0, 1.0),
-                None,
-                None,
-            ),
+            anim,
+            Sprite::new(&context.graphics, default_texture, Vec4::ONE, None, None),
         ));
 
         scripts.attach(player_script, player);
-
-        let trans = Transform2D::new(&context.graphics, Vec3::new(2.0, 0.0, 0.0), 0.0, Vec2::ONE);
-
-        default.spawn((
-            trans,
-            Sprite::new(
-                &context.graphics,
-                default_texture,
-                Vec4::new(1.0, 0.3, 1.0, 1.0),
-                None,
-                None,
-            ),
-        ));
 
         let default = worlds.add_world(default);
         worlds.start_world(default);
@@ -178,7 +176,7 @@ impl<'a> TwoDimApp<'a> {
             context.surface_config.width as f32 / context.surface_config.height as f32,
         );
 
-        TwoDimApp { stack, assets, scripts, worlds, renderer, camera }
+        AnimatedApp { stack, assets, scripts, worlds, renderer, camera }
     }
 }
 
@@ -189,7 +187,7 @@ fn main() {
 
     //Create the config and init the example project.
     let mut config = Config::new(None);
-    config.find_project(Path::new("examples/two_dim")).unwrap();
+    config.find_project(Path::new("examples/animated")).unwrap();
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());
@@ -199,7 +197,7 @@ fn main() {
     let context = pollster::block_on(Context::new(&mut window, config));
 
     //Create and init the application
-    let myapp = TwoDimApp::new(&context);
+    let myapp = AnimatedApp::new(&context);
 
     //Move my app and window into the context. And run the app.
     context.run(myapp, window);
