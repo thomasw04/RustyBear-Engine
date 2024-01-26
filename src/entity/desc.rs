@@ -5,12 +5,16 @@ use glam::{Vec2, Vec3, Vec4};
 use crate::{
     assets::{
         assets::{Ptr, SPRITE_SHADER},
-        buffer::UniformBuffer,
+        buffer::{Indices, UniformBuffer, Vertices},
         shader::Shader,
         texture::{Sampler, Texture2D},
     },
     context::VisContext,
-    render::{material::GenericMaterial, types::BindGroupEntry},
+    render::{
+        material::GenericMaterial,
+        mesh::GenericMesh,
+        types::{BindGroupEntry, Vertex2D},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -119,23 +123,46 @@ impl Transform2D {
     }
 }
 
-pub struct Sprite {
+pub struct Sprite<'a> {
     texture: Ptr<Texture2D>,
     tint: Vec4,
     sampler: Sampler,
     buffer: UniformBuffer,
     material: GenericMaterial,
+    mesh: GenericMesh<'a>,
     waiting: bool,
 }
 
-impl Sprite {
+impl<'a> Sprite<'a> {
     pub fn new_custom(
         context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>, texture: Ptr<Texture2D>,
-        tint: Vec4,
+        tint: Vec4, coords: Option<&[f32]>,
     ) -> Self {
         let mut buffer = UniformBuffer::new(context, size_of::<[f32; 4]>());
         buffer.update_buffer(context, bytemuck::cast_slice(&tint.to_array()));
         let sampler = Sampler::two_dim(context);
+
+        let vertices = if let Some(coords) = coords {
+            vec![
+                Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [coords[0], coords[1]] },
+                Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [coords[2], coords[3]] },
+                Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [coords[4], coords[5]] },
+                Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [coords[6], coords[7]] },
+            ]
+        } else {
+            vec![
+                Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
+                Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
+                Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
+                Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
+            ]
+        };
+
+        let indices = vec![0, 1, 2, 0, 3, 1];
+        let vertices = Vertices::new(&context, bytemuck::cast_slice(&vertices), Vertex2D::LAYOUT);
+        let indices =
+            Indices::new(&context, bytemuck::cast_slice(&indices), wgpu::IndexFormat::Uint16);
+        let mesh = GenericMesh::new(vertices, indices, 6);
 
         let material = GenericMaterial::new(
             context,
@@ -149,11 +176,20 @@ impl Sprite {
             ],
         );
 
-        Self { texture, sampler, tint, buffer, material, waiting: true }
+        Self { texture, sampler, tint, buffer, material, mesh, waiting: true }
     }
 
-    pub fn new(context: &VisContext, texture: Ptr<Texture2D>, tint: Vec4) -> Self {
-        Self::new_custom(context, SPRITE_SHADER.clone(), SPRITE_SHADER.clone(), texture, tint)
+    pub fn new(
+        context: &VisContext, texture: Ptr<Texture2D>, tint: Vec4, coords: Option<&[f32]>,
+    ) -> Self {
+        Self::new_custom(
+            context,
+            SPRITE_SHADER.clone(),
+            SPRITE_SHADER.clone(),
+            texture,
+            tint,
+            coords,
+        )
     }
 
     pub fn set_texture(&mut self, texture: Ptr<Texture2D>) {
@@ -190,5 +226,9 @@ impl Sprite {
 
     pub fn material(&self) -> &GenericMaterial {
         &self.material
+    }
+
+    pub fn mesh(&self) -> &GenericMesh<'a> {
+        &self.mesh
     }
 }

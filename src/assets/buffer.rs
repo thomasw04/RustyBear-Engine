@@ -85,6 +85,10 @@ impl<'a> Vertices<'a> {
 
         Self { buffer, layout: [layout] }
     }
+
+    pub fn update_buffer(&mut self, context: &VisContext, contents: &[u8]) {
+        context.queue.write_buffer(&self.buffer, 0, contents);
+    }
 }
 
 impl<'a> VertexLayout for Vertices<'a> {

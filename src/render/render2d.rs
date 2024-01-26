@@ -113,7 +113,7 @@ impl Renderer2D {
 
                 let config = RenderPipelineConfig::new(
                     &shader,
-                    Some(&self.sprite_mesh),
+                    Some(sprite.mesh()),
                     material,
                     &[transform.layout(), CameraBuffer::layout(context)],
                 );
@@ -155,8 +155,6 @@ impl Renderer2D {
                 });
 
                 if let Some(camera) = &self.camera_buffer {
-                    let mesh = &self.sprite_mesh;
-
                     for (i, renderable) in renderables.into_iter().enumerate() {
                         let (transform, sprite) = renderable.1;
 
@@ -181,15 +179,17 @@ impl Renderer2D {
                         render_pass.set_bind_group(2, camera.bind_group(), &[]);
 
                         //Set vertex buffer
-                        render_pass
-                            .set_vertex_buffer(0, VertexBuffer::buffer(mesh).unwrap().slice(..));
+                        render_pass.set_vertex_buffer(
+                            0,
+                            VertexBuffer::buffer(sprite.mesh()).unwrap().slice(..),
+                        );
 
                         //Set index buffer
-                        let (buffer, format) = IndexBuffer::buffer(mesh).unwrap();
+                        let (buffer, format) = IndexBuffer::buffer(sprite.mesh()).unwrap();
                         render_pass.set_index_buffer(buffer.slice(..), format);
 
                         //Draw the quad.
-                        render_pass.draw_indexed(0..mesh.num_indices(), 0, 0..1);
+                        render_pass.draw_indexed(0..sprite.mesh().num_indices(), 0, 0..1);
                     }
                 }
             }

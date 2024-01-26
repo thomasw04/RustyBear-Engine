@@ -115,14 +115,14 @@ impl<'a> TwoDimApp<'a> {
 
         default.spawn((
             trans,
-            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0)),
+            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
         ));
 
         let trans = Transform2D::new(&context.graphics, Vec3::new(2.0, 0.0, 0.0), 0.0, Vec2::ONE);
 
         default.spawn((
             trans,
-            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0)),
+            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
         ));
 
         let default = worlds.add_world(default);
