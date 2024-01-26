@@ -1,0 +1,7 @@
+{
+    "project_name":"Animated",
+    "author":"Philipp Erhardt",
+    "version":"0.1.0",
+    "data_folder":"data",
+    "code_folder":"code"
+}
