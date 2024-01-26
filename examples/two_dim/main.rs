@@ -2,7 +2,7 @@
 
 use std::{cell::Ref, path::Path};
 
-use glam::{Vec2, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
 #[cfg(target_arch = "wasm32")]
@@ -12,14 +12,17 @@ use RustyBear_Engine::{
     assets::assets::Assets,
     context::Context,
     core::{Application, ModuleStack},
-    entity::{desc::Transform2D, entities::Worlds},
+    entity::{
+        desc::{Sprite, Transform2D},
+        entities::Worlds,
+    },
     environment::config::Config,
     event::{Event, EventType},
     input::InputState,
     logging,
     render::{
         camera::OrthographicCamera,
-        render2d::{RenderData, Renderer2D, SpriteDesc, Transform2DDesc},
+        render2d::{RenderData, Renderer2D},
     },
     utils::Timestep,
     window::Window,
@@ -106,11 +109,20 @@ impl<'a> TwoDimApp<'a> {
 
         let mut default = World::new();
 
-        let default_texture = assets.request_asset("data/barrel.fur", 0);
+        let default_texture = assets.request_asset("data/red-among-us.fur", 0);
+
+        let trans = Transform2D::new(&context.graphics, Vec3::new(-2.0, 0.0, 0.0), 0.0, Vec2::ONE);
 
         default.spawn((
-            Transform2DDesc::new(Transform2D::default()),
-            SpriteDesc::new(default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0), None),
+            trans,
+            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0)),
+        ));
+
+        let trans = Transform2D::new(&context.graphics, Vec3::new(2.0, 0.0, 0.0), 0.0, Vec2::ONE);
+
+        default.spawn((
+            trans,
+            Sprite::new(&context.graphics, default_texture, Vec4::new(1.0, 0.3, 1.0, 1.0)),
         ));
 
         let default = worlds.add_world(default);

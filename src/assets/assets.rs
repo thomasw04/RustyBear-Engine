@@ -40,6 +40,8 @@ static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
         .unwrap()
 });
 
+pub static SPRITE_SHADER: Lazy<Ptr<Shader>> = Lazy::new(|| Ptr::new(Guid::new(0x1)));
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct GenPtr {
     guid: Guid,
@@ -121,6 +123,17 @@ impl Assets {
         let (in_sender, in_receiver): InChannel = mpsc::channel();
         let (out_sender, out_receiver): OutChannel = mpsc::channel();
 
+        let mut assets = Assets {
+            gpu_cache,
+            path_cache,
+            generator,
+
+            request_sender: in_sender,
+            asset_receiver: out_receiver,
+        };
+
+        assets.register_static(&context);
+
         rayon::spawn(move || {
             let context = context.clone();
 
@@ -150,14 +163,20 @@ impl Assets {
             }
         });
 
-        Assets {
-            gpu_cache,
-            path_cache,
-            generator,
+        return assets;
+    }
 
-            request_sender: in_sender,
-            asset_receiver: out_receiver,
-        }
+    fn register_static(&mut self, context: &VisContext) {
+        let guid = SPRITE_SHADER.guid;
+        let sprite_shader = Shader::new(
+            context,
+            guid,
+            wgpu::ShaderSource::Wgsl(include_str!("sprite.wgsl").into()),
+            what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
+        )
+        .unwrap();
+
+        self.gpu_cache.insert(guid, AssetType::Shader(sprite_shader));
     }
 
     fn request_id<S: Into<String> + AsRef<str>>(&mut self, path: S) -> Guid {

@@ -4,10 +4,10 @@ struct CameraUniform {
     view_projection: mat4x4<f32>,
 };
 
-@group(0) @binding(0)
+@group(1) @binding(0)
 var<uniform> transform: mat4x4<f32>;
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> camera: CameraUniform;
 
 struct VertexInput {
@@ -31,12 +31,12 @@ fn vertex_main(
     return out;
 }
 
-@group(0) @binding(1)
+@group(0) @binding(0)
 var<uniform> color: vec4<f32>;
 
-@group(0) @binding(2)
+@group(0) @binding(1)
 var texture: texture_2d<f32>;
-@group(0) @binding(3)
+@group(0) @binding(2)
 var texture_sampler: sampler;
 
 @fragment

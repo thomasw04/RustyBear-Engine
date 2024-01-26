@@ -1,10 +1,6 @@
-use glam::{Vec3, Vec4};
 use hashbrown::HashMap;
 
-use crate::{
-    assets::{assets::Ptr, texture::Texture2D},
-    utils::{Guid, GuidGenerator},
-};
+use crate::utils::{Guid, GuidGenerator};
 
 //A collection of entities that represents a set of worlds.
 pub struct Worlds {

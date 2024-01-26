@@ -7,6 +7,7 @@ use crate::{
 
 use wgpu::util::DeviceExt;
 
+#[derive(Debug)]
 pub struct UniformBuffer {
     buffer: wgpu::Buffer,
     size: usize,
