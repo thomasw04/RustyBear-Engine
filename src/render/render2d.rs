@@ -9,7 +9,7 @@ use crate::{
     context::{Context, VisContext},
     entity::{
         desc::{Sprite, Transform2D},
-        entities::Worlds,
+        entities::{self, Worlds},
     },
     event::{self, EventSubscriber},
 };
@@ -128,6 +128,15 @@ impl Renderer2D {
                 });
             {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
+                let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
+                    renderables.iter().collect();
+                entities.sort_by(|a, b| {
+                    a.1 .0
+                        .position()
+                        .z
+                        .partial_cmp(&b.1 .0.position().z)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
 
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("World Render Pass"),
@@ -155,7 +164,7 @@ impl Renderer2D {
                 });
 
                 if let Some(camera) = &self.camera_buffer {
-                    for (i, renderable) in renderables.into_iter().enumerate() {
+                    for (i, renderable) in entities.iter().enumerate() {
                         let (transform, sprite) = renderable.1;
 
                         let material = sprite.material();
