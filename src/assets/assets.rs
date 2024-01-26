@@ -133,9 +133,13 @@ impl Assets {
                 match what.load_asset(path.clone(), priority) {
                     Ok(asset) => {
                         rayon::spawn(move || {
-                            let asset = Self::load_asset(&context, asset, guid);
-                            let _ = out_sender.send((guid, Ok(asset)));
-                            log::info!("Loaded asset: {}", path);
+                            if let Some(asset) = Self::load_asset(&context, asset, guid) {
+                                let _ = out_sender.send((guid, Ok(asset)));
+                                log::info!("Loaded asset: {}", path);
+                            } else {
+                                let _ =
+                                    out_sender.send((guid, Err(format!("Failed to load asset."))));
+                            }
                         });
                     }
                     Err(error) => {
@@ -323,7 +327,7 @@ impl Assets {
         self.gpu_cache.remove(&guid);
     }
 
-    fn load_asset(context: &VisContext, asset: what::Asset, guid: Guid) -> AssetType {
+    fn load_asset(context: &VisContext, asset: what::Asset, guid: Guid) -> Option<AssetType> {
         match asset {
             what::Asset::Texture(texture) => {
                 let texture_data = image::load_from_memory(&texture.data);
@@ -332,19 +336,19 @@ impl Assets {
                     Ok(image) => {
                         let rgba = image.to_rgba8();
 
-                        AssetType::Texture2D(Texture2D::new(
+                        Some(AssetType::Texture2D(Texture2D::new(
                             context,
                             None,
                             image.dimensions(),
                             &rgba,
-                        ))
+                        )))
                     }
                     Err(e) => {
                         log::error!(
                             "Failed to load texture. Error: {}. Loading error texture instead...",
                             e
                         );
-                        AssetType::Texture2D(Texture2D::error_texture(context))
+                        None
                     }
                 }
             }
@@ -378,7 +382,7 @@ impl Assets {
 
                 texture.finish_creation();
 
-                AssetType::TextureArray(texture)
+                Some(AssetType::TextureArray(texture))
             }
             what::Asset::Shader(shader) => {
                 if let Ok(shader) = Shader::new(
@@ -387,10 +391,10 @@ impl Assets {
                     wgpu::ShaderSource::SpirV(shader.data.into()),
                     shader.stages,
                 ) {
-                    AssetType::Shader(shader)
+                    Some(AssetType::Shader(shader))
                 } else {
                     log::error!("Failed to load shader. Loading error shader instead.");
-                    todo!("Implement error shader.")
+                    None
                 }
             }
             _ => todo!("Implement other asset types."),

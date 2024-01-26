@@ -1,3 +1,5 @@
+use once_cell::sync::OnceCell;
+
 use crate::{context::VisContext, render::types::BindGroupEntry};
 
 pub struct TextureArray {
@@ -228,50 +230,54 @@ impl Texture2D {
         Texture2D { texture, view }
     }
 
-    pub fn error_texture(context: &VisContext) -> Texture2D {
-        if let Ok(image) = image::load_from_memory_with_format(
-            include_bytes!("../../resources/error.png"),
-            image::ImageFormat::Png,
-        ) {
-            let rgba = image.to_rgba8();
-            let dim = rgba.dimensions();
+    pub fn error_texture(context: &VisContext) -> &Texture2D {
+        static ERROR_TEXTURE: OnceCell<Texture2D> = OnceCell::new();
 
-            let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
-
-            let texture = context.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("error_texture"),
-                size: extend,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            });
-
-            context.queue.write_texture(
-                wgpu::ImageCopyTexture {
-                    texture: &texture,
-                    mip_level: 0,
-                    origin: wgpu::Origin3d::ZERO,
-                    aspect: wgpu::TextureAspect::All,
-                },
-                &rgba,
-                wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(4 * dim.0),
-                    rows_per_image: Some(dim.1),
-                },
-                extend,
-            );
-
-            let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-            Texture2D { texture, view }
-        } else {
-            //For devs: Of course this can also happen while engine development. E.g. broken png in resources/
-            panic!("Fatal. Error texture should always be loadable. This suggest you messed with the executable. Abort.");
-        }
+        ERROR_TEXTURE.get_or_init(|| {
+            if let Ok(image) = image::load_from_memory_with_format(
+                include_bytes!("../../resources/error.png"),
+                image::ImageFormat::Png,
+            ) {
+                let rgba = image.to_rgba8();
+                let dim = rgba.dimensions();
+    
+                let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
+    
+                let texture = context.device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("error_texture"),
+                    size: extend,
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                    view_formats: &[],
+                });
+    
+                context.queue.write_texture(
+                    wgpu::ImageCopyTexture {
+                        texture: &texture,
+                        mip_level: 0,
+                        origin: wgpu::Origin3d::ZERO,
+                        aspect: wgpu::TextureAspect::All,
+                    },
+                    &rgba,
+                    wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(4 * dim.0),
+                        rows_per_image: Some(dim.1),
+                    },
+                    extend,
+                );
+    
+                let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    
+                Texture2D { texture, view }
+            } else {
+                //For devs: Of course this can also happen while engine development. E.g. broken png in resources/
+                panic!("Fatal. Error texture should always be loadable. This suggest you messed with the executable. Abort.");
+            }
+        })
     }
 
     pub fn texture(&self) -> &wgpu::Texture {

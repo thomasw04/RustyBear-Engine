@@ -249,7 +249,11 @@ impl Renderer2D {
                 assets.consume_asset(AssetType::Sampler(Sampler::two_dim(context)), None::<&str>);
         }
 
-        let texture = assets.try_get(&desc.texture);
+        let texture = match assets.try_get(&desc.texture) {
+            Some(texture) => texture,
+            None => Texture2D::error_texture(context),
+        };
+
         let sampler = assets.try_get(&desc.sampler);
 
         if desc.buffer.is_none() {
@@ -258,9 +262,7 @@ impl Renderer2D {
         }
 
         if desc.material.is_none() || desc.dirty {
-            if let (Some(texture), Some(sampler), Some(buffer)) =
-                (texture, sampler, &mut desc.buffer)
-            {
+            if let (Some(sampler), Some(buffer)) = (sampler, &mut desc.buffer) {
                 buffer.update_buffer(context, bytemuck::cast_slice(&desc.tint.to_array()));
 
                 desc.material = Some(GenericMaterial::new(
