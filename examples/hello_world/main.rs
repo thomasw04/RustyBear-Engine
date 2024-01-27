@@ -15,9 +15,7 @@ fn main() {
 
     //Create the config and init the example project.
     let mut config = Config::new(None);
-    config
-        .find_project(Path::new("examples/hello_world"))
-        .unwrap();
+    config.find_project(Path::new("examples/hello_world")).unwrap();
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());

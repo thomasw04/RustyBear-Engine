@@ -27,9 +27,13 @@ impl UniformBuffer {
         context.queue.write_buffer(&self.buffer, 0, data);
     }
 
-    pub fn size(&self) -> usize { self.size }
+    pub fn size(&self) -> usize {
+        self.size
+    }
 
-    pub fn buffer(&self) -> &wgpu::Buffer { &self.buffer }
+    pub fn buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
 
     pub fn layout_entry(idx: u32) -> wgpu::BindGroupLayoutEntry {
         wgpu::BindGroupLayoutEntry {
@@ -86,11 +90,15 @@ impl<'a> Vertices<'a> {
 }
 
 impl<'a> VertexLayout for Vertices<'a> {
-    fn layout(&self) -> &[wgpu::VertexBufferLayout] { &self.layout }
+    fn layout(&self) -> &[wgpu::VertexBufferLayout] {
+        &self.layout
+    }
 }
 
 impl<'a> VertexBuffer for Vertices<'a> {
-    fn buffer(&self) -> Option<&wgpu::Buffer> { Some(&self.buffer) }
+    fn buffer(&self) -> Option<&wgpu::Buffer> {
+        Some(&self.buffer)
+    }
 }
 
 pub struct Indices {

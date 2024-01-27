@@ -5,7 +5,7 @@ use wgpu::TextureView;
 
 use crate::{
     assets::{
-        assets::{Assets, AssetType},
+        assets::{AssetType, Assets},
         buffer::{Indices, Vertices},
         shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
@@ -65,7 +65,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                    .unwrap(),
+                .unwrap(),
             ),
             None::<&str>,
         );
@@ -78,7 +78,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/skybox.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                    .unwrap(),
+                .unwrap(),
             ),
             None::<&str>,
         );
@@ -253,7 +253,6 @@ impl<'a> Renderer<'a> {
             let pipeline = self.pipelines.get_or_create(gpu, &config);
 
             render_pass.set_pipeline(pipeline);
-            println!("{}",self.material.groups().len());
 
             BindGroup::groups(&self.material).iter().enumerate().for_each(|(i, group)| {
                 render_pass.set_bind_group(i as u32, group, &[]);
@@ -303,7 +302,10 @@ impl<'a> Renderer<'a> {
                             1 => None,
                             _ => Some(view),
                         },
-                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
                     })],
                     depth_stencil_attachment: None,
                     ..Default::default()

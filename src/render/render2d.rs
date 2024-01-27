@@ -81,16 +81,16 @@ impl Renderer2D {
     }
 
     pub fn render(
-        &mut self, assets: &mut Assets, worlds: &mut Worlds, ctx: &mut Context, view: &TextureView, window: &Window,
+        &mut self, assets: &mut Assets, worlds: &mut Worlds, ctx: &mut Context, view: &TextureView,
+        window: &Window,
     ) {
         let context = ctx.graphics.as_ref();
         let fbo = &self.framebuffer;
         let fbo_view: TextureView = (&self.framebuffer).into();
 
-        let mut encoder =
-            context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Renderer2D Render Encoder"),
-            });
+        let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Renderer2D Render Encoder"),
+        });
 
         let _ = assets.update();
         let framebuffer_view: TextureView = (&self.framebuffer).into();
@@ -100,7 +100,7 @@ impl Renderer2D {
             let mut config_keys = Vec::new();
 
             for (_entity, (transform, sprite)) in
-            world.query_mut::<(&mut Transform2D, &mut Sprite)>()
+                world.query_mut::<(&mut Transform2D, &mut Sprite)>()
             {
                 if let Some(texture) = assets.try_get(&sprite.texture()) {
                     sprite.update(context, texture);
@@ -126,11 +126,10 @@ impl Renderer2D {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
                 let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
                     renderables.iter().collect();
-                entities.sort_by(|a, b| {
-                    a.1.0
-                        .position()
+                entities.sort_by(|(_, (a, _)), (_,(b,_))| {
+                    a.position()
                         .z
-                        .partial_cmp(&b.1.0.position().z)
+                        .partial_cmp(&b.position().z)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
 
@@ -202,9 +201,8 @@ impl Renderer2D {
 
         {
             let output = ctx.egui.end_frame(Some(window));
-            let paint_jobs = ctx.egui
-                .context()
-                .tessellate(output.shapes, ctx.egui.context().pixels_per_point());
+            let paint_jobs =
+                ctx.egui.context().tessellate(output.shapes, ctx.egui.context().pixels_per_point());
             let texture_delta = output.textures_delta;
 
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
@@ -228,7 +226,7 @@ impl Renderer2D {
             }
 
             {
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("GUI RenderPass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: match sample_count {
@@ -239,7 +237,10 @@ impl Renderer2D {
                             1 => None,
                             _ => Some(view),
                         },
-                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
                     })],
                     depth_stencil_attachment: None,
                     ..Default::default()
