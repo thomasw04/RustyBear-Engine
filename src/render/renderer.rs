@@ -1,9 +1,11 @@
 use std::default::Default;
+
+use log::log;
 use wgpu::TextureView;
 
 use crate::{
     assets::{
-        assets::{AssetType, Assets},
+        assets::{Assets, AssetType},
         buffer::{Indices, Vertices},
         shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
@@ -63,7 +65,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                .unwrap(),
+                    .unwrap(),
             ),
             None::<&str>,
         );
@@ -76,7 +78,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/skybox.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                .unwrap(),
+                    .unwrap(),
             ),
             None::<&str>,
         );
@@ -93,7 +95,7 @@ impl<'a> Renderer<'a> {
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
-        let egui_renderer = Renderer::recreate_gui(context, 1);
+        let egui_renderer = Renderer::recreate_gui(context, sample_count);
 
         let material = GenericMaterial::new(
             &context.graphics,
@@ -251,6 +253,7 @@ impl<'a> Renderer<'a> {
             let pipeline = self.pipelines.get_or_create(gpu, &config);
 
             render_pass.set_pipeline(pipeline);
+            println!("{}",self.material.groups().len());
 
             BindGroup::groups(&self.material).iter().enumerate().for_each(|(i, group)| {
                 render_pass.set_bind_group(i as u32, group, &[]);

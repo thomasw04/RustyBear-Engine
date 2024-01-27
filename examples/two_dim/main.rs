@@ -2,12 +2,13 @@
 
 use std::{cell::Ref, path::Path};
 
+use egui::{Color32, FontId};
+use egui::RichText;
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 use winit::keyboard::KeyCode;
+
 use RustyBear_Engine::{
     assets::assets::Assets,
     context::{Context, VisContext},
@@ -23,11 +24,13 @@ use RustyBear_Engine::{
     logging,
     render::{
         camera::OrthographicCamera,
-        render2d::{RenderData, Renderer2D},
+        render2d::Renderer2D,
     },
     utils::Timestep,
     window::Window,
 };
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
@@ -59,8 +62,13 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 
     fn gui_render(
-        &mut self, _view: &wgpu::TextureView, _context: &mut Context, _gui_context: &egui::Context,
+        &mut self, _view: &wgpu::TextureView, _context: &mut Context, ctx: &egui::Context,
     ) {
+        egui::Area::new("my_area")
+            .fixed_pos(egui::pos2(32.0, 32.0))
+            .show(ctx, |ui| {
+                ui.label(RichText::new("Large text").color(Color32::from_rgb(0, 0, 1)).font(FontId::proportional(40.0)));
+            });
     }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
