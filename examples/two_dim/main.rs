@@ -13,7 +13,7 @@ use RustyBear_Engine::{
     assets::assets::Assets,
     context::{Context, VisContext},
     core::{Application, ModuleStack},
-    entity::{
+    entities::{
         desc::{Sprite, Transform2D},
         entities::Worlds,
         script::{Scriptable, Scripts},
@@ -59,13 +59,16 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
-        egui::Area::new("my_area").fixed_pos(egui::pos2(32.0, 32.0)).show(context.egui.egui_ctx(), |ui| {
-            ui.label(
-                RichText::new("Large text")
-                    .color(Color32::from_rgb(0, 0, 1))
-                    .font(FontId::proportional(40.0)),
-            );
-        });
+        egui::Area::new("my_area").fixed_pos(egui::pos2(32.0, 32.0)).show(
+            context.egui.egui_ctx(),
+            |ui| {
+                ui.label(
+                    RichText::new("Large text")
+                        .color(Color32::from_rgb(0, 0, 1))
+                        .font(FontId::proportional(40.0)),
+                );
+            },
+        );
     }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {

@@ -14,9 +14,9 @@ use wasm_bindgen::prelude::*;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entity::desc::{Animation2D, Sprite, Transform2D};
-use RustyBear_Engine::entity::entities::Worlds;
-use RustyBear_Engine::entity::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::desc::{Animation2D, Sprite, Transform2D};
+use RustyBear_Engine::entities::entities::Worlds;
+use RustyBear_Engine::entities::script::{Scriptable, Scripts};
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
@@ -191,9 +191,9 @@ fn main() {
     config.find_project(Path::new("examples/animated")).unwrap();
 
     //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
+    let window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
-    window.native.set_cursor_visible(false);
+    //window.native.set_cursor_visible(false);
 
     let context = pollster::block_on(Context::new(window.native.clone(), config));
 

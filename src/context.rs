@@ -1,5 +1,9 @@
 use std::sync::Arc;
 
+use sysinfo::{System, SystemExt};
+use wgpu::{PresentMode, TextureFormatFeatureFlags};
+use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::EventLoopWindowTarget, keyboard::{Key, NamedKey}};
+
 use crate::{
     core::{Application, ModuleStack},
     environment::config::Config,
@@ -7,17 +11,6 @@ use crate::{
     input::InputState,
     utils::Timestep,
     window::Window,
-};
-use sysinfo::{System, SystemExt};
-use wgpu::{rwh::{HasDisplayHandle, HasRawDisplayHandle}, PresentMode, TextureFormatFeatureFlags};
-use winit::{event::{WindowEvent, Event}, event_loop::EventLoopWindowTarget, dpi::PhysicalSize, keyboard::{Key, NamedKey}};
-use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
-use wgpu::{PresentMode, TextureFormatFeatureFlags};
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::EventLoopWindowTarget,
-    keyboard::{Key, NamedKey},
 };
 
 pub struct Features {
@@ -162,7 +155,6 @@ impl<'a> Context<'a> {
                         },*/
                         WindowEvent::RedrawRequested => {
                             app.update(ts.step_fwd(), input_state.borrow(), &mut self);
-                            self.egui.take_egui_input(&window.native);
 
                             match self.render(&window.native, &mut app) {
                                 Ok(_) => {}
@@ -212,7 +204,8 @@ impl<'a> Context<'a> {
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.egui.begin_frame();
+        let input = self.egui.take_egui_input(&window);
+        self.egui.egui_ctx().begin_frame(input);
         app.gui_render(&view, self);
 
         app.render(&view, self, window);

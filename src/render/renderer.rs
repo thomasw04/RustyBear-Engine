@@ -180,13 +180,6 @@ impl<'a> Renderer<'a> {
             label: Some("Render Encoder"),
         });
 
-        let output = context.egui.egui_ctx().end_frame();
-        let paint_jobs = context
-            .egui
-            .egui_ctx()
-            .tessellate(output.shapes, context.egui.egui_ctx().pixels_per_point());
-        let texture_delta = output.textures_delta;
-
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -273,6 +266,12 @@ impl<'a> Renderer<'a> {
         }
 
         {
+            let egui_ctx = context.egui.egui_ctx();
+            let output = egui_ctx.end_frame();
+            let paint_jobs = egui_ctx
+                .tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let texture_delta = output.textures_delta;
+
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
                 size_in_pixels: [context.surface_config.width, context.surface_config.height],
                 pixels_per_point: window.scale_factor() as f32,

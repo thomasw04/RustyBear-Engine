@@ -4,7 +4,7 @@ use winit::window::Window;
 use crate::{
     assets::{assets::Assets, shader::ShaderVariant},
     context::{Context, VisContext},
-    entity::{
+    entities::{
         desc::{Animation2D, Sprite, Transform2D},
         entities::Worlds,
     },
@@ -200,9 +200,10 @@ impl Renderer2D {
         }
 
         {
-            let output = ctx.egui.end_frame(Some(window));
-            let paint_jobs =
-                ctx.egui.context().tessellate(output.shapes, ctx.egui.context().pixels_per_point());
+            let egui_ctx = ctx.egui.egui_ctx();
+            let output = egui_ctx.end_frame();
+            let paint_jobs = egui_ctx
+                .tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
