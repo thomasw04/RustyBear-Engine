@@ -1,13 +1,14 @@
+use std::f32::consts::PI;
+use std::path::{Path, PathBuf};
+
 use glam::{Vec2, Vec3, Vec4};
 use hashbrown::HashMap;
-
-use std::f32::consts::{PI, TAU};
-use std::path::{Path, PathBuf};
 
 use crate::assets::texture::{Sampler, Texture2D};
 use crate::assets::{assets, ldtk};
 use crate::context::VisContext;
-use crate::entities::desc::{Sprite, Transform2D};
+use crate::entities::sprite::Sprite;
+use crate::entities::transform2d::Transform2D;
 use crate::utils::{Guid, GuidGenerator};
 
 //A collection of entities that represents a set of worlds.

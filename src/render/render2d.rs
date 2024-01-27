@@ -1,35 +1,21 @@
 use wgpu::TextureView;
 use winit::window::Window;
 
+use crate::assets::assets::Assets;
+use crate::assets::shader::ShaderVariant;
+use crate::context::{Context, VisContext};
+use crate::entities::animation2d::Animation2D;
+use crate::entities::entities::Worlds;
+use crate::entities::sprite::Sprite;
+use crate::entities::transform2d::Transform2D;
+use crate::event::{self, EventSubscriber};
 use crate::render::renderer::Renderer;
-use crate::{
-    assets::{assets::Assets, shader::ShaderVariant},
-    context::{Context, VisContext},
-    entities::{
-        desc::{Animation2D, Sprite, Transform2D},
-        entities::Worlds,
-    },
-    event::{self, EventSubscriber},
-    utils::Timestep,
-};
+use crate::utils::Timestep;
 
-use super::types::{BindGroup, FragmentShader, VertexShader};
-use super::{
-    camera::CameraBuffer,
-    factory::{PipelineFactory, RenderPipelineConfig},
-    framebuffer::Framebuffer,
-    types::{IndexBuffer, VertexBuffer},
-};
-
-//Descriptors for this system
-
-//--------------------------------------------------------------------------------------------------
-
-pub struct RenderData<'a> {
-    pub ctx: &'a Context<'a>,
-    pub view: &'a TextureView,
-    pub window: &'a winit::window::Window,
-}
+use super::camera::CameraBuffer;
+use super::factory::{PipelineFactory, RenderPipelineConfig};
+use super::framebuffer::Framebuffer;
+use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
 
 pub struct Renderer2D {
     framebuffer: Framebuffer,

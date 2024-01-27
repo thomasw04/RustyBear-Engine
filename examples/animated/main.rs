@@ -3,7 +3,7 @@
 use std::cell::Ref;
 use std::path::Path;
 
-use egui::{FontId, Frame, RichText};
+use egui::{FontId, RichText};
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
@@ -14,9 +14,11 @@ use wasm_bindgen::prelude::*;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::desc::{Animation2D, Sprite, Transform2D};
+use RustyBear_Engine::entities::animation2d::Animation2D;
 use RustyBear_Engine::entities::entities::Worlds;
 use RustyBear_Engine::entities::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::sprite::Sprite;
+use RustyBear_Engine::entities::transform2d::Transform2D;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
@@ -56,7 +58,7 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
     }
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
-        egui::Window::new("window").frame(Frame::default()).show(context.egui.egui_ctx(), |ui| {
+        egui::Window::new("window").show(context.egui.egui_ctx(), |ui| {
             ui.label(RichText::new("Broom").font(FontId::proportional(40.0)));
         });
     }
@@ -66,7 +68,7 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
         renderer.update_animations(&context.graphics, delta, &mut self.worlds);
 
         if let Some(world) = self.worlds.get_mut() {
-            self.scripts.tick(&context.graphics, delta, world);
+            self.scripts.tick(&context.graphics, delta, world, &input_state);
         }
 
         let mut cam = self.camera.borrow_mut();
@@ -104,7 +106,7 @@ impl Scriptable for Player {
 
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
-        world: &mut hecs::World,
+        world: &mut hecs::World, input_state: &Ref<InputState>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
             let add = if self.dir == 0.0 {

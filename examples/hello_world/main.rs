@@ -4,9 +4,10 @@ use std::path::Path;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-use RustyBear_Engine::{
-    context::Context, environment::config::Config, logging, window::Window, RustyRuntime,
-};
+use RustyBear_Engine::context::Context;
+use RustyBear_Engine::environment::config::Config;
+use RustyBear_Engine::window::Window;
+use RustyBear_Engine::{logging, RustyRuntime};
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 fn main() {

@@ -1,8 +1,9 @@
-use instant::Instant;
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::ops;
 use std::path::{Path, PathBuf};
+
+use instant::Instant;
 
 pub struct Timestep {
     delta: f64,

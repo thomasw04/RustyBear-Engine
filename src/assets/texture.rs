@@ -1,6 +1,7 @@
 use once_cell::sync::OnceCell;
 
-use crate::{context::VisContext, render::types::BindGroupEntry};
+use crate::context::VisContext;
+use crate::render::types::BindGroupEntry;
 
 pub struct TextureArray {
     extend: wgpu::Extent3d,
@@ -240,9 +241,9 @@ impl Texture2D {
             ) {
                 let rgba = image.to_rgba8();
                 let dim = rgba.dimensions();
-    
+
                 let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
-    
+
                 let texture = context.device.create_texture(&wgpu::TextureDescriptor {
                     label: Some("error_texture"),
                     size: extend,
@@ -253,7 +254,7 @@ impl Texture2D {
                     usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
                     view_formats: &[],
                 });
-    
+
                 context.queue.write_texture(
                     wgpu::ImageCopyTexture {
                         texture: &texture,
@@ -269,9 +270,9 @@ impl Texture2D {
                     },
                     extend,
                 );
-    
+
                 let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    
+
                 Texture2D { texture, view }
             } else {
                 //For devs: Of course this can also happen while engine development. E.g. broken png in resources/

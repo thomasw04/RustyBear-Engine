@@ -13,15 +13,13 @@ use crate::{
     utils::Guid,
 };
 
+use super::camera::CameraBuffer;
+use super::factory::{PipelineFactory, RenderPipelineConfig};
+use super::framebuffer::Framebuffer;
 use super::material::SkyboxMaterial;
-use super::{
-    camera::CameraBuffer,
-    factory::{PipelineFactory, RenderPipelineConfig},
-    framebuffer::Framebuffer,
-    types::{BindGroup, FragmentShader, VertexShader},
-};
+use super::types::{BindGroup, FragmentShader, VertexShader};
 
-pub struct Renderer {
+pub(crate) struct Renderer {
     framebuffer: Framebuffer,
     assets: Assets,
     pipelines: PipelineFactory,

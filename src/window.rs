@@ -96,6 +96,7 @@ impl Window {
             window.set_fullscreen(None);
         } else {
             window.current_monitor().map(|monitor| {
+                #[allow(unused_variables)]
                 monitor.video_modes().next().map(|video_mode| {
                     #[cfg(any(target_os = "macos", unix))]
                     window.set_fullscreen(Some(Fullscreen::Borderless(Some(monitor))));

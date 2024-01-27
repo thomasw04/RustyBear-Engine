@@ -3,23 +3,22 @@
 use std::cell::Ref;
 use std::path::Path;
 
-use glam::{Vec2, Vec4};
-use hecs::World;
+use glam::Vec2;
 use rccell::RcCell;
+use winit::keyboard::KeyCode;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-use winit::keyboard::KeyCode;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::Context;
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::desc::Transform2D;
 use RustyBear_Engine::entities::entities::Worlds;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
 use RustyBear_Engine::logging;
 use RustyBear_Engine::render::camera::OrthographicCamera;
-use RustyBear_Engine::render::render2d::{RenderData, Renderer2D};
+use RustyBear_Engine::render::render2d::Renderer2D;
 use RustyBear_Engine::utils::Timestep;
 use RustyBear_Engine::window::Window;
 
@@ -32,7 +31,9 @@ pub struct LDTKApp<'a> {
 }
 
 impl<'a> Application<'a> for LDTKApp<'a> {
-    fn on_event(&mut self, _event: &Event, _context: &mut Context) -> bool { false }
+    fn on_event(&mut self, _event: &Event, _context: &mut Context) -> bool {
+        false
+    }
 
     fn render(
         &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
@@ -44,8 +45,6 @@ impl<'a> Application<'a> for LDTKApp<'a> {
                 &context.graphics,
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
-
-            let render_data = RenderData { ctx: context, view, window };
 
             renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
@@ -75,7 +74,9 @@ impl<'a> Application<'a> for LDTKApp<'a> {
 
     fn quit(&mut self) {}
 
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> { &mut self.stack }
+    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
+        &mut self.stack
+    }
 }
 
 impl<'a> LDTKApp<'a> {
