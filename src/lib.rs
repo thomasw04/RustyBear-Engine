@@ -17,6 +17,17 @@ pub mod window;
 
 use std::cell::Ref;
 
+//Re-exports
+pub use egui;
+pub use glam;
+pub use hecs;
+pub use log;
+pub use pollster;
+pub use rccell;
+pub use wgpu;
+pub use what;
+pub use winit;
+
 use assets::assets::Assets;
 use egui::lerp;
 use glam::Vec3;
@@ -25,10 +36,9 @@ use input::InputState;
 use rccell::RcCell;
 use render::{camera::PerspectiveCamera, renderer::Renderer};
 
-use crate::{context::Context, core::Application, environment::config::Config, sound::AudioEngine};
+use crate::{context::Context, core::Application, sound::AudioEngine};
 
 use event::{Event, EventSubscriber};
-use window::Window;
 use winit::{
     event::{ElementState, MouseButton},
     keyboard::KeyCode,
