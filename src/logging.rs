@@ -41,6 +41,8 @@ pub fn init() {
             .set_level_color(Level::Error, Some(Color::Red))
             .build();
 
+
+            
             let logger = TermLogger::new(LevelFilter::Info, config, TerminalMode::Mixed, ColorChoice::Auto);
             let _ = PROGRESS_BARS.set(MultiProgress::new());
 

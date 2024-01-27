@@ -24,7 +24,7 @@ use super::{
 //--------------------------------------------------------------------------------------------------
 
 pub struct RenderData<'a> {
-    pub ctx: &'a Context,
+    pub ctx: &'a Context<'a>,
     pub view: &'a TextureView,
     pub window: &'a winit::window::Window,
 }

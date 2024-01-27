@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use winit::{
     dpi::{LogicalPosition, PhysicalSize},
@@ -31,7 +33,7 @@ impl Default for WindowConfig {
 }
 
 pub struct Window {
-    pub native: winit::window::Window,
+    pub native: Arc<winit::window::Window>,
     pub event_loop: winit::event_loop::EventLoop<()>,
 }
 
@@ -86,7 +88,7 @@ impl Window {
                 .expect("Couldn't append canvas to the document body.");
         }
 
-        Window { native: window, event_loop }
+        Window { native: Arc::new(window), event_loop }
     }
 
     fn toggle_fullscreen(window: &winit::window::Window) {

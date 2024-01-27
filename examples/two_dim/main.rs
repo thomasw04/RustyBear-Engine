@@ -60,10 +60,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
         }
     }
 
-    fn gui_render(
-        &mut self, _view: &wgpu::TextureView, _context: &mut Context, _gui_context: &egui::Context,
-    ) {
-    }
+    fn gui_render(&mut self, _view: &wgpu::TextureView, _context: &mut Context) {}
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
         if let Some(world) = self.worlds.get_mut() {
@@ -196,7 +193,7 @@ fn main() {
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 
-    let context = pollster::block_on(Context::new(&mut window, config));
+    let context = pollster::block_on(Context::new(window.native.clone(), config));
 
     //Create and init the application
     let myapp = TwoDimApp::new(&context);
