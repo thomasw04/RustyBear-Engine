@@ -106,7 +106,7 @@ impl Scriptable for Player {
 
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
-        world: &mut hecs::World,
+        world: &mut hecs::World, input_state: &Ref<InputState>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
             let add = if self.dir == 0.0 {

@@ -17,16 +17,6 @@ use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
 use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
 
-//Descriptors for this system
-
-//--------------------------------------------------------------------------------------------------
-
-pub struct RenderData<'a> {
-    pub ctx: &'a Context<'a>,
-    pub view: &'a TextureView,
-    pub window: &'a winit::window::Window,
-}
-
 pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,

@@ -107,7 +107,7 @@ impl Scriptable for Player {
 
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
-        world: &mut hecs::World,
+        world: &mut hecs::World, input_state: &Ref<InputState>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
             transform.add_pos(context, Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
