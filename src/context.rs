@@ -1,17 +1,19 @@
 use std::sync::Arc;
 
+use egui::ViewportInfo;
 use sysinfo::{System, SystemExt};
 use wgpu::{PresentMode, TextureFormatFeatureFlags};
-use winit::{dpi::PhysicalSize, event::{Event, WindowEvent}, event_loop::EventLoopWindowTarget, keyboard::{Key, NamedKey}};
+use winit::dpi::PhysicalSize;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::EventLoopWindowTarget;
+use winit::keyboard::{Key, NamedKey};
 
-use crate::{
-    core::{Application, ModuleStack},
-    environment::config::Config,
-    event,
-    input::InputState,
-    utils::Timestep,
-    window::Window,
-};
+use crate::core::{Application, ModuleStack};
+use crate::environment::config::Config;
+use crate::event;
+use crate::input::InputState;
+use crate::utils::Timestep;
+use crate::window::Window;
 
 pub struct Features {
     pub texture_features: wgpu::TextureFormatFeatureFlags,
@@ -104,11 +106,18 @@ impl<'a> Context<'a> {
         //Create new egui context.
         let egui = egui::Context::default();
         let viewport_id = egui.viewport_id();
-        let egui = egui_winit::State::new(egui, viewport_id, &window, Some(window.scale_factor() as f32), None);
+        let egui = egui_winit::State::new(
+            egui,
+            viewport_id,
+            &window,
+            Some(window.scale_factor() as f32),
+            None,
+        );
 
         Context {
-            graphics: Arc::new(VisContext {  device, queue, format }),
-           surface, surface_config,
+            graphics: Arc::new(VisContext { device, queue, format }),
+            surface,
+            surface_config,
             features,
             egui,
             config,
@@ -142,9 +151,9 @@ impl<'a> Context<'a> {
             {
                 Event::WindowEvent { window_id, ref event }
 
-                if window_id == window.native.id() => 
+                if window_id == window.native.id() =>
                 {
-                    self.egui.on_window_event(&window.native, &event);
+                    let  _ = self.egui.on_window_event(&window.native, &event);
 
                     match event {
                         WindowEvent::Resized(new_size) => {
@@ -160,8 +169,8 @@ impl<'a> Context<'a> {
                                 Ok(_) => {}
                                 Err(wgpu::SurfaceError::Lost) => { self.resize(PhysicalSize { width: self.surface_config.width, height: self.surface_config.height }); },
                                 Err(wgpu::SurfaceError::OutOfMemory) => { window_target.exit(); },
-                                Err(e) => 
-                                { 
+                                Err(e) =>
+                                {
                                     log::error!("{:?}", e);
                                 },
                             }
@@ -204,6 +213,10 @@ impl<'a> Context<'a> {
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
+        let mut info = ViewportInfo::default();
+        egui_winit::update_viewport_info(&mut info, self.egui.egui_ctx(), window);
+        let context = self.egui.egui_ctx().clone();
+        self.egui.egui_input_mut().viewports.insert(context.viewport_id(), info);
         let input = self.egui.take_egui_input(&window);
         self.egui.egui_ctx().begin_frame(input);
         app.gui_render(&view, self);

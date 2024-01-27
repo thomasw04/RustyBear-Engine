@@ -1,25 +1,21 @@
 use wgpu::TextureView;
 use winit::window::Window;
 
-use crate::{
-    assets::{assets::Assets, shader::ShaderVariant},
-    context::{Context, VisContext},
-    entities::{
-        desc::{Animation2D, Sprite, Transform2D},
-        entities::Worlds,
-    },
-    event::{self, EventSubscriber},
-    utils::Timestep,
-};
+use crate::assets::assets::Assets;
+use crate::assets::shader::ShaderVariant;
+use crate::context::{Context, VisContext};
+use crate::entities::animation2d::Animation2D;
+use crate::entities::entities::Worlds;
+use crate::entities::sprite::Sprite;
+use crate::entities::transform2d::Transform2D;
+use crate::event::{self, EventSubscriber};
 use crate::render::renderer::Renderer;
+use crate::utils::Timestep;
 
-use super::{
-    camera::CameraBuffer,
-    factory::{PipelineFactory, RenderPipelineConfig},
-    framebuffer::Framebuffer,
-    types::{IndexBuffer, VertexBuffer},
-};
-use super::types::{BindGroup, FragmentShader, VertexShader};
+use super::camera::CameraBuffer;
+use super::factory::{PipelineFactory, RenderPipelineConfig};
+use super::framebuffer::Framebuffer;
+use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
 
 //Descriptors for this system
 
@@ -126,11 +122,8 @@ impl Renderer2D {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
                 let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
                     renderables.iter().collect();
-                entities.sort_by(|(_, (a, _)), (_,(b,_))| {
-                    a.position()
-                        .z
-                        .partial_cmp(&b.position().z)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                entities.sort_by(|(_, (a, _)), (_, (b, _))| {
+                    a.position().z.partial_cmp(&b.position().z).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -202,8 +195,7 @@ impl Renderer2D {
         {
             let egui_ctx = ctx.egui.egui_ctx();
             let output = egui_ctx.end_frame();
-            let paint_jobs = egui_ctx
-                .tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {

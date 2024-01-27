@@ -1,29 +1,23 @@
 use std::default::Default;
 
-use log::log;
 use wgpu::TextureView;
 
-use crate::{
-    assets::{
-        assets::{AssetType, Assets},
-        buffer::{Indices, Vertices},
-        shader::{Shader, ShaderVariant},
-        texture::{Sampler, Texture2D},
-    },
-    context::{Context, VisContext},
-    event::{self, EventSubscriber},
-    render::{material::GenericMaterial, types::BindGroupEntry},
-    utils::Guid,
-};
+use crate::assets::assets::{AssetType, Assets};
+use crate::assets::buffer::{Indices, Vertices};
+use crate::assets::shader::{Shader, ShaderVariant};
+use crate::assets::texture::{Sampler, Texture2D};
+use crate::context::{Context, VisContext};
+use crate::event::{self, EventSubscriber};
+use crate::render::material::GenericMaterial;
+use crate::render::types::BindGroupEntry;
+use crate::utils::Guid;
 
-use super::{
-    camera::CameraBuffer,
-    factory::{PipelineFactory, RenderPipelineConfig},
-    framebuffer::Framebuffer,
-    mesh::GenericMesh,
-    types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader},
-};
-use super::{material::SkyboxMaterial, types::Vertex2D};
+use super::camera::CameraBuffer;
+use super::factory::{PipelineFactory, RenderPipelineConfig};
+use super::framebuffer::Framebuffer;
+use super::material::SkyboxMaterial;
+use super::mesh::GenericMesh;
+use super::types::{BindGroup, FragmentShader, IndexBuffer, Vertex2D, VertexBuffer, VertexShader};
 
 pub struct Renderer<'a> {
     framebuffer: Framebuffer,
@@ -268,8 +262,7 @@ impl<'a> Renderer<'a> {
         {
             let egui_ctx = context.egui.egui_ctx();
             let output = egui_ctx.end_frame();
-            let paint_jobs = egui_ctx
-                .tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {

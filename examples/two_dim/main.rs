@@ -1,33 +1,31 @@
 #![allow(non_snake_case)]
 
-use std::{cell::Ref, path::Path};
+use std::cell::Ref;
+use std::path::Path;
 
-use egui::{Color32, FontId};
-use egui::RichText;
+use egui::{Color32, FontId, RichText};
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
 use winit::keyboard::KeyCode;
 
-use RustyBear_Engine::{
-    assets::assets::Assets,
-    context::{Context, VisContext},
-    core::{Application, ModuleStack},
-    entities::{
-        desc::{Sprite, Transform2D},
-        entities::Worlds,
-        script::{Scriptable, Scripts},
-    },
-    environment::config::Config,
-    event::{Event, EventType},
-    input::InputState,
-    logging,
-    render::{camera::OrthographicCamera, render2d::Renderer2D},
-    utils::Timestep,
-    window::Window,
-};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+use RustyBear_Engine::assets::assets::Assets;
+use RustyBear_Engine::context::{Context, VisContext};
+use RustyBear_Engine::core::{Application, ModuleStack};
+use RustyBear_Engine::entities::entities::Worlds;
+use RustyBear_Engine::entities::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::sprite::Sprite;
+use RustyBear_Engine::entities::transform2d::Transform2D;
+use RustyBear_Engine::environment::config::Config;
+use RustyBear_Engine::event::{Event, EventType};
+use RustyBear_Engine::input::InputState;
+use RustyBear_Engine::logging;
+use RustyBear_Engine::render::camera::OrthographicCamera;
+use RustyBear_Engine::render::render2d::Renderer2D;
+use RustyBear_Engine::utils::Timestep;
+use RustyBear_Engine::window::Window;
 
 pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
@@ -198,7 +196,7 @@ fn main() {
     config.find_project(Path::new("examples/two_dim")).unwrap();
 
     //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
+    let window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 

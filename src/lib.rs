@@ -1,5 +1,23 @@
 #![allow(non_snake_case)]
 
+use std::cell::Ref;
+
+use egui::lerp;
+use glam::Vec3;
+use rccell::RcCell;
+use winit::event::{ElementState, MouseButton};
+use winit::keyboard::KeyCode;
+
+use assets::assets::Assets;
+use event::{Event, EventSubscriber};
+use input::InputState;
+use render::camera::PerspectiveCamera;
+use render::renderer::Renderer;
+
+use crate::context::Context;
+use crate::core::{Application, ModuleStack};
+use crate::sound::AudioEngine;
+
 pub mod utils;
 #[macro_use]
 pub mod core;
@@ -14,27 +32,6 @@ pub mod logging;
 pub mod render;
 pub mod sound;
 pub mod window;
-
-use std::cell::Ref;
-
-use assets::assets::Assets;
-use egui::lerp;
-use glam::Vec3;
-use input::InputState;
-
-use rccell::RcCell;
-use render::{camera::PerspectiveCamera, renderer::Renderer};
-
-use crate::{context::Context, core::Application, environment::config::Config, sound::AudioEngine};
-
-use event::{Event, EventSubscriber};
-use window::Window;
-use winit::{
-    event::{ElementState, MouseButton},
-    keyboard::KeyCode,
-};
-
-use crate::core::ModuleStack;
 
 struct MyHandler {
     audio: AudioEngine,

@@ -3,7 +3,7 @@
 use std::cell::Ref;
 use std::path::Path;
 
-use egui::{FontId, Frame, RichText};
+use egui::{FontId, RichText};
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
@@ -14,9 +14,11 @@ use wasm_bindgen::prelude::*;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::desc::{Animation2D, Sprite, Transform2D};
+use RustyBear_Engine::entities::animation2d::Animation2D;
 use RustyBear_Engine::entities::entities::Worlds;
 use RustyBear_Engine::entities::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::sprite::Sprite;
+use RustyBear_Engine::entities::transform2d::Transform2D;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
@@ -56,7 +58,7 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
     }
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
-         egui::Window::new("window").frame(Frame::default()).show(context.egui.egui_ctx(), |ui| {
+        egui::Window::new("window").show(context.egui.egui_ctx(), |ui| {
             ui.label(RichText::new("Broom").font(FontId::proportional(40.0)));
         });
     }
