@@ -21,6 +21,7 @@ use std::cell::Ref;
 pub use egui;
 pub use glam;
 pub use hecs;
+pub use hecs_hierarchy;
 pub use log;
 pub use pollster;
 pub use rccell;

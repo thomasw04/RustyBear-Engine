@@ -71,7 +71,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
         if let Some(world) = self.worlds.get_mut() {
-            self.scripts.tick(&context.graphics, delta, world);
+            self.scripts.tick(&context.graphics, delta, world, &input_state);
         }
 
         let mut cam = self.camera.borrow_mut();
@@ -110,7 +110,7 @@ impl Scriptable for Player {
         world: &mut hecs::World, input_state: &Ref<InputState>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
-            transform.add_pos(context, Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
+            transform.add_pos(Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
         }
     }
 

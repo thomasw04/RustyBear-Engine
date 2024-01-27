@@ -85,8 +85,14 @@ impl Renderer2D {
         if let Some(world) = worlds.get_mut() {
             let mut config_keys = Vec::new();
 
-            for (_entity, (transform, sprite)) in
-                world.query_mut::<(&mut Transform2D, &mut Sprite)>()
+            //Iterate over all entities with a transform component but do not borrow.
+            for (entity, _) in world.query::<()>().with::<&Transform2D>().iter() {
+                if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
+                    transform.update(context, entity, world);
+                }
+            }
+
+            for (_, (transform, sprite)) in world.query::<(&mut Transform2D, &mut Sprite)>().iter()
             {
                 if let Some(texture) = assets.try_get(&sprite.texture()) {
                     sprite.update(context, texture);

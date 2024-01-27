@@ -68,7 +68,7 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
         renderer.update_animations(&context.graphics, delta, &mut self.worlds);
 
         if let Some(world) = self.worlds.get_mut() {
-            self.scripts.tick(&context.graphics, delta, world);
+            self.scripts.tick(&context.graphics, delta, world, &input_state);
         }
 
         let mut cam = self.camera.borrow_mut();
@@ -114,7 +114,7 @@ impl Scriptable for Player {
             } else {
                 Vec3::new(-0.01 * delta.norm(), 0.0, 0.0)
             };
-            transform.add_pos(context, add);
+            transform.add_pos(add);
 
             if transform.position().x > 2.0 {
                 self.dir = 1.0;

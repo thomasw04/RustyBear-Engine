@@ -12,7 +12,6 @@ use wasm_bindgen::prelude::*;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::Context;
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::desc::Transform2D;
 use RustyBear_Engine::entities::entities::Worlds;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};

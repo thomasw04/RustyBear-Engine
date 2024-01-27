@@ -5,6 +5,8 @@ use hashbrown::HashMap;
 use crate::input::InputState;
 use crate::{context::VisContext, utils::Timestep};
 
+use super::entities;
+
 pub trait Scriptable {
     fn on_spawn(&mut self, context: &VisContext, entity: hecs::Entity, world: &mut hecs::World);
     fn tick(
