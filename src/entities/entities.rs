@@ -1,13 +1,14 @@
+use std::f32::consts::PI;
+use std::path::{Path, PathBuf};
+
 use glam::{Vec2, Vec3, Vec4};
 use hashbrown::HashMap;
-
-use std::f32::consts::{PI, TAU};
-use std::path::{Path, PathBuf};
 
 use crate::assets::texture::{Sampler, Texture2D};
 use crate::assets::{assets, ldtk};
 use crate::context::VisContext;
-use crate::entities::desc::{Sprite, Transform2D};
+use crate::entities::sprite::Sprite;
+use crate::entities::transform2d::Transform2D;
 use crate::utils::{Guid, GuidGenerator};
 
 //A collection of entities that represents a set of worlds.
@@ -24,7 +25,9 @@ impl Default for Worlds {
 }
 
 impl Worlds {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_world(&mut self, world: hecs::World) -> Guid {
         let guid = self.generator.generate();
@@ -32,7 +35,9 @@ impl Worlds {
         guid
     }
 
-    pub fn get_world(&mut self, guid: Guid) -> Option<&hecs::World> { self.worlds.get(&guid) }
+    pub fn get_world(&mut self, guid: Guid) -> Option<&hecs::World> {
+        self.worlds.get(&guid)
+    }
 
     pub fn get_mut(&mut self) -> Option<&mut hecs::World> {
         if let Some(guid) = self.current_world {
@@ -50,7 +55,9 @@ impl Worlds {
         }
     }
 
-    pub fn start_world(&mut self, guid: Guid) { self.current_world = Some(guid); }
+    pub fn start_world(&mut self, guid: Guid) {
+        self.current_world = Some(guid);
+    }
 
     pub fn from_ldtk_file<P: AsRef<Path>>(
         context: &VisContext, loc: &Option<PathBuf>, assets: &mut assets::Assets, ldtk_file_path: P,
