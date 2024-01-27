@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::assets::texture::{Sampler, Texture2D};
 use crate::assets::{assets, ldtk};
 use crate::context::VisContext;
-use crate::entity::desc::{Sprite, Transform2D};
+use crate::entities::desc::{Sprite, Transform2D};
 use crate::utils::{Guid, GuidGenerator};
 
 //A collection of entities that represents a set of worlds.
