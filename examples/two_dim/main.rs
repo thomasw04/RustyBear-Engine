@@ -2,13 +2,15 @@
 
 use std::{cell::Ref, path::Path};
 
-use egui::{Color32, FontId};
 use egui::RichText;
+use egui::{Color32, FontId};
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
 use winit::keyboard::KeyCode;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 use RustyBear_Engine::{
     assets::assets::Assets,
     context::{Context, VisContext},
@@ -26,8 +28,6 @@ use RustyBear_Engine::{
     utils::Timestep,
     window::Window,
 };
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 
 pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
@@ -112,7 +112,7 @@ impl Scriptable for Player {
         world: &mut hecs::World,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
-            transform.add_pos(context, Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
+            transform.add_pos(Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
         }
     }
 

@@ -1,6 +1,7 @@
 use wgpu::TextureView;
 use winit::window::Window;
 
+use crate::render::renderer::Renderer;
 use crate::{
     assets::{assets::Assets, shader::ShaderVariant},
     context::{Context, VisContext},
@@ -11,15 +12,14 @@ use crate::{
     event::{self, EventSubscriber},
     utils::Timestep,
 };
-use crate::render::renderer::Renderer;
 
+use super::types::{BindGroup, FragmentShader, VertexShader};
 use super::{
     camera::CameraBuffer,
     factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
     types::{IndexBuffer, VertexBuffer},
 };
-use super::types::{BindGroup, FragmentShader, VertexShader};
 
 //Descriptors for this system
 
@@ -99,8 +99,14 @@ impl Renderer2D {
         if let Some(world) = worlds.get_mut() {
             let mut config_keys = Vec::new();
 
-            for (_entity, (transform, sprite)) in
-                world.query_mut::<(&mut Transform2D, &mut Sprite)>()
+            //Iterate over all entities with a transform component but do not borrow.
+            for (entity, _) in world.query::<()>().with::<&Transform2D>().iter() {
+                if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
+                    transform.update(context, entity, world);
+                }
+            }
+
+            for (_, (transform, sprite)) in world.query::<(&mut Transform2D, &mut Sprite)>().iter()
             {
                 if let Some(texture) = assets.try_get(&sprite.texture()) {
                     sprite.update(context, texture);
@@ -126,11 +132,8 @@ impl Renderer2D {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
                 let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
                     renderables.iter().collect();
-                entities.sort_by(|(_, (a, _)), (_,(b,_))| {
-                    a.position()
-                        .z
-                        .partial_cmp(&b.position().z)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+                entities.sort_by(|(_, (a, _)), (_, (b, _))| {
+                    a.position().z.partial_cmp(&b.position().z).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
                 let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -202,8 +205,7 @@ impl Renderer2D {
         {
             let egui_ctx = ctx.egui.egui_ctx();
             let output = egui_ctx.end_frame();
-            let paint_jobs = egui_ctx
-                .tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {

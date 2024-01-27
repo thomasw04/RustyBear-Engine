@@ -24,7 +24,9 @@ impl Default for Worlds {
 }
 
 impl Worlds {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_world(&mut self, world: hecs::World) -> Guid {
         let guid = self.generator.generate();
@@ -32,7 +34,9 @@ impl Worlds {
         guid
     }
 
-    pub fn get_world(&mut self, guid: Guid) -> Option<&hecs::World> { self.worlds.get(&guid) }
+    pub fn get_world(&mut self, guid: Guid) -> Option<&hecs::World> {
+        self.worlds.get(&guid)
+    }
 
     pub fn get_mut(&mut self) -> Option<&mut hecs::World> {
         if let Some(guid) = self.current_world {
@@ -50,7 +54,9 @@ impl Worlds {
         }
     }
 
-    pub fn start_world(&mut self, guid: Guid) { self.current_world = Some(guid); }
+    pub fn start_world(&mut self, guid: Guid) {
+        self.current_world = Some(guid);
+    }
 
     pub fn from_ldtk_file<P: AsRef<Path>>(
         context: &VisContext, loc: &Option<PathBuf>, assets: &mut assets::Assets, ldtk_file_path: P,

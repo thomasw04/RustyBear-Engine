@@ -56,7 +56,7 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
     }
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
-         egui::Window::new("window").frame(Frame::default()).show(context.egui.egui_ctx(), |ui| {
+        egui::Window::new("window").frame(Frame::default()).show(context.egui.egui_ctx(), |ui| {
             ui.label(RichText::new("Broom").font(FontId::proportional(40.0)));
         });
     }
@@ -112,7 +112,7 @@ impl Scriptable for Player {
             } else {
                 Vec3::new(-0.01 * delta.norm(), 0.0, 0.0)
             };
-            transform.add_pos(context, add);
+            transform.add_pos(add);
 
             if transform.position().x > 2.0 {
                 self.dir = 1.0;

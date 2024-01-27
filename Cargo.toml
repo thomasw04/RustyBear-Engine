@@ -46,6 +46,7 @@ hashbrown = "0.14.3"
 smallvec = { version = "1.11.2", features = ["const_new", "union", "const_generics"] }
 hecs = "0.10.4"
 glyphon = "0.5.0"
+hecs-hierarchy = "0.12.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"
