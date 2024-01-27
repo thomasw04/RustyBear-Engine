@@ -3,24 +3,26 @@
 use std::cell::Ref;
 use std::path::Path;
 
+use egui::{FontId, Frame, RichText};
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
+use winit::keyboard::KeyCode;
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-use winit::keyboard::KeyCode;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entity::desc::{Animation2D, Sprite, Transform2D};
-use RustyBear_Engine::entity::entities::Worlds;
-use RustyBear_Engine::entity::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::desc::{Animation2D, Sprite, Transform2D};
+use RustyBear_Engine::entities::entities::Worlds;
+use RustyBear_Engine::entities::script::{Scriptable, Scripts};
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
 use RustyBear_Engine::logging;
 use RustyBear_Engine::render::camera::OrthographicCamera;
-use RustyBear_Engine::render::render2d::{RenderData, Renderer2D};
+use RustyBear_Engine::render::render2d::Renderer2D;
 use RustyBear_Engine::utils::Timestep;
 use RustyBear_Engine::window::Window;
 
@@ -49,13 +51,15 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
-            let render_data = RenderData { ctx: context, view, window };
-
-            renderer.render(render_data, &mut self.assets, &mut self.worlds);
+            renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
     }
 
-    fn gui_render(&mut self, _view: &wgpu::TextureView, _context: &mut Context) {}
+    fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
+         egui::Window::new("window").frame(Frame::default()).show(context.egui.egui_ctx(), |ui| {
+            ui.label(RichText::new("Broom").font(FontId::proportional(40.0)));
+        });
+    }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
         let mut renderer = self.renderer.borrow_mut();
@@ -187,9 +191,9 @@ fn main() {
     config.find_project(Path::new("examples/animated")).unwrap();
 
     //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
+    let window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
-    window.native.set_cursor_visible(false);
+    //window.native.set_cursor_visible(false);
 
     let context = pollster::block_on(Context::new(window.native.clone(), config));
 

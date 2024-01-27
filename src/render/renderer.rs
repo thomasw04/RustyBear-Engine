@@ -1,4 +1,7 @@
-use wgpu::{RenderPassDescriptor, TextureView};
+use std::default::Default;
+
+use log::log;
+use wgpu::TextureView;
 
 use crate::{
     assets::{
@@ -92,7 +95,7 @@ impl<'a> Renderer<'a> {
 
         let camera_buffer = CameraBuffer::new(&context.graphics, "Default Camera");
 
-        let egui_renderer = Renderer::recreate_gui(context, 1);
+        let egui_renderer = Renderer::recreate_gui(context, sample_count);
 
         let material = GenericMaterial::new(
             &context.graphics,
@@ -134,11 +137,11 @@ impl<'a> Renderer<'a> {
         }
     }
 
-    fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu::Renderer {
+    pub(crate) fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu::Renderer {
         egui_wgpu::Renderer::new(
             &context.graphics.device,
             context.surface_config.format,
-            Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+            None,
             sample_count,
         )
     }
@@ -176,13 +179,6 @@ impl<'a> Renderer<'a> {
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-
-        let output = context.egui.egui_ctx().end_frame();
-        let paint_jobs = context
-            .egui
-            .egui_ctx()
-            .tessellate(output.shapes, context.egui.egui_ctx().pixels_per_point());
-        let texture_delta = output.textures_delta;
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -270,25 +266,49 @@ impl<'a> Renderer<'a> {
         }
 
         {
+            let egui_ctx = context.egui.egui_ctx();
+            let output = egui_ctx.end_frame();
+            let paint_jobs = egui_ctx
+                .tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let texture_delta = output.textures_delta;
+
             let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
                 size_in_pixels: [context.surface_config.width, context.surface_config.height],
                 pixels_per_point: window.scale_factor() as f32,
             };
 
-            for (id, delta) in texture_delta.set {
-                self.egui_renderer.update_texture(&gpu.device, &gpu.queue, id, &delta);
-            }
-
             self.egui_renderer.update_buffers(
                 &gpu.device,
                 &gpu.queue,
-                &mut encoder,
+                &mut (&mut encoder),
                 &paint_jobs,
                 &screen_descriptor,
             );
 
+            for (id, delta) in texture_delta.set {
+                self.egui_renderer.update_texture(&gpu.device, &gpu.queue, id, &delta);
+            }
+
             {
-                let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor::default());
+                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("GUI RenderPass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: match sample_count {
+                            1 => view,
+                            _ => &framebuffer_view,
+                        },
+                        resolve_target: match sample_count {
+                            1 => None,
+                            _ => Some(view),
+                        },
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: None,
+                    ..Default::default()
+                });
                 self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
             }
 
