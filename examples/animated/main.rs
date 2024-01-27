@@ -6,9 +6,8 @@ use std::path::Path;
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 use winit::keyboard::KeyCode;
+
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
@@ -20,9 +19,11 @@ use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
 use RustyBear_Engine::logging;
 use RustyBear_Engine::render::camera::OrthographicCamera;
-use RustyBear_Engine::render::render2d::{RenderData, Renderer2D};
+use RustyBear_Engine::render::render2d::Renderer2D;
 use RustyBear_Engine::utils::Timestep;
 use RustyBear_Engine::window::Window;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 pub struct AnimatedApp<'a> {
     stack: ModuleStack<'a>,
@@ -49,15 +50,14 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
-            let render_data = RenderData { ctx: context, view, window };
-
-            renderer.render(render_data, &mut self.assets, &mut self.worlds);
+            renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
     }
 
     fn gui_render(
         &mut self, _view: &wgpu::TextureView, _context: &mut Context, _gui_context: &egui::Context,
     ) {
+        self.renderer.gui_render(_view, _context, _gui_context);
     }
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {

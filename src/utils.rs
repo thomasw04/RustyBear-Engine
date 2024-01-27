@@ -162,7 +162,8 @@ impl GuidGenerator {
 
     pub fn generate(&mut self) -> Guid {
         let mut id = rand::random::<u64>();
-        while self.used.contains(&id) && id < 10 {
+        const RESERVED_IDS: u64 = 10;
+        while self.used.contains(&id) && id < RESERVED_IDS {
             id = rand::random::<u64>();
         }
         self.used.insert(id);

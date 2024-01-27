@@ -1,4 +1,5 @@
 use wgpu::TextureView;
+use winit::window::Window;
 
 use crate::{
     assets::{assets::Assets, shader::ShaderVariant},
@@ -10,14 +11,15 @@ use crate::{
     event::{self, EventSubscriber},
     utils::Timestep,
 };
+use crate::render::renderer::Renderer;
 
-use super::types::{BindGroup, FragmentShader, VertexShader};
 use super::{
     camera::CameraBuffer,
     factory::{PipelineFactory, RenderPipelineConfig},
     framebuffer::Framebuffer,
     types::{IndexBuffer, VertexBuffer},
 };
+use super::types::{BindGroup, FragmentShader, VertexShader};
 
 //Descriptors for this system
 
@@ -33,6 +35,7 @@ pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,
     camera_buffer: Option<CameraBuffer>,
+    egui_renderer: egui_wgpu::Renderer,
 }
 
 impl EventSubscriber for Renderer2D {
@@ -54,8 +57,9 @@ impl Renderer2D {
         let pipelines = PipelineFactory::new();
         let framebuffer = Framebuffer::new(context, sample_count);
         let camera_buffer = Some(CameraBuffer::new(&context.graphics, "Default Camera"));
+        let egui_renderer = Renderer::recreate_gui(context, sample_count);
 
-        Renderer2D { framebuffer, pipelines, camera_buffer }
+        Renderer2D { framebuffer, pipelines, camera_buffer, egui_renderer }
     }
 
     pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
@@ -76,18 +80,27 @@ impl Renderer2D {
         }
     }
 
-    pub fn render(&mut self, data: RenderData, assets: &mut Assets, worlds: &mut Worlds) {
-        let context = data.ctx.graphics.as_ref();
+    pub fn render(
+        &mut self, assets: &mut Assets, worlds: &mut Worlds, ctx: &mut Context, view: &TextureView, window: &Window,
+    ) {
+        let context = ctx.graphics.as_ref();
         let fbo = &self.framebuffer;
         let fbo_view: TextureView = (&self.framebuffer).into();
 
+        let mut encoder =
+            context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Renderer2D Render Encoder"),
+            });
+
         let _ = assets.update();
+        let framebuffer_view: TextureView = (&self.framebuffer).into();
+        let sample_count = self.framebuffer.sample_count();
 
         if let Some(world) = worlds.get_mut() {
             let mut config_keys = Vec::new();
 
             for (_entity, (transform, sprite)) in
-                world.query_mut::<(&mut Transform2D, &mut Sprite)>()
+            world.query_mut::<(&mut Transform2D, &mut Sprite)>()
             {
                 if let Some(texture) = assets.try_get(&sprite.texture()) {
                     sprite.update(context, texture);
@@ -109,19 +122,15 @@ impl Renderer2D {
                 config_keys.push(config.key());
             }
 
-            let mut encoder =
-                context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Renderer2D Render Encoder"),
-                });
             {
                 let mut renderables = world.query::<(&Transform2D, &Sprite)>();
                 let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
                     renderables.iter().collect();
                 entities.sort_by(|a, b| {
-                    a.1 .0
+                    a.1.0
                         .position()
                         .z
-                        .partial_cmp(&b.1 .0.position().z)
+                        .partial_cmp(&b.1.0.position().z)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 });
 
@@ -129,12 +138,12 @@ impl Renderer2D {
                     label: Some("World Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: match fbo.sample_count() {
-                            1 => data.view,
+                            1 => &view,
                             _ => &fbo_view,
                         },
                         resolve_target: match fbo.sample_count() {
                             1 => None,
-                            _ => Some(data.view),
+                            _ => Some(&view),
                         },
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -189,7 +198,59 @@ impl Renderer2D {
                     }
                 }
             }
-            context.queue.submit(std::iter::once(encoder.finish()));
         }
+
+        {
+            let output = ctx.egui.end_frame(Some(window));
+            let paint_jobs = ctx.egui
+                .context()
+                .tessellate(output.shapes, ctx.egui.context().pixels_per_point());
+            let texture_delta = output.textures_delta;
+
+            let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+                size_in_pixels: [ctx.surface_config.width, ctx.surface_config.height],
+                pixels_per_point: window.scale_factor() as f32,
+            };
+
+            let device = &ctx.graphics.device;
+
+            let queue = &ctx.graphics.queue;
+            self.egui_renderer.update_buffers(
+                device,
+                queue,
+                &mut encoder,
+                &paint_jobs,
+                &screen_descriptor,
+            );
+
+            for (id, delta) in texture_delta.set {
+                self.egui_renderer.update_texture(device, queue, id, &delta);
+            }
+
+            {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("GUI RenderPass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: match sample_count {
+                            1 => view,
+                            _ => &framebuffer_view,
+                        },
+                        resolve_target: match sample_count {
+                            1 => None,
+                            _ => Some(view),
+                        },
+                        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+                    })],
+                    depth_stencil_attachment: None,
+                    ..Default::default()
+                });
+                self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
+            }
+
+            for id in texture_delta.free {
+                self.egui_renderer.free_texture(&id);
+            }
+        }
+        context.queue.submit(std::iter::once(encoder.finish()));
     }
 }

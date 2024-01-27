@@ -54,9 +54,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
-            let render_data = RenderData { ctx: context, view, window };
-
-            renderer.render(render_data, &mut self.assets, &mut self.worlds);
+            renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
     }
 
