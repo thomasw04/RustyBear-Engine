@@ -12,17 +12,16 @@ For the asset management of the engine see [thomasw04/what](https://github.com/t
 - Native Metal (macOS), Vulkan (Linux + Windows) and DirectX 12 (Windows) support. Thanks to wgpu.
 - Thus runs out of the box on all three platforms.
 - Easy to use event/input handling system + game controller support.
-- Camera controller, Textures, Quad.
-- Skybox.
+- 2D renderering, supporting animations and ldtk world loading.
+- Rust scripting + hecs integration.
+- 3d skybox renderer.
 - Pipeline hashing.
 - Egui for simple gui creation.
-- WASM support. (Can be a little bit behind)
+- WASM support. (Currently broken)
 
 ## Main Features (Planned: Sorted from highest priority)
 - 2D/3D renderer.
-- Rust scripting
 - 3D audio engine.
-- LDtk support. 
 - LuaJit/Squirrel scripting language.
 - Physics engine.
 
@@ -30,7 +29,7 @@ For the asset management of the engine see [thomasw04/what](https://github.com/t
 
 1. Clone the repo 
 2. Install rustup, gcc and (libudev-dev, libasound2-dev only on linux) 
-3. Run ```cargo run --release```
+3. Run ```cargo run --release --example hello_world```
 4. Profit :)
 
 ## OR use the prebuilt binaries
