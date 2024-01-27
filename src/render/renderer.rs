@@ -2,35 +2,33 @@ use std::default::Default;
 
 use wgpu::TextureView;
 
-use crate::assets::assets::{AssetType, Assets};
-use crate::assets::buffer::{Indices, Vertices};
-use crate::assets::shader::{Shader, ShaderVariant};
-use crate::assets::texture::{Sampler, Texture2D};
-use crate::context::{Context, VisContext};
-use crate::event::{self, EventSubscriber};
-use crate::render::material::GenericMaterial;
-use crate::render::types::BindGroupEntry;
-use crate::utils::Guid;
+use crate::{
+    assets::{
+        assets::{AssetType, Assets},
+        buffer::Vertices,
+        shader::{Shader, ShaderVariant},
+    },
+    context::{Context, VisContext},
+    event::{self, EventSubscriber},
+    utils::Guid,
+};
 
 use super::camera::CameraBuffer;
 use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
 use super::material::SkyboxMaterial;
-use super::mesh::GenericMesh;
-use super::types::{BindGroup, FragmentShader, IndexBuffer, Vertex2D, VertexBuffer, VertexShader};
+use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
 
-pub struct Renderer<'a> {
+pub struct Renderer {
     framebuffer: Framebuffer,
     assets: Assets,
     pipelines: PipelineFactory,
-    material: GenericMaterial,
-    mesh: GenericMesh<'a>,
     camera_buffer: CameraBuffer,
     skybox: Option<SkyboxMaterial>,
     egui_renderer: egui_wgpu::Renderer,
 }
 
-impl<'a> EventSubscriber for Renderer<'a> {
+impl EventSubscriber for Renderer {
     fn on_event(&mut self, event: &event::Event, context: &mut Context) -> bool {
         match event {
             event::Event::Resized { width, height } => {
@@ -42,7 +40,7 @@ impl<'a> EventSubscriber for Renderer<'a> {
     }
 }
 
-impl<'a> Renderer<'a> {
+impl Renderer {
     pub fn new(context: &Context, mut assets: Assets) -> Self {
         //Renderable setup
         let sample_count = 4;
@@ -50,19 +48,6 @@ impl<'a> Renderer<'a> {
         let pipelines = PipelineFactory::new();
 
         let framebuffer = Framebuffer::new(context, sample_count);
-
-        let default_shader = assets.consume_asset(
-            AssetType::Shader(
-                Shader::new(
-                    &context.graphics,
-                    Guid::dead(),
-                    wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
-                    what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
-                )
-                .unwrap(),
-            ),
-            None::<&str>,
-        );
 
         let sky_shader = assets.consume_asset(
             AssetType::Shader(
@@ -77,9 +62,6 @@ impl<'a> Renderer<'a> {
             None::<&str>,
         );
 
-        let texture = Texture2D::error_texture(&context.graphics);
-        let sampler = Sampler::two_dim(&context.graphics);
-
         //TODO add capability to what for material asset type containing textures, shaders, etc.
         let sky_tex = assets.request_asset("data/skybox.fur", 0);
 
@@ -91,44 +73,7 @@ impl<'a> Renderer<'a> {
 
         let egui_renderer = Renderer::recreate_gui(context, sample_count);
 
-        let material = GenericMaterial::new(
-            &context.graphics,
-            default_shader,
-            default_shader,
-            &[Texture2D::layout_entry(0), Sampler::layout_entry(1)],
-            &[texture.group_entry(0), sampler.group_entry(1)],
-        );
-
-        const VERTICES: &[Vertex2D] = &[
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [0.0, 1.0] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [1.0, 0.0] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [0.0, 0.0] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [1.0, 1.0] },
-        ];
-
-        const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
-
-        let vertices =
-            Vertices::new(&context.graphics, bytemuck::cast_slice(VERTICES), Vertex2D::LAYOUT);
-
-        let indices = Indices::new(
-            &context.graphics,
-            bytemuck::cast_slice(INDICES),
-            wgpu::IndexFormat::Uint16,
-        );
-
-        let mesh = GenericMesh::new(vertices, indices, 6);
-
-        Renderer {
-            framebuffer,
-            assets,
-            pipelines,
-            material,
-            mesh,
-            camera_buffer,
-            skybox,
-            egui_renderer,
-        }
+        Renderer { framebuffer, assets, pipelines, camera_buffer, skybox, egui_renderer }
     }
 
     pub(crate) fn recreate_gui(context: &Context, sample_count: u32) -> egui_wgpu::Renderer {
@@ -213,52 +158,6 @@ impl<'a> Renderer<'a> {
                 render_pass.draw(0..3, 0..1);
             }
         }
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: match sample_count {
-                        1 => view,
-                        _ => &framebuffer_view,
-                    },
-                    resolve_target: match sample_count {
-                        1 => None,
-                        _ => Some(view),
-                    },
-                    ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
-                })],
-                depth_stencil_attachment: None,
-                ..Default::default()
-            });
-
-            let shader = ShaderVariant::Double(
-                assets.try_get(VertexShader::ptr(&self.material)).unwrap(),
-                assets.try_get(FragmentShader::ptr(&self.material)).unwrap(),
-            );
-
-            let config = RenderPipelineConfig::new(
-                &shader,
-                Some(&self.mesh),
-                &self.material,
-                &[CameraBuffer::layout(gpu)],
-            );
-
-            let pipeline = self.pipelines.get_or_create(gpu, &config);
-
-            render_pass.set_pipeline(pipeline);
-
-            BindGroup::groups(&self.material).iter().enumerate().for_each(|(i, group)| {
-                render_pass.set_bind_group(i as u32, group, &[]);
-            });
-
-            render_pass.set_bind_group(1, self.camera_buffer.bind_group(), &[]);
-            render_pass.set_vertex_buffer(0, VertexBuffer::buffer(&self.mesh).unwrap().slice(..));
-            let (buffer, format) = IndexBuffer::buffer(&self.mesh).unwrap();
-            render_pass.set_index_buffer(buffer.slice(..), format);
-            render_pass.draw_indexed(0..self.mesh.num_indices(), 0, 0..1);
-        }
-
         {
             let egui_ctx = context.egui.egui_ctx();
             let output = egui_ctx.end_frame();

@@ -1,23 +1,5 @@
 #![allow(non_snake_case)]
 
-use std::cell::Ref;
-
-use egui::lerp;
-use glam::Vec3;
-use rccell::RcCell;
-use winit::event::{ElementState, MouseButton};
-use winit::keyboard::KeyCode;
-
-use assets::assets::Assets;
-use event::{Event, EventSubscriber};
-use input::InputState;
-use render::camera::PerspectiveCamera;
-use render::renderer::Renderer;
-
-use crate::context::Context;
-use crate::core::{Application, ModuleStack};
-use crate::sound::AudioEngine;
-
 pub mod utils;
 #[macro_use]
 pub mod core;
@@ -32,6 +14,37 @@ pub mod logging;
 pub mod render;
 pub mod sound;
 pub mod window;
+
+use std::cell::Ref;
+
+//Re-exports
+pub use egui;
+pub use glam;
+pub use hecs;
+pub use log;
+pub use pollster;
+pub use rccell;
+pub use wgpu;
+pub use what;
+pub use winit;
+
+use assets::assets::Assets;
+use egui::lerp;
+use glam::Vec3;
+use input::InputState;
+
+use rccell::RcCell;
+use render::{camera::PerspectiveCamera, renderer::Renderer};
+
+use crate::{context::Context, core::Application, sound::AudioEngine};
+
+use event::{Event, EventSubscriber};
+use winit::{
+    event::{ElementState, MouseButton},
+    keyboard::KeyCode,
+};
+
+use crate::core::ModuleStack;
 
 struct MyHandler {
     audio: AudioEngine,
@@ -69,7 +82,7 @@ impl MyHandler {
 
 pub struct RustyRuntime<'a> {
     stack: ModuleStack<'a>,
-    renderer: RcCell<Renderer<'a>>,
+    renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
     demo_window: egui_demo_lib::DemoWindows,
 }
