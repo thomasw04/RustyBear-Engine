@@ -2,7 +2,7 @@ use wgpu::{RenderPassDescriptor, TextureView};
 
 use crate::{
     assets::{
-        assets::{Assets, AssetType},
+        assets::{AssetType, Assets},
         buffer::{Indices, Vertices},
         shader::{Shader, ShaderVariant},
         texture::{Sampler, Texture2D},
@@ -62,7 +62,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/sprite.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                    .unwrap(),
+                .unwrap(),
             ),
             None::<&str>,
         );
@@ -75,7 +75,7 @@ impl<'a> Renderer<'a> {
                     wgpu::ShaderSource::Wgsl(include_str!("../assets/skybox.wgsl").into()),
                     what::ShaderStages::VERTEX | what::ShaderStages::FRAGMENT,
                 )
-                    .unwrap(),
+                .unwrap(),
             ),
             None::<&str>,
         );
@@ -177,11 +177,11 @@ impl<'a> Renderer<'a> {
             label: Some("Render Encoder"),
         });
 
-        let output = context.egui.end_frame(Some(window));
+        let output = context.egui.egui_ctx().end_frame();
         let paint_jobs = context
             .egui
-            .context()
-            .tessellate(output.shapes, context.egui.context().pixels_per_point());
+            .egui_ctx()
+            .tessellate(output.shapes, context.egui.egui_ctx().pixels_per_point());
         let texture_delta = output.textures_delta;
 
         {

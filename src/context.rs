@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use sysinfo::{System, SystemExt};
-use wgpu::{TextureFormatFeatureFlags, PresentMode};
+use wgpu::{rwh::{HasDisplayHandle, HasRawDisplayHandle}, PresentMode, TextureFormatFeatureFlags};
 use winit::{event::{WindowEvent, Event}, event_loop::EventLoopWindowTarget, dpi::PhysicalSize, keyboard::{Key, NamedKey}};
 use crate::{window::Window, core::{ModuleStack, Application}, utils::Timestep, event, input::InputState, environment::config::Config};
 
@@ -10,23 +10,23 @@ pub struct Features {
 } 
 
 pub struct VisContext {
-    pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub format: wgpu::TextureFormat,
 }
 
-pub struct Context {
+pub struct Context<'a> {
     pub graphics: Arc<VisContext>,
+    pub surface: wgpu::Surface<'a>,
     pub surface_config: wgpu::SurfaceConfiguration,
     pub features: Features,
-    pub egui: egui_winit_platform::Platform,
+    pub egui: egui_winit::State,
     pub config: Config,
     pub sysinfo: System,
 }
 
-impl<'a> Context {
-    pub async fn new(window: &mut Window, config: Config) -> Context {
+impl<'a> Context<'a> {
+    pub async fn new(window: Arc<winit::window::Window>, config: Config) -> Context<'a> {
         let sysinfo = System::new_with_specifics(sysinfo::RefreshKind::new().with_memory());
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor 
@@ -36,9 +36,7 @@ impl<'a> Context {
             ..Default::default()
         });
 
-        let surface = unsafe {
-            instance.create_surface(&window.native)
-        }.unwrap();
+        let surface: wgpu::Surface<'static> = instance.create_surface(window.clone()).unwrap();
 
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
@@ -56,11 +54,12 @@ impl<'a> Context {
         let surface_config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
-            width: window.native.inner_size().width,
-            height: window.native.inner_size().height,
+            width: window.inner_size().width,
+            height: window.inner_size().height,
             present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: capabilities.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
 
         let texture_features = adapter.get_texture_format_features(format).flags;
@@ -68,8 +67,8 @@ impl<'a> Context {
 
         let (device, queue) = adapter.request_device(
             &wgpu::DeviceDescriptor {
-                features: Context::activated_features(adapter.features()),
-                limits: if cfg!(target_arch = "wasm32") {
+                required_features: Context::activated_features(adapter.features()),
+                required_limits: if cfg!(target_arch = "wasm32") {
                     wgpu::Limits::downlevel_webgl2_defaults()
                 } else {
                     wgpu::Limits::default()
@@ -86,16 +85,12 @@ impl<'a> Context {
 
         surface.configure(&device, &surface_config);
 
-        let egui = egui_winit_platform::Platform::new(egui_winit_platform::PlatformDescriptor
-        {
-            physical_width: window.native.inner_size().width, 
-            physical_height: window.native.inner_size().height, 
-            scale_factor: window.native.scale_factor(), 
-            font_definitions: egui::FontDefinitions::default(),
-            style: Default::default(),
-        });
+        //Create new egui context.
+        let egui = egui::Context::default();
+        let viewport_id = egui.viewport_id();
+        let egui = egui_winit::State::new(egui, viewport_id, &window, Some(window.scale_factor() as f32), None);
 
-        Context { graphics: Arc::new(VisContext { surface, device, queue, format }), surface_config, features, egui, config, sysinfo }
+        Context { graphics: Arc::new(VisContext { device, queue, format }), surface, surface_config, features, egui, config, sysinfo }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features
@@ -122,14 +117,14 @@ impl<'a> Context {
 
         let _ = window.event_loop.run(enclose! { (input_state) move |event, window_target|
         {
-            self.egui.handle_event(&event);
-
             let _handled = match event
             {
                 Event::WindowEvent { window_id, ref event }
 
                 if window_id == window.native.id() => 
                 {
+                    self.egui.on_window_event(&window.native, &event);
+
                     match event {
                         WindowEvent::Resized(new_size) => {
                             self.resize(*new_size);
@@ -139,7 +134,7 @@ impl<'a> Context {
                         },*/
                         WindowEvent::RedrawRequested => {
                             app.update(ts.step_fwd(), input_state.borrow(), &mut self);
-                            self.egui.update_time(ts.total_secs());
+                            self.egui.take_egui_input(&window.native);
 
                             match self.render(&window.native, &mut app) {
                                 Ok(_) => {}
@@ -179,18 +174,18 @@ impl<'a> Context {
             self.surface_config.width = new_size.width;
             self.surface_config.height = new_size.height;
 
-            self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
+            self.surface.configure(&self.graphics.device, &self.surface_config);
         }
     }
 
     fn render(&mut self, window: &winit::window::Window, app: &mut impl Application<'a>) -> Result<(), wgpu::SurfaceError>
     {
-        let output = self.graphics.surface.get_current_texture()?;
+        let output = self.surface.get_current_texture()?;
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         //self.egui.begin_frame();
-        app.gui_render(&view, self, &self.egui.context());
+        app.gui_render(&view, self);
 
         app.render(&view, self, window);
 
@@ -205,7 +200,7 @@ impl<'a> Context {
             false => self.surface_config.present_mode = PresentMode::AutoNoVsync,
         }
        
-        self.graphics.surface.configure(&self.graphics.device, &self.surface_config);
+        self.surface.configure(&self.graphics.device, &self.surface_config);
     }
 
     pub fn vsync(&self) -> bool

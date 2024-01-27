@@ -15,16 +15,14 @@ fn main() {
 
     //Create the config and init the example project.
     let mut config = Config::new(None);
-    config
-        .find_project(Path::new("examples/hello_world"))
-        .unwrap();
+    config.find_project(Path::new("examples/hello_world")).unwrap();
 
     //Create the window from the config and create the context.
     let mut window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 
-    let context = pollster::block_on(Context::new(&mut window, config));
+    let context = pollster::block_on(Context::new(window.native.clone(), config));
 
     //Create and init the application
     let myapp = RustyRuntime::new(&context);

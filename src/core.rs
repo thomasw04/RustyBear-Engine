@@ -27,9 +27,7 @@ pub trait Application<'a> {
     fn render(
         &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
     );
-    fn gui_render(
-        &mut self, view: &wgpu::TextureView, context: &mut Context, gui_context: &egui::Context,
-    );
+    fn gui_render(&mut self, view: &wgpu::TextureView, context: &mut Context);
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
     fn quit(&mut self);
 
