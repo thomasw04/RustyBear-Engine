@@ -51,10 +51,7 @@ impl<'a> Application<'a> for LDTKApp<'a> {
         }
     }
 
-    fn gui_render(
-        &mut self, _view: &wgpu::TextureView, _context: &mut Context, _gui_context: &egui::Context,
-    ) {
-    }
+    fn gui_render(&mut self, _view: &wgpu::TextureView, _context: &mut Context) {}
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
         let mut cam = self.camera.borrow_mut();
@@ -127,11 +124,11 @@ fn main() {
     config.find_project(Path::new("examples/ldtk")).unwrap();
 
     //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
+    let window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 
-    let context = pollster::block_on(Context::new(&mut window, config));
+    let context = pollster::block_on(Context::new(window.native.clone(), config));
 
     //Create and init the application
     let myapp = LDTKApp::new(&context);
