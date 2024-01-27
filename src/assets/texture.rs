@@ -230,7 +230,7 @@ impl Texture2D {
         Texture2D { texture, view }
     }
 
-    pub fn error_texture(context: &VisContext) -> &Texture2D {
+    pub fn error_texture<'a>(context: &'a VisContext) -> &'a Texture2D {
         static ERROR_TEXTURE: OnceCell<Texture2D> = OnceCell::new();
 
         ERROR_TEXTURE.get_or_init(|| {

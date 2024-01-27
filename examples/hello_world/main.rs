@@ -22,7 +22,7 @@ fn main() {
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 
-    let context = pollster::block_on(Context::new(&mut window, config));
+    let context = pollster::block_on(Context::new(window.native.clone(), config));
 
     //Create and init the application
     let myapp = RustyRuntime::new(&context);

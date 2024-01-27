@@ -2,15 +2,13 @@
 
 use std::{cell::Ref, path::Path};
 
-use egui::RichText;
 use egui::{Color32, FontId};
+use egui::RichText;
 use glam::{Vec2, Vec3, Vec4};
 use hecs::World;
 use rccell::RcCell;
 use winit::keyboard::KeyCode;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
 use RustyBear_Engine::{
     assets::assets::Assets,
     context::{Context, VisContext},
@@ -28,6 +26,8 @@ use RustyBear_Engine::{
     utils::Timestep,
     window::Window,
 };
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
@@ -58,10 +58,8 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
         }
     }
 
-    fn gui_render(
-        &mut self, _view: &wgpu::TextureView, _context: &mut Context, ctx: &egui::Context,
-    ) {
-        egui::Area::new("my_area").fixed_pos(egui::pos2(32.0, 32.0)).show(ctx, |ui| {
+    fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
+        egui::Area::new("my_area").fixed_pos(egui::pos2(32.0, 32.0)).show(context.egui.egui_ctx(), |ui| {
             ui.label(
                 RichText::new("Large text")
                     .color(Color32::from_rgb(0, 0, 1))
@@ -201,7 +199,7 @@ fn main() {
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 
-    let context = pollster::block_on(Context::new(&mut window, config));
+    let context = pollster::block_on(Context::new(window.native.clone(), config));
 
     //Create and init the application
     let myapp = TwoDimApp::new(&context);

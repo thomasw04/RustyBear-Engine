@@ -113,10 +113,8 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
         }
     }
 
-    fn gui_render(
-        &mut self, _view: &wgpu::TextureView, _context: &mut Context, gui_context: &egui::Context,
-    ) {
-        self.demo_window.ui(gui_context);
+    fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
+        self.demo_window.ui(context.egui.egui_ctx());
     }
 
     fn update(
@@ -207,21 +205,4 @@ impl<'a> RustyRuntime<'a> {
 
         RustyRuntime { stack, renderer, camera, demo_window: egui_demo_lib::DemoWindows::default() }
     }
-}
-
-pub fn example_app() {
-    logging::init();
-    println!();
-
-    let config = Config::new(None);
-
-    //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
-    let context = pollster::block_on(Context::new(&mut window, config));
-
-    //Create and init the application
-    let myapp = RustyRuntime::new(&context);
-
-    //Move my app and window into the context. And run the app.
-    context.run(myapp, window);
 }
