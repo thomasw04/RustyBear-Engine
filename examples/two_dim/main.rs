@@ -5,7 +5,7 @@ use std::path::Path;
 
 use egui::{Color32, FontId, RichText};
 use glam::{Vec2, Vec3, Vec4};
-use hecs::World;
+use hecs::{Entity, World};
 use rccell::RcCell;
 use winit::keyboard::KeyCode;
 
@@ -15,7 +15,7 @@ use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
 use RustyBear_Engine::entities::entities::Worlds;
-use RustyBear_Engine::entities::script::{Scriptable, Scripts};
+use RustyBear_Engine::entities::script::{ScriptHandle, Scriptable, Scripts};
 use RustyBear_Engine::entities::sprite::Sprite;
 use RustyBear_Engine::entities::transform2d::Transform2D;
 use RustyBear_Engine::environment::config::Config;
@@ -108,6 +108,7 @@ impl Scriptable for Player {
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
         world: &mut hecs::World, input_state: &Ref<InputState>,
+        new_scripts: &mut Vec<(ScriptHandle, Entity)>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
             transform.add_pos(Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
