@@ -52,6 +52,8 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
+            renderer.update_viewport(self.camera.borrow_mut().viewport());
+
             renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
     }
@@ -177,10 +179,6 @@ impl<'a> TwoDimApp<'a> {
 
         let camera = RcCell::new(OrthographicCamera::default());
         stack.subscribe(EventType::Layer, camera.clone());
-
-        camera.borrow_mut().set_aspect_ratio(
-            context.surface_config.width as f32 / context.surface_config.height as f32,
-        );
 
         TwoDimApp { stack, assets, scripts, worlds, renderer, camera }
     }

@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+use egui::viewport;
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use once_cell::sync::OnceCell;
 use wgpu::util::DeviceExt;
@@ -20,10 +21,69 @@ pub const OPENGL_TO_WGPU: glam::Mat4 = glam::mat4
     Vec4::new(0.0, 0.0, 0.0, 1.5),
 );
 
+struct AspectMgr {
+    width: f32,
+    height: f32,
+    fixed_aspect_ratio: Option<f32>,
+}
+
+impl AspectMgr {
+    pub fn new(width: f32, height: f32, fixed_aspect_ratio: Option<f32>) -> Self {
+        AspectMgr { width, height, fixed_aspect_ratio }
+    }
+
+    pub fn viewport(&self) -> (f32, f32, f32, f32) {
+        let width = self.width;
+        let height = self.height;
+        let fixed_aspect_ratio = self.fixed_aspect_ratio;
+
+        //If there is a fixed aspect ratio, snap the width and height to it.
+        //Then center the viewport in the middle of the screen.
+        let (width, height) = match fixed_aspect_ratio {
+            Some(aspect_ratio) => {
+                let aspect_ratio = aspect_ratio as f32;
+                let screen_aspect_ratio = width as f32 / height as f32;
+                if screen_aspect_ratio > aspect_ratio {
+                    let width = height as f32 * aspect_ratio;
+                    (width, height)
+                } else {
+                    let height = width as f32 / aspect_ratio;
+                    (width, height)
+                }
+            }
+            None => (width, height),
+        };
+
+        let x = (width - self.width).abs() / 2.0;
+        let y = (height - self.height).abs() / 2.0;
+        (x, y, width, height)
+    }
+
+    pub fn aspect_ratio(&self) -> f32 {
+        match self.fixed_aspect_ratio {
+            Some(aspect_ratio) => aspect_ratio,
+            None => self.width / self.height,
+        }
+    }
+
+    pub fn width(&self) -> f32 {
+        self.width
+    }
+
+    pub fn height(&self) -> f32 {
+        self.height
+    }
+
+    pub fn set_dims(&mut self, width: f32, height: f32) {
+        self.width = width;
+        self.height = height;
+    }
+}
+
 pub struct OrthographicCamera {
     position: Vec2,
     rotation: f32,
-    aspect_ratio: f32,
+    aspect_mgr: AspectMgr,
     zoom_level: f32,
     near: f32,
     far: f32,
@@ -34,10 +94,12 @@ pub struct OrthographicCamera {
 
 impl Default for OrthographicCamera {
     fn default() -> Self {
+        let aspect_mgr = AspectMgr::new(1280.0, 720.0, Some(16.0 / 9.0));
+
         OrthographicCamera {
             position: Vec2::new(0.0, 0.0),
             rotation: 0.0,
-            aspect_ratio: 1280.0 / 720.0,
+            aspect_mgr,
             zoom_level: 1.0,
             near: 0.1,
             far: 100.0,
@@ -52,7 +114,7 @@ impl EventSubscriber for OrthographicCamera {
     fn on_event(&mut self, event: &crate::event::Event, _context: &mut Context) -> bool {
         match event {
             event::Event::Resized { width, height } => {
-                self.aspect_ratio = *width as f32 / *height as f32;
+                self.aspect_mgr.set_dims(*width as f32, *height as f32);
                 self.dirty = true;
                 false
             }
@@ -87,7 +149,7 @@ impl OrthographicCamera {
     }
 
     fn calc_view_projection(&mut self) {
-        self.set_projection(self.aspect_ratio, self.zoom_level, self.near, self.far);
+        self.set_projection(self.aspect_mgr.aspect_ratio(), self.zoom_level, self.near, self.far);
         self.set_view(self.position, self.rotation);
         self.dirty = false;
     }
@@ -107,6 +169,10 @@ impl OrthographicCamera {
         let rotation = glam::Mat4::from_rotation_z(rotation * PI / 180.0);
         self.view = rotation * glam::Mat4::from_translation(Vec3::new(position.x, position.y, 1.0));
         self.view = self.view.inverse();
+    }
+
+    pub fn viewport(&self) -> (f32, f32, f32, f32) {
+        self.aspect_mgr.viewport()
     }
 
     pub fn position(&self) -> Vec2 {
@@ -146,11 +212,11 @@ impl OrthographicCamera {
     }
 
     pub fn aspect_ratio(&self) -> f32 {
-        self.aspect_ratio
+        self.aspect_mgr.aspect_ratio()
     }
 
-    pub fn set_aspect_ratio(&mut self, aspect_ratio: f32) {
-        self.aspect_ratio = aspect_ratio;
+    pub fn set_dim(&mut self, width: f32, height: f32) {
+        self.aspect_mgr.set_dims(width, height);
         self.dirty = true;
     }
 
@@ -334,6 +400,7 @@ impl PerspectiveCamera {
 
 pub struct CameraBuffer {
     name: String,
+    viewport: (f32, f32, f32, f32),
     bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
     uniform: CameraUniform,
@@ -359,7 +426,9 @@ impl CameraBuffer {
             }],
         });
 
-        CameraBuffer { name: String::from(name), bind_group, camera_buffer, uniform }
+        let viewport = (0.0, 0.0, 0.0, 0.0);
+
+        CameraBuffer { name: String::from(name), bind_group, camera_buffer, uniform, viewport }
     }
 
     //TODO: Use some kind of staging buffer, for performance
@@ -368,8 +437,16 @@ impl CameraBuffer {
         context.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 
+    pub fn update_viewport(&mut self, viewport: (f32, f32, f32, f32)) {
+        self.viewport = viewport;
+    }
+
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn viewport(&self) -> (f32, f32, f32, f32) {
+        self.viewport
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {

@@ -3,17 +3,16 @@ use crate::context::Context;
 pub struct Framebuffer {
     texture: wgpu::Texture,
     sample_count: u32,
+    width: f32,
+    height: f32,
 }
 
 impl Framebuffer {
-    pub fn new(context: &Context, sample_count: u32) -> Self {
+    pub fn new(context: &Context, sample_count: u32, fixed_aspect_ratio: Option<f32>) -> Self {
+        let (width, height) = (context.surface_config.width, context.surface_config.height);
         let texture = context.graphics.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),
-            size: wgpu::Extent3d {
-                width: context.surface_config.width,
-                height: context.surface_config.height,
-                depth_or_array_layers: 1,
-            },
+            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count,
             dimension: wgpu::TextureDimension::D2,
@@ -22,12 +21,14 @@ impl Framebuffer {
             view_formats: &context.surface_config.view_formats,
         });
 
-        Framebuffer { texture, sample_count }
+        Framebuffer { texture, sample_count, width: width as f32, height: height as f32 }
     }
 
     pub fn resize(&mut self, context: &Context, width: u32, height: u32) {
         if width > 0 && height > 0 {
             let samples = self.texture.sample_count();
+            self.width = width as f32;
+            self.height = height as f32;
             self.create_buffer(context, samples, width, height);
         }
     }
