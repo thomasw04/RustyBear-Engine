@@ -145,7 +145,7 @@ impl Worlds {
                 world.spawn((transform, fanta));
             }
 
-            for entity in layer.entity_instances.iter() {}
+            for _entity in layer.entity_instances.iter() {}
 
             layer_z -= layer_z_coord_offset;
         }

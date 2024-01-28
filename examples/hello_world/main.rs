@@ -19,7 +19,7 @@ fn main() {
     config.find_project(Path::new("examples/hello_world")).unwrap();
 
     //Create the window from the config and create the context.
-    let mut window = Window::new("{}".to_string());
+    let window = Window::new("{}".to_string());
     window.native.set_ime_allowed(true);
     window.native.set_cursor_visible(false);
 

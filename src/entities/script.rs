@@ -1,17 +1,17 @@
 use std::cell::Ref;
 
 use hashbrown::HashMap;
+use hecs::Entity;
 
 use crate::input::InputState;
 use crate::{context::VisContext, utils::Timestep};
-
-use super::entities;
 
 pub trait Scriptable {
     fn on_spawn(&mut self, context: &VisContext, entity: hecs::Entity, world: &mut hecs::World);
     fn tick(
         &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
         world: &mut hecs::World, input_state: &Ref<InputState>,
+        new_scripts: &mut Vec<(ScriptHandle, Entity)>,
     );
     fn on_destroy(&mut self, context: &VisContext, entity: hecs::Entity, world: &mut hecs::World);
 }
@@ -68,10 +68,14 @@ impl Scripts {
         &mut self, context: &VisContext, delta: &Timestep, world: &mut hecs::World,
         input_state: &Ref<InputState>,
     ) {
+        let mut new_scripts: Vec<(ScriptHandle, Entity)> = Vec::new();
         for (script, entities) in self.scripts.iter_mut() {
             for entity in entities.iter() {
-                script.tick(context, *entity, delta, world, &input_state);
+                script.tick(context, *entity, delta, world, &input_state, &mut new_scripts);
             }
+        }
+        for (s, e) in new_scripts.into_iter() {
+            self.attach(s, e);
         }
     }
 
