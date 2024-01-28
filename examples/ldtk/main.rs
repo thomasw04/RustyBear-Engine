@@ -52,7 +52,7 @@ impl<'a> Application<'a> for LDTKApp<'a> {
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, _context: &mut Context) {}
 
-    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
+    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, _context: &mut Context) {
         let mut cam = self.camera.borrow_mut();
 
         if input_state.is_key_down(&KeyCode::KeyD) {

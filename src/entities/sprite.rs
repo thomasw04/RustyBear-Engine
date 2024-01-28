@@ -3,7 +3,7 @@ use crate::assets::buffer::{Indices, UniformBuffer, Vertices};
 use crate::assets::shader::Shader;
 use crate::assets::texture::{Sampler, Texture2D};
 use crate::context::VisContext;
-use crate::hecs_hierarchy::Hierarchy;
+
 use crate::render::material::GenericMaterial;
 use crate::render::mesh::GenericMesh;
 use crate::render::types::{BindGroupEntry, Vertex2D};

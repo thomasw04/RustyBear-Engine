@@ -106,9 +106,9 @@ impl Scriptable for Player {
     fn on_spawn(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
 
     fn tick(
-        &mut self, context: &VisContext, entity: hecs::Entity, delta: &Timestep,
-        world: &mut hecs::World, input_state: &Ref<InputState>,
-        new_scripts: &mut Vec<(ScriptHandle, Entity)>,
+        &mut self, _context: &VisContext, entity: hecs::Entity, delta: &Timestep,
+        world: &mut hecs::World, _input_state: &Ref<InputState>,
+        _new_scripts: &mut Vec<(ScriptHandle, Entity)>,
     ) {
         if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
             transform.add_pos(Vec3::new(0.01 * delta.norm(), 0.0, 0.0));
