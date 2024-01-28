@@ -16,6 +16,7 @@ pub trait Scriptable {
     fn on_destroy(&mut self, context: &VisContext, entity: hecs::Entity, world: &mut hecs::World);
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ScriptHandle {
     id: u64,
 }
@@ -71,7 +72,7 @@ impl Scripts {
         let mut new_scripts: Vec<(ScriptHandle, Entity)> = Vec::new();
         for (script, entities) in self.scripts.iter_mut() {
             for entity in entities.iter() {
-                script.tick(context, *entity, delta, world, &input_state, &mut new_scripts);
+                script.tick(context, *entity, delta, world, input_state, &mut new_scripts);
             }
         }
         for (s, e) in new_scripts.into_iter() {
