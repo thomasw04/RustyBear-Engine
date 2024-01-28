@@ -19,10 +19,10 @@ fn vertex_main(
         out.texture_coords = vec2<f32>(0.0, 0.0);
     } else if mesh.vertex_index == 1u {
         out.clip_position = vec4<f32>(3.0, -1.0, 0.0, 1.0); // bottom right
-        out.texture_coords = vec2<f32>(3.0, 0.0);
+        out.texture_coords = vec2<f32>(2.0, 0.0);
     } else {
         out.clip_position = vec4<f32>(-1.0, 3.0, 0.0, 1.0); // top left
-        out.texture_coords = vec2<f32>(0.0, 3.0);
+        out.texture_coords = vec2<f32>(0.0, 2.0);
     }
     
     return out;
