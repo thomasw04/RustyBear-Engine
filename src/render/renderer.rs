@@ -47,7 +47,7 @@ impl Renderer {
 
         let pipelines = PipelineFactory::new();
 
-        let framebuffer = Framebuffer::new(context, sample_count);
+        let framebuffer = Framebuffer::new(context, sample_count, None);
 
         let sky_shader = assets.consume_asset(
             AssetType::Shader(

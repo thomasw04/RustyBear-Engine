@@ -53,6 +53,8 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
                 self.camera.borrow_mut().view_projection().to_cols_array_2d(),
             );
 
+            renderer.update_viewport(self.camera.borrow_mut().viewport());
+
             renderer.render(&mut self.assets, &mut self.worlds, context, view, window);
         }
     }
@@ -172,12 +174,14 @@ impl<'a> AnimatedApp<'a> {
         let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
         stack.subscribe(EventType::Layer, renderer.clone());
 
+        let white = assets.request_asset("data/white.fur", 0);
+        assets.wait_for(&white.into());
+        let white = assets.try_get(&white).unwrap();
+
+        renderer.borrow_mut().set_background(&context.graphics, white, Vec4::ONE);
+
         let camera = RcCell::new(OrthographicCamera::default());
         stack.subscribe(EventType::Layer, camera.clone());
-
-        camera.borrow_mut().set_aspect_ratio(
-            context.surface_config.width as f32 / context.surface_config.height as f32,
-        );
 
         AnimatedApp { stack, assets, scripts, worlds, renderer, camera }
     }

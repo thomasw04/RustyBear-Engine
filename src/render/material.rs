@@ -1,3 +1,7 @@
+use glam::Vec4;
+
+use crate::assets::assets::BACKGROUND_SHADER;
+use crate::assets::texture::Texture2D;
 use crate::render::types::BindGroupEntry;
 
 use crate::{
@@ -148,6 +152,102 @@ impl VertexShader for GenericMaterialLayout {
 impl MaterialLayout for GenericMaterialLayout {
     fn base_config(&self) -> Option<PipelineBaseConfig> {
         None
+    }
+}
+
+pub struct Background2DMaterial {
+    //Shader
+    vertex: Ptr<Shader>,
+    fragment: Ptr<Shader>,
+
+    //Bind group layout and bind group
+    bind_layout: [wgpu::BindGroupLayout; 1],
+    bind_group: [wgpu::BindGroup; 1],
+
+    //Buffer and uniform
+    buffer: UniformBuffer,
+}
+
+impl Background2DMaterial {
+    pub fn new(context: &VisContext, texture: &Texture2D, tint: Vec4) -> Self {
+        let mut buffer = UniformBuffer::new(context, std::mem::size_of::<[f32; 4]>());
+        buffer.update_buffer(context, bytemuck::cast_slice(&tint.to_array()));
+
+        let bind_layout =
+            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                entries: &[
+                    UniformBuffer::layout_entry(0),
+                    Texture2D::layout_entry(1),
+                    Sampler::layout_entry(2),
+                ],
+            });
+
+        let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &bind_layout,
+            entries: &[
+                buffer.group_entry(0),
+                texture.group_entry(1),
+                Sampler::two_dim(context).group_entry(2),
+            ],
+        });
+
+        Background2DMaterial {
+            vertex: *BACKGROUND_SHADER,
+            fragment: *BACKGROUND_SHADER,
+            bind_layout: [bind_layout],
+            bind_group: [bind_group],
+            buffer,
+        }
+    }
+
+    pub fn update_texture(&mut self, context: &VisContext, texture: &Texture2D) {
+        self.bind_group[0] = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &self.bind_layout[0],
+            entries: &[
+                self.buffer.group_entry(0),
+                texture.group_entry(1),
+                Sampler::two_dim(context).group_entry(2),
+            ],
+        });
+    }
+
+    pub fn update_tint(&mut self, context: &VisContext, tint: Vec4) {
+        self.buffer.update_buffer(context, bytemuck::cast_slice(&tint.to_array()));
+    }
+}
+
+impl MaterialLayout for Background2DMaterial {
+    fn base_config(&self) -> Option<PipelineBaseConfig> {
+        None
+    }
+}
+
+impl Material for Background2DMaterial {}
+
+impl BindLayout for Background2DMaterial {
+    fn layouts(&self) -> &[wgpu::BindGroupLayout] {
+        &self.bind_layout
+    }
+}
+
+impl BindGroup for Background2DMaterial {
+    fn groups(&self) -> &[wgpu::BindGroup] {
+        &self.bind_group
+    }
+}
+
+impl FragmentShader for Background2DMaterial {
+    fn ptr(&self) -> &Ptr<Shader> {
+        &self.fragment
+    }
+}
+
+impl VertexShader for Background2DMaterial {
+    fn ptr(&self) -> &Ptr<Shader> {
+        &self.vertex
     }
 }
 
