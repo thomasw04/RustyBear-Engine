@@ -36,7 +36,7 @@ egui-wgpu = { git = "https://github.com/emilk/egui.git", features = ["winit"] }
 egui-winit = { git = "https://github.com/emilk/egui.git", features = ["clipboard"] }
 egui_demo_lib = { git = "https://github.com/emilk/egui.git" }
 what = { git = "https://github.com/thomasw04/what.git" }
-sysinfo = "0.29.11"
+sysinfo = "0.30.5"
 rand = "0.8.5"
 indicatif = "0.17.7"
 indicatif-log-bridge = "0.2.2"
