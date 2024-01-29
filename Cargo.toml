@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 cfg-if = "1"
 bimap = { version = "0.6.3", features = ["serde"] }
-env_logger = "0.10.1"
+env_logger = "0.11.1"
 gilrs = "0.10.4"
 log = "0.4.18"
 pollster = "0.3.0"
