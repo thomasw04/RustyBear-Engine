@@ -8,7 +8,7 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
-    pub fn new(context: &Context, sample_count: u32, fixed_aspect_ratio: Option<f32>) -> Self {
+    pub fn new(context: &Context, sample_count: u32) -> Self {
         let (width, height) = (context.surface_config.width, context.surface_config.height);
         let texture = context.graphics.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),

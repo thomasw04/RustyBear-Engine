@@ -266,16 +266,14 @@ impl GenericMaterial {
         context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>,
         entries: &[wgpu::BindGroupLayoutEntry], groups: &[wgpu::BindGroupEntry],
     ) -> Self {
-        let bind_layout =
-            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                entries: &entries,
-            });
+        let bind_layout = context
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: None, entries });
 
         let bind_group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_layout,
-            entries: &groups,
+            entries: groups,
         });
 
         GenericMaterial { vertex, fragment, bind_layout: [bind_layout], bind_group: [bind_group] }

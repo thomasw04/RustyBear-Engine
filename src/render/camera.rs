@@ -1,6 +1,5 @@
 use std::f32::consts::PI;
 
-use egui::viewport;
 use glam::{Mat4, Vec2, Vec3, Vec4};
 use once_cell::sync::OnceCell;
 use wgpu::util::DeviceExt;
@@ -41,13 +40,12 @@ impl AspectMgr {
         //Then center the viewport in the middle of the screen.
         let (width, height) = match fixed_aspect_ratio {
             Some(aspect_ratio) => {
-                let aspect_ratio = aspect_ratio as f32;
-                let screen_aspect_ratio = width as f32 / height as f32;
+                let screen_aspect_ratio = width / height;
                 if screen_aspect_ratio > aspect_ratio {
-                    let width = height as f32 * aspect_ratio;
+                    let width = height * aspect_ratio;
                     (width, height)
                 } else {
-                    let height = width as f32 / aspect_ratio;
+                    let height = width / aspect_ratio;
                     (width, height)
                 }
             }

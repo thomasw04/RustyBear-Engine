@@ -153,7 +153,7 @@ impl<'a> Context<'a> {
 
                 if window_id == window.native.id() =>
                 {
-                    let  _ = self.egui.on_window_event(&window.native, &event);
+                    let  _ = self.egui.on_window_event(&window.native, event);
 
                     match event {
                         WindowEvent::Resized(new_size) => {
@@ -217,7 +217,7 @@ impl<'a> Context<'a> {
         egui_winit::update_viewport_info(&mut info, self.egui.egui_ctx(), window);
         let context = self.egui.egui_ctx().clone();
         self.egui.egui_input_mut().viewports.insert(context.viewport_id(), info);
-        let input = self.egui.take_egui_input(&window);
+        let input = self.egui.take_egui_input(window);
         self.egui.egui_ctx().begin_frame(input);
         app.gui_render(&view, self);
 

@@ -13,7 +13,6 @@ use crate::utils::{Guid, GuidGenerator};
 
 use std::any::Any;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
 
@@ -68,7 +67,7 @@ impl<T> Hash for Ptr<T> {
 
 impl<T> Clone for Ptr<T> {
     fn clone(&self) -> Self {
-        Ptr { guid: self.guid, phantom: PhantomData }
+        *self
     }
 }
 
@@ -151,8 +150,8 @@ impl Assets {
                                 let _ = out_sender.send((guid, Ok(asset)));
                                 log::info!("Loaded asset: {}", path);
                             } else {
-                                let _ =
-                                    out_sender.send((guid, Err(format!("Failed to load asset."))));
+                                let _ = out_sender
+                                    .send((guid, Err("Failed to load asset.".to_string())));
                             }
                         });
                     }
@@ -164,7 +163,7 @@ impl Assets {
             }
         });
 
-        return assets;
+        assets
     }
 
     fn register_static(&mut self, context: &VisContext) {

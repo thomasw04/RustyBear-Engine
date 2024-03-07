@@ -46,9 +46,9 @@ impl<'a> Sprite<'a> {
         };
 
         const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
-        let vertices = Vertices::new(&context, bytemuck::cast_slice(&vertices), Vertex2D::LAYOUT);
+        let vertices = Vertices::new(context, bytemuck::cast_slice(&vertices), Vertex2D::LAYOUT);
         let indices =
-            Indices::new(&context, bytemuck::cast_slice(&INDICES), wgpu::IndexFormat::Uint16);
+            Indices::new(context, bytemuck::cast_slice(INDICES), wgpu::IndexFormat::Uint16);
         let mesh = GenericMesh::new(vertices, indices, 6);
 
         let material = GenericMaterial::new(

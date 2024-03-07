@@ -47,7 +47,7 @@ impl Renderer {
 
         let pipelines = PipelineFactory::new();
 
-        let framebuffer = Framebuffer::new(context, sample_count, None);
+        let framebuffer = Framebuffer::new(context, sample_count);
 
         let sky_shader = assets.consume_asset(
             AssetType::Shader(
@@ -172,7 +172,7 @@ impl Renderer {
             self.egui_renderer.update_buffers(
                 &gpu.device,
                 &gpu.queue,
-                &mut (&mut encoder),
+                &mut (encoder),
                 &paint_jobs,
                 &screen_descriptor,
             );

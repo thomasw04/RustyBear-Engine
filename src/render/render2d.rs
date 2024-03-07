@@ -2,10 +2,10 @@ use glam::Vec4;
 use wgpu::TextureView;
 use winit::window::Window;
 
-use crate::assets::assets::{Assets, BACKGROUND_SHADER, SPRITE_SHADER};
-use crate::assets::buffer::{UniformBuffer, Vertices};
+use crate::assets::assets::{Assets, BACKGROUND_SHADER};
+use crate::assets::buffer::Vertices;
 use crate::assets::shader::ShaderVariant;
-use crate::assets::texture::{Sampler, Texture2D};
+use crate::assets::texture::Texture2D;
 use crate::context::{Context, VisContext};
 use crate::entities::animation2d::Animation2D;
 use crate::entities::entities::Worlds;
@@ -18,7 +18,7 @@ use crate::utils::Timestep;
 use super::camera::CameraBuffer;
 use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
-use super::material::{Background2DMaterial, GenericMaterial};
+use super::material::Background2DMaterial;
 use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
 
 pub struct Renderer2D {
@@ -46,7 +46,7 @@ impl Renderer2D {
         //Renderable setup
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
-        let framebuffer = Framebuffer::new(context, sample_count, Some(16.0 / 9.0));
+        let framebuffer = Framebuffer::new(context, sample_count);
         let camera_buffer = Some(CameraBuffer::new(&context.graphics, "Default Camera"));
         let egui_renderer = Renderer::recreate_gui(context, sample_count);
 
@@ -111,12 +111,12 @@ impl Renderer2D {
                     label: Some("Background Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: match fbo.sample_count() {
-                            1 => &view,
+                            1 => view,
                             _ => &fbo_view,
                         },
                         resolve_target: match fbo.sample_count() {
                             1 => None,
-                            _ => Some(&view),
+                            _ => Some(view),
                         },
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
@@ -163,7 +163,7 @@ impl Renderer2D {
                 for (_, (transform, sprite)) in
                     world.query::<(&mut Transform2D, &mut Sprite)>().iter()
                 {
-                    if let Some(texture) = assets.try_get(&sprite.texture()) {
+                    if let Some(texture) = assets.try_get(sprite.texture()) {
                         sprite.update(context, texture);
                     }
 
@@ -199,12 +199,12 @@ impl Renderer2D {
                         label: Some("World Render Pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                             view: match fbo.sample_count() {
-                                1 => &view,
+                                1 => view,
                                 _ => &fbo_view,
                             },
                             resolve_target: match fbo.sample_count() {
                                 1 => None,
-                                _ => Some(&view),
+                                _ => Some(view),
                             },
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Load,

@@ -111,7 +111,7 @@ impl Worlds {
                 let scale_x = 1.0 / (layer.c_wid as f32);
                 let scale_y = 1.0 / (layer.c_hei as f32);
                 let scale = scale_x.min(scale_y);
-                debug_assert!(scale >= 0.0 && scale <= 1.0, "scale out of bounds");
+                debug_assert!((0.0..=1.0).contains(&scale), "scale out of bounds");
 
                 // Calculate x and y coordinates from tile position
 
@@ -131,7 +131,7 @@ impl Worlds {
 
                 // This is definitely correct:
                 let fanta = Sprite::new(
-                    &context,
+                    context,
                     layer_texture,
                     Vec4::new(1.0, 1.0, 1.0, tile.a as f32),
                     Some(&tile.coords_8(
@@ -153,7 +153,7 @@ impl Worlds {
         let mut worlds = Worlds::new();
         let guid = worlds.add_world(world);
         worlds.start_world(guid);
-        return Ok(worlds);
+        Ok(worlds)
     }
 }
 
