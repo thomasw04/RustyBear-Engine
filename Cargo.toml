@@ -30,7 +30,7 @@ image = "0.24.6"
 rayon = "1.7.0"
 clap = { version = "4.3.10", features = ["derive"] }
 gltf = "1.2.0"
-glam = "0.25.0"
+glam = "0.26.0"
 egui = { git = "https://github.com/emilk/egui.git" }
 egui-wgpu = { git = "https://github.com/emilk/egui.git", features = ["winit"] }
 egui-winit = { git = "https://github.com/emilk/egui.git", features = ["clipboard"] }
