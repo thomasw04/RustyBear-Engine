@@ -70,15 +70,7 @@ impl<'a> Sprite<'a> {
         context: &VisContext, texture: Ptr<Texture2D>, tint: Vec4, coords: Option<&[f32]>,
         sampler: Option<Sampler>,
     ) -> Self {
-        Self::new_custom(
-            context,
-            SPRITE_SHADER.clone(),
-            SPRITE_SHADER.clone(),
-            texture,
-            tint,
-            coords,
-            sampler,
-        )
+        Self::new_custom(context, *SPRITE_SHADER, *SPRITE_SHADER, texture, tint, coords, sampler)
     }
 
     pub fn set_coords(&mut self, context: &VisContext, coords: &[f32]) {

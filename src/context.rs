@@ -194,6 +194,9 @@ impl<'a> Context<'a> {
             if let Some(gilrs_event) = gilrs_event_option {
                 Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, window_target, &mut self);
             }
+
+            //Finish the profiling frame.
+            profiling::finish_frame!();
         }});
     }
 
@@ -206,6 +209,7 @@ impl<'a> Context<'a> {
         }
     }
 
+    #[profiling::function]
     fn render(
         &mut self, window: &winit::window::Window, app: &mut impl Application<'a>,
     ) -> Result<(), wgpu::SurfaceError> {
@@ -219,6 +223,11 @@ impl<'a> Context<'a> {
         self.egui.egui_input_mut().viewports.insert(context.viewport_id(), info);
         let input = self.egui.take_egui_input(window);
         self.egui.egui_ctx().begin_frame(input);
+
+        //Profiler window.
+        #[cfg(feature = "profiler")]
+        puffin_egui::profiler_window(self.egui.egui_ctx());
+
         app.gui_render(&view, self);
 
         app.render(&view, self, window);

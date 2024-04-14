@@ -7,6 +7,7 @@ use crate::assets::assets::GenPtr;
 use crate::assets::shader::ShaderVariant;
 use crate::context::VisContext;
 use crate::utils::Guid;
+use crate::utils::StableMap;
 use hashbrown::HashMap;
 use smallvec::SmallVec;
 
@@ -29,6 +30,7 @@ pub struct RenderPipelineConfig<'a> {
     key: PipelineConfigKey,
 }
 
+#[profiling::all_functions]
 impl<'a> RenderPipelineConfig<'a> {
     pub fn new(
         shader: &'a ShaderVariant<'a>, vertex_layout: Option<&'a impl VertexLayout>,
@@ -72,6 +74,7 @@ pub struct RenderPipelineBuilder<'a> {
     base_config: PipelineBaseConfig,
 }
 
+#[profiling::all_functions]
 impl<'a> RenderPipelineBuilder<'a> {
     pub fn new(shader: &'a ShaderVariant<'a>) -> Self {
         Self {
@@ -113,7 +116,7 @@ impl<'a> RenderPipelineBuilder<'a> {
 }
 
 pub struct PipelineFactory {
-    cache: HashMap<PipelineConfigKey, wgpu::RenderPipeline>,
+    cache: StableMap<PipelineConfigKey, wgpu::RenderPipeline>,
 }
 
 impl Default for PipelineFactory {
@@ -122,27 +125,32 @@ impl Default for PipelineFactory {
     }
 }
 
+#[profiling::all_functions]
 impl PipelineFactory {
     pub fn new() -> Self {
-        Self { cache: HashMap::new() }
+        Self { cache: StableMap::new() }
     }
 
-    pub fn get(&self, config: &RenderPipelineConfig) -> Option<&wgpu::RenderPipeline> {
-        self.cache.get(&config.key)
+    pub fn get<'b>(&self, config: &RenderPipelineConfig) -> Option<&'b wgpu::RenderPipeline> {
+        self.cache.get_raw(&config.key)
     }
 
-    pub fn get_key(&self, key: &PipelineConfigKey) -> Option<&wgpu::RenderPipeline> {
-        self.cache.get(key)
+    pub fn get_key<'b>(&self, key: &PipelineConfigKey) -> Option<&'b wgpu::RenderPipeline> {
+        self.cache.get_raw(key)
     }
 
     pub fn prepare(&mut self, context: &VisContext, config: &RenderPipelineConfig) {
         let _ = self.get_or_create(context, config);
     }
 
-    pub fn get_or_create(
+    pub fn get_or_create<'b>(
         &mut self, context: &VisContext, config: &RenderPipelineConfig,
-    ) -> &wgpu::RenderPipeline {
-        self.cache.entry(config.key).or_insert_with(|| PipelineFactory::create(context, config))
+    ) -> &'b wgpu::RenderPipeline {
+        if let Some(pipeline) = self.get(config) {
+            pipeline
+        } else {
+            self.cache.insert_raw(&config.key, PipelineFactory::create(context, config))
+        }
     }
 
     fn create(context: &VisContext, config: &RenderPipelineConfig) -> wgpu::RenderPipeline {

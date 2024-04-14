@@ -2,6 +2,7 @@ use std::num::NonZeroU64;
 
 use crate::context::VisContext;
 use crate::render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout};
+use crate::utils::TypeDisplay;
 
 use wgpu::util::DeviceExt;
 
@@ -11,6 +12,13 @@ pub struct UniformBuffer {
     size: usize,
 }
 
+impl TypeDisplay for UniformBuffer {
+    fn type_name() -> &'static str {
+        "UniformBuffer"
+    }
+}
+
+#[profiling::all_functions]
 impl UniformBuffer {
     pub fn new(context: &VisContext, size: usize) -> Self {
         let buffer = context.device.create_buffer(&wgpu::BufferDescriptor {
@@ -49,6 +57,7 @@ impl UniformBuffer {
     }
 }
 
+#[profiling::all_functions]
 impl BindGroupEntry for UniformBuffer {
     fn group_entry(&self, idx: u32) -> wgpu::BindGroupEntry {
         wgpu::BindGroupEntry {
@@ -71,6 +80,7 @@ pub struct Vertices<'a> {
     layout: [wgpu::VertexBufferLayout<'a>; 1],
 }
 
+#[profiling::all_functions]
 impl<'a> Vertices<'a> {
     pub fn new(
         context: &VisContext, contents: &[u8], layout: wgpu::VertexBufferLayout<'a>,
@@ -106,6 +116,7 @@ pub struct Indices {
     format: wgpu::IndexFormat,
 }
 
+#[profiling::all_functions]
 impl Indices {
     pub fn new(context: &VisContext, contents: &[u8], format: wgpu::IndexFormat) -> Self {
         let buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

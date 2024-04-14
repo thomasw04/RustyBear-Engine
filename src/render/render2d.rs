@@ -19,7 +19,8 @@ use super::camera::CameraBuffer;
 use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
 use super::material::Background2DMaterial;
-use super::types::{BindGroup, FragmentShader, IndexBuffer, VertexBuffer, VertexShader};
+use super::types::{BindGroup, IndexBuffer, VertexBuffer};
+use super::utils::create_color_renderpass;
 
 pub struct Renderer2D {
     framebuffer: Framebuffer,
@@ -41,6 +42,7 @@ impl EventSubscriber for Renderer2D {
     }
 }
 
+#[profiling::all_functions]
 impl Renderer2D {
     pub fn new(context: &Context, _assets: &mut Assets) -> Self {
         //Renderable setup
@@ -96,8 +98,6 @@ impl Renderer2D {
     ) {
         let context = ctx.graphics.as_ref();
         let fbo = &self.framebuffer;
-        let fbo_view: TextureView = (&self.framebuffer).into();
-        let sample_count = fbo.sample_count();
         let _ = assets.update();
 
         let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -107,40 +107,22 @@ impl Renderer2D {
         if let Some(camera_buffer) = &self.camera_buffer {
             //Background render pass---------------------------------------------------------------------
             {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Background Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: match fbo.sample_count() {
-                            1 => view,
-                            _ => &fbo_view,
-                        },
-                        resolve_target: match fbo.sample_count() {
-                            1 => None,
-                            _ => Some(view),
-                        },
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    ..Default::default()
-                });
+                let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, true);
 
                 let (x, y, w, h) = camera_buffer.viewport();
                 render_pass.set_viewport(x, y, w, h, 0.0, 1.0);
 
-                if let Some(background) = &self.background {
-                    let shader = ShaderVariant::Single(assets.try_get(&BACKGROUND_SHADER).unwrap());
-
-                    let config =
-                        RenderPipelineConfig::new(&shader, None::<&Vertices>, background, &[]);
+                if let (Some(bg), Ok(shader)) =
+                    (&self.background, assets.try_get(&BACKGROUND_SHADER))
+                {
+                    let shader: ShaderVariant = shader.into();
+                    let config = RenderPipelineConfig::new(&shader, None::<&Vertices>, bg, &[]);
 
                     let pipeline = self.pipelines.get_or_create(context, &config);
 
                     render_pass.set_pipeline(pipeline);
 
-                    for (i, bind_group) in background.groups().iter().enumerate() {
+                    for (i, bind_group) in bg.groups().iter().enumerate() {
                         render_pass.set_bind_group(i as u32, bind_group, &[]);
                     }
 
@@ -151,8 +133,6 @@ impl Renderer2D {
             //------------------------------------------------------------------------------------------
             //Prepare World Render Pass--------------------------------------------------------------------------
             if let Some(world) = worlds.get_mut() {
-                let mut config_keys = Vec::new();
-
                 //Iterate over all entities with a transform component but do not borrow.
                 for (entity, _) in world.query::<()>().with::<&Transform2D>().iter() {
                     if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
@@ -160,33 +140,10 @@ impl Renderer2D {
                     }
                 }
 
-                for (_, (transform, sprite)) in
-                    world.query::<(&mut Transform2D, &mut Sprite)>().iter()
                 {
-                    if let Some(texture) = assets.try_get(sprite.texture()) {
-                        sprite.update(context, texture);
-                    }
-
-                    let material = sprite.material();
-                    let vertex = assets.try_get(VertexShader::ptr(material)).unwrap();
-                    let fragment = assets.try_get(FragmentShader::ptr(material)).unwrap();
-                    let shader = ShaderVariant::Double(vertex, fragment);
-
-                    let config = RenderPipelineConfig::new(
-                        &shader,
-                        Some(sprite.mesh()),
-                        material,
-                        &[transform.layout(), CameraBuffer::layout(context)],
-                    );
-
-                    self.pipelines.prepare(context, &config);
-                    config_keys.push(config.key());
-                }
-
-                {
-                    let mut renderables = world.query::<(&Transform2D, &Sprite)>();
-                    let mut entities: Vec<(hecs::Entity, (&Transform2D, &Sprite<'_>))> =
-                        renderables.iter().collect();
+                    let mut renderables = world.query::<(&mut Transform2D, &mut Sprite)>();
+                    let mut entities: Vec<(hecs::Entity, (&mut Transform2D, &mut Sprite<'_>))> =
+                        renderables.into_iter().collect();
                     entities.sort_by(|(_, (a, _)), (_, (b, _))| {
                         a.position()
                             .z
@@ -195,65 +152,60 @@ impl Renderer2D {
                     });
 
                     //World Render Pass---------------------------------------------------------------------
-                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("World Render Pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: match fbo.sample_count() {
-                                1 => view,
-                                _ => &fbo_view,
-                            },
-                            resolve_target: match fbo.sample_count() {
-                                1 => None,
-                                _ => Some(view),
-                            },
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Load,
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        ..Default::default()
-                    });
+                    let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, false);
 
                     //Set viewport
                     let (x, y, w, h) = camera_buffer.viewport();
                     render_pass.set_viewport(x, y, w, h, 0.0, 1.0);
 
-                    for (i, renderable) in entities.iter().enumerate() {
-                        let (transform, sprite) = renderable.1;
+                    for (entity, renderable) in entities.iter_mut() {
+                        let (transform, sprite) = renderable;
+
+                        //Update components
+                        (*transform).update(context, *entity, world);
+
+                        if let Ok(texture) = assets.try_get(sprite.texture()) {
+                            sprite.update(context, texture);
+                        }
 
                         let material = sprite.material();
 
-                        let pipeline = self
-                            .pipelines
-                            .get_key(unsafe { config_keys.get_unchecked(i) })
-                            .unwrap();
+                        if let Ok(shader) = ShaderVariant::from_material(material, assets) {
+                            let config = RenderPipelineConfig::new(
+                                &shader,
+                                Some(sprite.mesh()),
+                                material,
+                                &[transform.layout(), CameraBuffer::layout(context)],
+                            );
 
-                        render_pass.set_pipeline(pipeline);
+                            let pipeline = self.pipelines.get_or_create(context, &config);
 
-                        //Set material
-                        for (i, bind_group) in material.groups().iter().enumerate() {
-                            render_pass.set_bind_group(i as u32, bind_group, &[]);
+                            render_pass.set_pipeline(pipeline);
+
+                            //Set material
+                            for (i, bind_group) in material.groups().iter().enumerate() {
+                                render_pass.set_bind_group(i as u32, bind_group, &[]);
+                            }
+
+                            //Set transform buffer
+                            render_pass.set_bind_group(1, transform.group(), &[]);
+
+                            //Set camera buffer
+                            render_pass.set_bind_group(2, camera_buffer.bind_group(), &[]);
+
+                            //Set vertex buffer
+                            render_pass.set_vertex_buffer(
+                                0,
+                                VertexBuffer::buffer(sprite.mesh()).unwrap().slice(..),
+                            );
+
+                            //Set index buffer
+                            let (buffer, format) = IndexBuffer::buffer(sprite.mesh()).unwrap();
+                            render_pass.set_index_buffer(buffer.slice(..), format);
+
+                            //Draw the quad.
+                            render_pass.draw_indexed(0..sprite.mesh().num_indices(), 0, 0..1);
                         }
-
-                        //Set transform buffer
-                        render_pass.set_bind_group(1, transform.group(), &[]);
-
-                        //Set camera buffer
-                        render_pass.set_bind_group(2, camera_buffer.bind_group(), &[]);
-
-                        //Set vertex buffer
-                        render_pass.set_vertex_buffer(
-                            0,
-                            VertexBuffer::buffer(sprite.mesh()).unwrap().slice(..),
-                        );
-
-                        //Set index buffer
-                        let (buffer, format) = IndexBuffer::buffer(sprite.mesh()).unwrap();
-                        render_pass.set_index_buffer(buffer.slice(..), format);
-
-                        //Draw the quad.
-                        render_pass.draw_indexed(0..sprite.mesh().num_indices(), 0, 0..1);
                     }
                 }
                 //------------------------------------------------------------------------------------------
@@ -268,7 +220,7 @@ impl Renderer2D {
             let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
-            let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+            let screen_descriptor = egui_wgpu::ScreenDescriptor {
                 size_in_pixels: [ctx.surface_config.width, ctx.surface_config.height],
                 pixels_per_point: window.scale_factor() as f32,
             };
@@ -289,25 +241,7 @@ impl Renderer2D {
             }
 
             {
-                let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("GUI RenderPass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: match sample_count {
-                            1 => view,
-                            _ => &fbo_view,
-                        },
-                        resolve_target: match sample_count {
-                            1 => None,
-                            _ => Some(view),
-                        },
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Load,
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
-                    depth_stencil_attachment: None,
-                    ..Default::default()
-                });
+                let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, false);
                 self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
             }
 

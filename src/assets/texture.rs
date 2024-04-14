@@ -2,6 +2,7 @@ use once_cell::sync::OnceCell;
 
 use crate::context::VisContext;
 use crate::render::types::BindGroupEntry;
+use crate::utils::TypeDisplay;
 
 pub struct TextureArray {
     extend: wgpu::Extent3d,
@@ -10,6 +11,13 @@ pub struct TextureArray {
     sampler: wgpu::Sampler,
 }
 
+impl TypeDisplay for TextureArray {
+    fn type_name() -> &'static str {
+        "TextureArray"
+    }
+}
+
+#[profiling::all_functions]
 impl TextureArray {
     pub fn new(context: &VisContext, size: u32, layers: u32) -> Self {
         let extend = wgpu::Extent3d { width: size, height: size, depth_or_array_layers: layers };
@@ -132,6 +140,13 @@ pub struct Sampler {
     sampler: wgpu::Sampler,
 }
 
+impl TypeDisplay for Sampler {
+    fn type_name() -> &'static str {
+        "Sampler"
+    }
+}
+
+#[profiling::all_functions]
 impl Sampler {
     pub fn new(context: &VisContext) -> Self {
         let sampler = context.device.create_sampler(&wgpu::SamplerDescriptor {
@@ -193,6 +208,13 @@ pub struct Texture2D {
     view: wgpu::TextureView,
 }
 
+impl TypeDisplay for Texture2D {
+    fn type_name() -> &'static str {
+        "Texture2D"
+    }
+}
+
+#[profiling::all_functions]
 impl Texture2D {
     pub fn new(
         context: &VisContext, name: Option<&str>, dim: (u32, u32), bytes: &[u8],

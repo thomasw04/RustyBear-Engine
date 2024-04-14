@@ -112,7 +112,7 @@ impl Renderer {
         let assets = &mut self.assets;
 
         let _ = assets.update();
-        let framebuffer_view: TextureView = (&self.framebuffer).into();
+        let framebuffer_view: &TextureView = self.framebuffer.get_view();
         let sample_count = self.framebuffer.sample_count();
 
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -125,7 +125,7 @@ impl Renderer {
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: match sample_count {
                         1 => view,
-                        _ => &framebuffer_view,
+                        _ => framebuffer_view,
                     },
                     resolve_target: match sample_count {
                         1 => None,
@@ -164,7 +164,7 @@ impl Renderer {
             let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
             let texture_delta = output.textures_delta;
 
-            let screen_descriptor = egui_wgpu::renderer::ScreenDescriptor {
+            let screen_descriptor = egui_wgpu::ScreenDescriptor {
                 size_in_pixels: [context.surface_config.width, context.surface_config.height],
                 pixels_per_point: window.scale_factor() as f32,
             };
@@ -187,7 +187,7 @@ impl Renderer {
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                         view: match sample_count {
                             1 => view,
-                            _ => &framebuffer_view,
+                            _ => framebuffer_view,
                         },
                         resolve_target: match sample_count {
                             1 => None,

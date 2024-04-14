@@ -59,7 +59,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 
     fn gui_render(&mut self, _view: &wgpu::TextureView, context: &mut Context) {
-        egui::Area::new("my_area").fixed_pos(egui::pos2(32.0, 32.0)).show(
+        egui::Area::new(egui::Id::new("my_area")).fixed_pos(egui::pos2(32.0, 32.0)).show(
             context.egui.egui_ctx(),
             |ui| {
                 ui.label(

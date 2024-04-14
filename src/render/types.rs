@@ -56,8 +56,8 @@ pub struct PipelineBaseConfig {
     pub cull: bool,
     pub polygon_mode: wgpu::PolygonMode,
     pub blend: Option<wgpu::BlendState>,
-    pub write_mask: wgpu::ColorWrites,
-    pub samples: u32,
+    pub write_mask: wgpu::ColorWrites, // 1 byte
+    pub samples: u32,                  // 1 byte
 }
 
 impl Default for PipelineBaseConfig {

@@ -9,9 +9,10 @@ use crate::context::VisContext;
 use crate::logging;
 use crate::render::material::GenericMaterial;
 use crate::render::types::BindGroupEntry;
-use crate::utils::{Guid, GuidGenerator};
+use crate::utils::{Guid, GuidGenerator, TypeDisplay};
 
 use std::any::Any;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc};
@@ -19,6 +20,7 @@ use std::sync::{mpsc, Arc};
 use super::buffer::UniformBuffer;
 use super::shader::Shader;
 use super::texture::{Sampler, Texture2D, TextureArray};
+use super::types::AssetError;
 
 pub enum AssetType {
     TextureArray(TextureArray),
@@ -57,6 +59,12 @@ impl<T> From<Ptr<T>> for GenPtr {
 pub struct Ptr<T> {
     guid: Guid,
     phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: TypeDisplay> Display for Ptr<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", T::type_name(), self.guid)
+    }
 }
 
 impl<T> Hash for Ptr<T> {
@@ -108,6 +116,7 @@ pub struct Assets {
     asset_receiver: Receiver<(Guid, Result<AssetType, String>)>,
 }
 
+#[profiling::all_functions]
 impl Assets {
     pub fn new(context: Arc<VisContext>, loc: Option<what::Location>, max_size: usize) -> Self {
         type InChannel = (Sender<(String, Guid, usize)>, Receiver<(String, Guid, usize)>);
@@ -135,6 +144,7 @@ impl Assets {
         assets.register_static(&context);
 
         rayon::spawn(move || {
+            profiling::register_thread!("Asset Manager");
             let context = context.clone();
 
             let mut what = what::What::new(max_size, loc);
@@ -302,16 +312,7 @@ impl Assets {
             self.wait_for(&(*ptr).into());
         }
 
-        self.gpu_cache.get(&ptr.guid).and_then(|asset| match asset {
-            AssetType::TextureArray(texture_array) => {
-                (texture_array as &dyn Any).downcast_ref::<T>()
-            }
-            AssetType::Texture2D(texture) => (texture as &dyn Any).downcast_ref::<T>(),
-            AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
-            AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
-            AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
-            AssetType::GenericMaterial(material) => (material as &dyn Any).downcast_ref::<T>(),
-        })
+        self.gpu_cache.get(&ptr.guid).and_then(|asset| Assets::to_asset(asset))
     }
 
     pub fn try_get_mut<T: 'static>(&mut self, ptr: &Ptr<T>) -> Option<&mut T> {
@@ -327,17 +328,16 @@ impl Assets {
         })
     }
 
-    pub fn try_get<T: 'static>(&self, ptr: &Ptr<T>) -> Option<&T> {
-        self.gpu_cache.get(&ptr.guid).and_then(|asset| match asset {
-            AssetType::TextureArray(texture_array) => {
-                (texture_array as &dyn Any).downcast_ref::<T>()
-            }
-            AssetType::Texture2D(texture) => (texture as &dyn Any).downcast_ref::<T>(),
-            AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
-            AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
-            AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
-            AssetType::GenericMaterial(material) => (material as &dyn Any).downcast_ref::<T>(),
-        })
+    pub fn try_get<T: 'static + TypeDisplay>(&self, ptr: &Ptr<T>) -> Result<&T, AssetError> {
+        if let Some(asset) = self.gpu_cache.get(&ptr.guid) {
+            Assets::to_asset(asset).ok_or_else(|| {
+                AssetError::TypeMismatch(
+                    self.asset_path(ptr.guid).cloned().unwrap_or_else(|| format!("{}", ptr)),
+                )
+            })
+        } else {
+            Err(AssetError::NotFound(format!("{}", ptr)))
+        }
     }
 
     pub fn try_get_entry(&self, ptr: &GenPtr) -> Option<&dyn BindGroupEntry> {
@@ -349,6 +349,19 @@ impl Assets {
             AssetType::Sampler(sampler) => Some(sampler as &dyn BindGroupEntry),
             AssetType::GenericMaterial(_) => None,
         })
+    }
+
+    fn to_asset<T: 'static>(asset: &AssetType) -> Option<&T> {
+        match asset {
+            AssetType::TextureArray(texture_array) => {
+                (texture_array as &dyn Any).downcast_ref::<T>()
+            }
+            AssetType::Texture2D(texture) => (texture as &dyn Any).downcast_ref::<T>(),
+            AssetType::Shader(shader) => (shader as &dyn Any).downcast_ref::<T>(),
+            AssetType::Uniforms(uniforms) => (uniforms as &dyn Any).downcast_ref::<T>(),
+            AssetType::Sampler(sampler) => (sampler as &dyn Any).downcast_ref::<T>(),
+            AssetType::GenericMaterial(material) => (material as &dyn Any).downcast_ref::<T>(),
+        }
     }
 
     pub fn delete_asset(&mut self, guid: Guid) {

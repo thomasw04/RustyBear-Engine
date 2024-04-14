@@ -2,6 +2,7 @@ use crate::context::Context;
 
 pub struct Framebuffer {
     texture: wgpu::Texture,
+    view: wgpu::TextureView,
     sample_count: u32,
     width: f32,
     height: f32,
@@ -21,7 +22,9 @@ impl Framebuffer {
             view_formats: &context.surface_config.view_formats,
         });
 
-        Framebuffer { texture, sample_count, width: width as f32, height: height as f32 }
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        Framebuffer { texture, view, sample_count, width: width as f32, height: height as f32 }
     }
 
     pub fn resize(&mut self, context: &Context, width: u32, height: u32) {
@@ -49,6 +52,10 @@ impl Framebuffer {
         self.sample_count
     }
 
+    pub fn get_view(&self) -> &wgpu::TextureView {
+        &self.view
+    }
+
     fn create_buffer(&mut self, context: &Context, sample_count: u32, width: u32, height: u32) {
         self.texture = context.graphics.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),
@@ -60,11 +67,7 @@ impl Framebuffer {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &context.surface_config.view_formats,
         });
-    }
-}
 
-impl From<&Framebuffer> for wgpu::TextureView {
-    fn from(value: &Framebuffer) -> Self {
-        value.texture.create_view(&wgpu::TextureViewDescriptor::default())
+        self.view = self.texture.create_view(&wgpu::TextureViewDescriptor::default());
     }
 }

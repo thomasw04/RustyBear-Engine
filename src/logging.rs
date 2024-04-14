@@ -55,4 +55,10 @@ pub fn init() {
             }
         }
     }
+
+    //Init profiling
+    profiling::register_thread!("main");
+
+    #[cfg(feature = "profiler")]
+    profiling::puffin::set_scopes_on(true);
 }

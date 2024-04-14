@@ -1,9 +1,12 @@
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter, Result};
 use std::hash::Hash;
 use std::ops;
 use std::path::{Path, PathBuf};
 
+use hashbrown::HashMap;
 use instant::Instant;
+use refpool::{Pool, PoolRef};
 
 pub struct Timestep {
     delta: f64,
@@ -137,6 +140,12 @@ pub struct Guid {
     id: u64,
 }
 
+impl Display for Guid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "{:x}", self.id)
+    }
+}
+
 impl Guid {
     pub fn new(id: u64) -> Guid {
         Guid { id }
@@ -169,5 +178,54 @@ impl GuidGenerator {
         }
         self.used.insert(id);
         Guid::new(id)
+    }
+}
+
+pub trait TypeDisplay {
+    fn type_name() -> &'static str;
+}
+
+pub struct StableMap<K, V> {
+    map: HashMap<K, PoolRef<V>>,
+    pool: Pool<V>,
+}
+
+impl Default for StableMap<u32, u32> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[profiling::all_functions]
+impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
+    pub fn new() -> Self {
+        Self { map: HashMap::new(), pool: Pool::new(1024) }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { map: HashMap::with_capacity(capacity), pool: Pool::new(capacity) }
+    }
+
+    pub fn insert(&mut self, key: &K, value: V) -> PoolRef<V> {
+        self.map.insert(key.clone(), PoolRef::new(&self.pool, value));
+        self.map.get(key).unwrap().clone()
+    }
+
+    pub fn insert_raw<'b>(&mut self, key: &K, value: V) -> &'b V {
+        self.map.insert(key.clone(), PoolRef::new(&self.pool, value));
+        self.get_raw(key).unwrap()
+    }
+
+    pub fn get(&self, key: &K) -> Option<PoolRef<V>> {
+        self.map.get(key).cloned()
+    }
+
+    pub fn get_raw<'b>(&self, key: &K) -> Option<&'b V> {
+        let ptr = (self.map.get(key)?.as_ref()) as *const V;
+        Some(unsafe { &*ptr })
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<PoolRef<V>> {
+        self.map.remove(key)
     }
 }

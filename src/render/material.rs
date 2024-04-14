@@ -4,6 +4,7 @@ use crate::assets::assets::BACKGROUND_SHADER;
 use crate::assets::texture::Texture2D;
 use crate::render::types::BindGroupEntry;
 
+use crate::utils::TypeDisplay;
 use crate::{
     assets::{
         assets::Ptr,
@@ -259,6 +260,12 @@ pub struct GenericMaterial {
     //Bind group layout and bind group
     bind_layout: [wgpu::BindGroupLayout; 1],
     bind_group: [wgpu::BindGroup; 1],
+}
+
+impl TypeDisplay for GenericMaterial {
+    fn type_name() -> &'static str {
+        "GenericMaterial"
+    }
 }
 
 impl GenericMaterial {
