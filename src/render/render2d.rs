@@ -133,22 +133,13 @@ impl Renderer2D {
             //------------------------------------------------------------------------------------------
             //Prepare World Render Pass--------------------------------------------------------------------------
             if let Some(world) = worlds.get_mut() {
-                //Iterate over all entities with a transform component but do not borrow.
-                for (entity, _) in world.query::<()>().with::<&Transform2D>().iter() {
-                    if let Ok(mut transform) = world.get::<&mut Transform2D>(entity) {
-                        transform.update(context, entity, world);
-                    }
-                }
-
                 {
                     let mut renderables = world.query::<(&mut Transform2D, &mut Sprite)>();
                     let mut entities: Vec<(hecs::Entity, (&mut Transform2D, &mut Sprite<'_>))> =
                         renderables.into_iter().collect();
+
                     entities.sort_by(|(_, (a, _)), (_, (b, _))| {
-                        a.position()
-                            .z
-                            .partial_cmp(&b.position().z)
-                            .unwrap_or(std::cmp::Ordering::Equal)
+                        a.position().z.total_cmp(&b.position().z)
                     });
 
                     //World Render Pass---------------------------------------------------------------------
@@ -213,7 +204,6 @@ impl Renderer2D {
         }
 
         //------------------------------------------------------------------------------------------
-
         {
             let egui_ctx = ctx.egui.egui_ctx();
             let output = egui_ctx.end_frame();
