@@ -15,7 +15,7 @@ use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
 use RustyBear_Engine::entities::animation2d::Animation2D;
-use RustyBear_Engine::entities::entities::Worlds;
+use RustyBear_Engine::entities::worlds::Worlds;
 use RustyBear_Engine::entities::script::{ScriptHandle, Scriptable, Scripts};
 use RustyBear_Engine::entities::sprite::Sprite;
 use RustyBear_Engine::entities::transform2d::Transform2D;

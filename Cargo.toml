@@ -1,3 +1,4 @@
+workspace = { members = ["derive"] }
 [package]
 name = "RustyBear-Engine"
 version = "0.1.0"
@@ -51,6 +52,8 @@ refpool = "0.4.3"
 profiling = "1.0.15"
 puffin_egui = "0.27.0"
 thiserror = "1.0.58"
+libc = "0.2.154"
+derive = { path = "derive" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"

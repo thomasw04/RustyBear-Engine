@@ -1,11 +1,14 @@
+use std::alloc::LayoutError;
 use std::collections::HashSet;
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::ops;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::{alloc, ops};
 
 use hashbrown::HashMap;
 use instant::Instant;
+use libc::c_void;
 use refpool::{Pool, PoolRef};
 
 pub struct Timestep {
@@ -141,7 +144,7 @@ pub struct Guid {
 }
 
 impl Display for Guid {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{:x}", self.id)
     }
 }
@@ -185,6 +188,36 @@ pub trait TypeDisplay {
     fn type_name() -> &'static str;
 }
 
+pub struct UncheckedArray<T> {
+    begin: *mut T,
+}
+
+impl<T> UncheckedArray<T> {
+    pub fn new(size: usize) -> Option<UncheckedArray<T>> {
+        unsafe {
+            let begin = libc::malloc(size * std::mem::size_of::<T>()) as *mut T;
+            if begin.is_null() {
+                return None;
+            }
+            Some(UncheckedArray { begin })
+        }
+    }
+
+    pub fn get(&self, index: usize) -> &T {
+        unsafe { &*self.begin.add(index) }
+    }
+
+    pub fn set(&self, index: usize, value: T) {
+        unsafe { *self.begin.add(index) = value };
+    }
+}
+
+impl<T> Drop for UncheckedArray<T> {
+    fn drop(&mut self) {
+        unsafe { libc::free(self.begin as *mut c_void) };
+    }
+}
+
 pub struct StableMap<K, V> {
     map: HashMap<K, PoolRef<V>>,
     pool: Pool<V>,
@@ -211,6 +244,8 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
         self.map.get(key).unwrap().clone()
     }
 
+    /// This function is dangerous.
+    /// It is undefined behavious to use the returned reference after the value is removed or the map is destroyed.
     pub fn insert_raw<'b>(&mut self, key: &K, value: V) -> &'b V {
         self.map.insert(key.clone(), PoolRef::new(&self.pool, value));
         self.get_raw(key).unwrap()
@@ -220,6 +255,8 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
         self.map.get(key).cloned()
     }
 
+    /// This function is dangerous.
+    /// It is undefined behavious to use the returned reference after the value is removed or the map is destroyed.
     pub fn get_raw<'b>(&self, key: &K) -> Option<&'b V> {
         let ptr = (self.map.get(key)?.as_ref()) as *const V;
         Some(unsafe { &*ptr })

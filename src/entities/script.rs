@@ -1,10 +1,19 @@
 use std::cell::Ref;
 
+use crate::input::InputState;
+use crate::{context::VisContext, utils::Timestep};
+use derive::Entity;
 use hashbrown::HashMap;
 use hecs::Entity;
 
-use crate::input::InputState;
-use crate::{context::VisContext, utils::Timestep};
+#[Entity]
+pub struct Player {}
+
+fn test() {
+    let mut world = hecs::World::new();
+    let handle = world.spawn(());
+    let player = Player::instantiate(handle, world);
+}
 
 pub trait Scriptable {
     fn on_spawn(&mut self, context: &VisContext, entity: hecs::Entity, world: &mut hecs::World);
@@ -37,6 +46,7 @@ impl Scripts {
         let id = self.id_generator;
         self.scripts.push((script, Vec::new()));
         self.ids.insert(id, self.scripts.len() as u64 - 1);
+
         ScriptHandle { id }
     }
 
@@ -57,9 +67,9 @@ impl Scripts {
         &mut self, context: &VisContext, target: hecs::Entity, world: &mut hecs::World,
     ) {
         for (script, entities) in self.scripts.iter_mut() {
-            for entity in entities.iter() {
-                if *entity == target {
-                    script.on_spawn(context, *entity, world);
+            for entity in entities.iter().copied() {
+                if entity == target {
+                    script.on_spawn(context, entity, world);
                 }
             }
         }
@@ -71,8 +81,8 @@ impl Scripts {
     ) {
         let mut new_scripts: Vec<(ScriptHandle, Entity)> = Vec::new();
         for (script, entities) in self.scripts.iter_mut() {
-            for entity in entities.iter() {
-                script.tick(context, *entity, delta, world, input_state, &mut new_scripts);
+            for entity in entities.iter().copied() {
+                script.tick(context, entity, delta, world, input_state, &mut new_scripts);
             }
         }
         for (s, e) in new_scripts.into_iter() {
