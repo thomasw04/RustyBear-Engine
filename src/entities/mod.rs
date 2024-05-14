@@ -4,4 +4,5 @@ pub mod script;
 pub mod sprite;
 pub mod transform;
 pub mod transform2d;
+pub mod vecs;
 pub mod worlds;

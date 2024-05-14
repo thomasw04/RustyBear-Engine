@@ -7,12 +7,15 @@ use hashbrown::HashMap;
 use hecs::Entity;
 
 #[Entity]
-pub struct Player {}
+pub struct Player {
+    x: f32,
+    y: f32,
+}
 
 fn test() {
     let mut world = hecs::World::new();
     let handle = world.spawn(());
-    let player = Player::instantiate(handle, world);
+    let player = Player::instantiate(handle.into(), world.into());
 }
 
 pub trait Scriptable {

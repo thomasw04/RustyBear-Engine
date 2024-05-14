@@ -11,40 +11,6 @@ use crate::entities::sprite::Sprite;
 use crate::entities::transform2d::Transform2D;
 use crate::utils::{Guid, GuidGenerator};
 
-pub struct World {
-    inner: hecs::World,
-}
-
-impl Default for World {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl World {
-    pub fn new() -> Self {
-        Self { inner: hecs::World::new() }
-    }
-
-    pub fn spawn(&mut self, components: impl hecs::DynamicBundle) -> hecs::Entity {
-        self.inner.spawn(components)
-    }
-
-    pub fn despawn(&mut self, entity: hecs::Entity) -> bool {
-        self.inner.despawn(entity).is_ok()
-    }
-
-    pub fn query<Q: hecs::Query>(&self) -> hecs::QueryBorrow<Q> {
-        self.inner.query()
-    }
-
-    pub fn query_mut<Q: hecs::Query>(&mut self) -> hecs::QueryMut<Q> {
-        self.inner.query_mut()
-    }
-
-    
-}
-
 //A collection of entities that represents a set of worlds.
 pub struct Worlds {
     worlds: HashMap<Guid, hecs::World>,

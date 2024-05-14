@@ -15,7 +15,7 @@ pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
             ident: Some(Ident::new("_gen_handle", Span::call_site())),
             colon_token: None,
             mutability: FieldMutability::None,
-            ty: Type::Verbatim(quote::quote! { hecs::Entity }),
+            ty: Type::Verbatim(quote::quote! { crate::entities::vecs::EntityHandle }),
         });
         fields.named.push(Field {
             attrs: vec![],
@@ -23,15 +23,18 @@ pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
             ident: Some(Ident::new("_gen_world", Span::call_site())),
             colon_token: None,
             mutability: FieldMutability::None,
-            ty: Type::Verbatim(quote::quote! { hecs::World }),
+            ty: Type::Verbatim(quote::quote! { crate::entities::vecs::World }),
         });
     }
+
+    //Add the default derive to the struct.
+    input.attrs.push(syn::parse_quote! { #[derive(Default)] });
 
     //Create a function instantiate.
     let instantiate = quote::quote! {
         impl #name {
-            pub fn instantiate(handle: hecs::Entity, world: hecs::World) -> Self {
-                Self { _gen_handle: handle, _gen_world: world }
+            pub fn instantiate(handle: crate::entities::vecs::EntityHandle, world: crate::entities::vecs::World) -> Self {
+                Self { _gen_handle: handle, _gen_world: world, ..Default::default() }
             }
         }
     };
@@ -39,15 +42,15 @@ pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
     //Implement the entity trait for the struct
     let expanded = quote::quote! {
         impl crate::entities::entity::Entity for #name {
-            fn handle(&self) -> hecs::Entity {
+            fn handle(&self) -> crate::entities::vecs::EntityHandle {
                 self._gen_handle
             }
 
-            fn world(&self) -> &hecs::World {
+            fn world(&self) -> &crate::entities::vecs::World {
                 &self._gen_world
             }
 
-            fn world_mut(&mut self) -> &mut hecs::World {
+            fn world_mut(&mut self) -> &mut crate::entities::vecs::World {
                 &mut self._gen_world
             }
         }
