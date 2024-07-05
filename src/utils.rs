@@ -245,7 +245,8 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
     }
 
     /// This function is dangerous.
-    /// It is undefined behavious to use the returned reference after the value is removed or the map is destroyed.
+    /// It is undefined behaviour to use the returned reference after the value is removed or the map is destroyed.
+    /// It is also undefined behaviour to change the value while there is a reference to it alive.
     pub fn insert_raw<'b>(&mut self, key: &K, value: V) -> &'b V {
         self.map.insert(key.clone(), PoolRef::new(&self.pool, value));
         self.get_raw(key).unwrap()
@@ -256,7 +257,8 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
     }
 
     /// This function is dangerous.
-    /// It is undefined behavious to use the returned reference after the value is removed or the map is destroyed.
+    /// It is undefined behaviour to use the returned reference after the value is removed or the map is destroyed.
+    /// It is also undefined behaviour to change the value while there is a reference to it alive.
     pub fn get_raw<'b>(&self, key: &K) -> Option<&'b V> {
         let ptr = (self.map.get(key)?.as_ref()) as *const V;
         Some(unsafe { &*ptr })
@@ -266,3 +268,67 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
         self.map.remove(key)
     }
 }
+
+/*pub struct Range<T: Index<usize> + IndexMut<usize> + Ord> {
+    range: (T, T),
+    len: u32,
+}
+
+impl<T: Index<usize> + IndexMut<usize> + Ord> Range<T> {
+    pub fn new(range: (T, T), len: u32) -> Range<T> {
+        Range { range, len }
+    }
+
+    pub fn from<U>(min: U, max: U, len: u32) -> Range<T>
+    where
+        U: Into<T> + Ord,
+    {
+        Range { range: (min.into(), max.into()), len }
+    }
+
+    pub fn contains<U>(&self, value: U) -> bool
+    where
+        U: Into<T> + Ord,
+    {
+        let value = value.into();
+        for index in 0..self.len {
+            let index = index as usize;
+            let (min, max) = self.range;
+            if value[index] < min[index] && value[index] > max[index] {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn contains_nth(&self, nth: u32, value: f32) -> bool {
+        if nth >= self.len {
+            return false;
+        }
+
+        let (min, max) = self.data[nth];
+        value >= min && value <= max
+    }
+
+    pub fn intersects(&self, other: &Range<T>) -> bool {
+        if other.len != self.len {
+            return false;
+        }
+
+        let (min, max) = self.range;
+        if !other.contains(min) && !other.contains(max) {
+            return false;
+        }
+
+        true
+    }
+}
+*/
+/*pub struct Entity {}
+
+pub enum Node<'a, T> {
+    Empty,
+    Inner(Range<f32>, SmallVec<[&'a Node<'a, T>; 8]>),
+    Leaf(SmallVec<[T; 8]>),
+}*/

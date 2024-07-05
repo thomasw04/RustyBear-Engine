@@ -1,4 +1,5 @@
 use glam::Vec4;
+use hecs::EntityRef;
 use wgpu::TextureView;
 use winit::window::Window;
 
@@ -135,6 +136,7 @@ impl Renderer2D {
             if let Some(world) = worlds.get_mut() {
                 {
                     let mut renderables = world.query::<(&mut Transform2D, &mut Sprite)>();
+
                     let mut entities: Vec<(hecs::Entity, (&mut Transform2D, &mut Sprite<'_>))> =
                         renderables.into_iter().collect();
 

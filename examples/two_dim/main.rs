@@ -14,10 +14,10 @@ use wasm_bindgen::prelude::*;
 use RustyBear_Engine::assets::assets::Assets;
 use RustyBear_Engine::context::{Context, VisContext};
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::worlds::Worlds;
-use RustyBear_Engine::entities::script::{ScriptHandle, Scriptable, Scripts};
+//use RustyBear_Engine::entities::script::{ScriptHandle, Scriptable, Scripts};
 use RustyBear_Engine::entities::sprite::Sprite;
 use RustyBear_Engine::entities::transform2d::Transform2D;
+use RustyBear_Engine::entities::worlds::Worlds;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;
@@ -31,7 +31,7 @@ pub struct TwoDimApp<'a> {
     stack: ModuleStack<'a>,
     assets: Assets,
     worlds: Worlds,
-    scripts: Scripts,
+    //scripts: Scripts,
     renderer: RcCell<Renderer2D>,
     camera: RcCell<OrthographicCamera>,
 }
@@ -73,7 +73,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
 
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context) {
         if let Some(world) = self.worlds.get_mut() {
-            self.scripts.tick(&context.graphics, delta, world, &input_state);
+            // self.scripts.tick(&context.graphics, delta, world, &input_state);
         }
 
         let mut cam = self.camera.borrow_mut();
@@ -102,7 +102,7 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 }
 
-struct Player {}
+/*struct Player {}
 
 impl Scriptable for Player {
     fn on_spawn(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
@@ -118,7 +118,7 @@ impl Scriptable for Player {
     }
 
     fn on_destroy(&mut self, _context: &VisContext, _entity: hecs::Entity, _world: &mut World) {}
-}
+}*/
 
 impl<'a> TwoDimApp<'a> {
     pub fn new(context: &Context) -> Self {
@@ -132,7 +132,7 @@ impl<'a> TwoDimApp<'a> {
             log::warn!("Project: {:?}", path);
         }
 
-        let mut scripts = Scripts::new();
+        // let mut scripts = Scripts::new();
         let mut assets =
             Assets::new(context.graphics.clone(), loc, (context.free_memory() / 2) as usize);
 
@@ -141,8 +141,8 @@ impl<'a> TwoDimApp<'a> {
         let mut default = World::new();
 
         let default_texture = assets.request_asset("data/red-among-us.fur", 0);
-        let player_script = Player {};
-        let player_script = scripts.add_script(Box::new(player_script));
+        //let player_script = Player {};
+        //let player_script = scripts.add_script(Box::new(player_script));
 
         let trans = Transform2D::new(&context.graphics, Vec3::new(-2.0, 0.0, 1.0), 0.0, Vec2::ONE);
 
@@ -157,7 +157,7 @@ impl<'a> TwoDimApp<'a> {
             ),
         ));
 
-        scripts.attach(player_script, player);
+        //scripts.attach(player_script, player);
 
         let trans = Transform2D::new(&context.graphics, Vec3::new(2.0, 0.0, 0.0), 0.0, Vec2::ONE);
 
@@ -181,7 +181,7 @@ impl<'a> TwoDimApp<'a> {
         let camera = RcCell::new(OrthographicCamera::default());
         stack.subscribe(EventType::Layer, camera.clone());
 
-        TwoDimApp { stack, assets, scripts, worlds, renderer, camera }
+        TwoDimApp { stack, assets, worlds, renderer, camera }
     }
 }
 
