@@ -3,7 +3,7 @@ use proc_macro2::Span;
 use syn::{parse_macro_input, Field, FieldMutability, Fields, Ident, ItemStruct, Type, Visibility};
 
 #[proc_macro_attribute]
-pub fn Entable(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as ItemStruct);
     let name = input.ident.clone();
 
@@ -23,7 +23,7 @@ pub fn Entable(_args: TokenStream, input: TokenStream) -> TokenStream {
             ident: Some(Ident::new("_gen_world", Span::call_site())),
             colon_token: None,
             mutability: FieldMutability::None,
-            ty: Type::Verbatim(quote::quote! { crate::entities::world::World }),
+            ty: Type::Verbatim(quote::quote! { Option<&'a crate::entities::world::World> }),
         });
         fields.named.push(Field {
             attrs: vec![],
@@ -37,30 +37,27 @@ pub fn Entable(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     //Add the default derive to the struct.
     input.attrs.push(syn::parse_quote! { #[derive(Default)] });
+    input.generics.params.push(syn::parse_quote! { 'a });
 
     //Create a function instantiate.
     let instantiate = quote::quote! {
-        impl #name {
-            pub fn instantiate(handle: crate::entities::world::Entity, world: crate::entities::world::World) -> Self {
-                let cmds = crate::entities::world::CommandBuffer::new(world.inner().deref());
-                Self { _gen_handle: handle, _gen_cmds: cmds, _gen_world: world, ..Default::default() }
+        impl<'a> #name<'a> {
+            pub fn instantiate(handle: crate::entities::world::Entity, world: &'a crate::entities::world::World) -> Self {
+                let cmds = crate::entities::world::CommandBuffer::new(unsafe { world.inner().deref() });
+                Self { _gen_handle: handle, _gen_cmds: cmds, _gen_world: Some(world), ..Default::default() }
             }
         }
     };
 
     //Implement the entity trait for the struct
     let expanded = quote::quote! {
-        impl crate::entities::world::Entable for #name {
+        impl<'a> crate::entities::world::Entable for #name<'a> {
             fn handle(&self) -> crate::entities::world::Entity {
                 self._gen_handle
             }
 
-            fn world(&self) -> &crate::entities::world::World {
-                &self._gen_world
-            }
-
-            fn world_mut(&mut self) -> &mut crate::entities::world::World {
-                &mut self._gen_world
+            fn world(&self) -> &'a crate::entities::world::World {
+                &self._gen_world.expect("THIS IS A BUG! World is not initialized.")
             }
 
             fn cmds(&self) -> &crate::entities::world::CommandBuffer {

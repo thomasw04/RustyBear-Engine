@@ -8,7 +8,7 @@ use legion::{
 // Abstraction layer for managing state.
 // -------------------------------------
 use std::{
-    cell::{Ref, RefMut, UnsafeCell},
+    cell::{Ref, UnsafeCell},
     ops::DerefMut,
 };
 
@@ -25,7 +25,6 @@ pub type Script = Box<dyn Scriptable + Send + Sync>;
 pub trait Entable {
     fn handle(&self) -> Entity;
     fn world(&self) -> &World;
-    fn world_mut(&mut self) -> &mut World;
     fn cmds(&self) -> &CommandBuffer;
     fn cmds_mut(&mut self) -> &mut CommandBuffer;
 
@@ -90,7 +89,7 @@ pub trait Entable {
     ) where
         Q::View: ReadOnly,
     {
-        self.world().for_each::<Q>(func)
+        unsafe { self.world().for_each::<Q>(func) }
     }
 
     fn get<'a, Q: IntoQuery + Send + Sync>(
@@ -99,14 +98,7 @@ pub trait Entable {
     where
         Q::View: ReadOnly,
     {
-        self.world().query_get::<Q>(self.handle())
-    }
-
-    fn get_mut<'a, Q: IntoQuery + Send + Sync>(
-        &'a mut self,
-    ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element> {
-        let handle = self.handle();
-        self.world_mut().query_mut::<Q>(handle)
+        unsafe { self.world().query_get::<Q>(self.handle()) }
     }
 
     fn get_by_entity<'a, Q: IntoQuery + Send + Sync>(
@@ -115,13 +107,7 @@ pub trait Entable {
     where
         Q::View: ReadOnly,
     {
-        self.world().query_get::<Q>(entity)
-    }
-
-    fn get_by_entity_mut<'a, Q: IntoQuery + Send + Sync>(
-        &'a mut self, entity: Entity,
-    ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element> {
-        self.world_mut().query_mut::<Q>(entity)
+        unsafe { self.world().query_get::<Q>(entity) }
     }
 }
 
@@ -186,106 +172,53 @@ impl World {
         Self(UnsafeCell::new(legion::World::default()))
     }
 
-    pub fn spawn<T>(&mut self, components: T) -> Entity
-    where
-        Option<T>: IntoComponentSource,
-    {
-        let entity = self.0.get_mut().push(components);
-
-        if let Some(mut ent) = self.0.get_mut().entry(entity) {
-            if let Ok(com) = ent.get_component_mut::<Script>() {
-                com.on_spawn(entity.into());
-            }
-        }
-
-        entity.into()
+    /// # Safety
+    /// Creates a mutable reference to the world.
+    /// This reference is only allowed to exist while no other reference (mutable or not) is alive.
+    #[allow(clippy::mut_from_ref)]
+    pub unsafe fn inner_mut(&self) -> &mut legion::World {
+        self.0.get().as_mut().expect("This is a bug. World is not initialized.")
     }
 
-    pub fn is_alive(&self, entity: Entity) -> bool {
-        let world =
-            unsafe { self.0.get().as_ref().expect("This is a bug. World is not initialized.") };
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
+    pub unsafe fn inner(&self) -> &legion::World {
+        self.0.get().as_ref().expect("This is a bug. World is not initialized.")
+    }
+
+    pub unsafe fn apply(&self, cmds: &mut CommandBuffer) {
+        let world = self.inner_mut();
+
+        cmds.0.flush(world, &mut legion::Resources::default());
+    }
+
+    pub unsafe fn is_alive(&self, entity: Entity) -> bool {
+        let world = self.inner();
         world.contains(entity.into())
     }
 
-    pub fn despawn(&mut self, entity: Entity) -> bool {
-        self.0.get_mut().remove(entity.into())
-    }
-
-    pub fn get<'a, T: Component>(&'a self, _entity: Entity) -> Option<Ref<'a, T>> {
-        /*  let inner = self.0.borrow();
-
-        if inner.contains(entity.into()) && inner.entry_ref(entity.into()).is_ok() {
-            Some(Ref::map(self.0.borrow(), |x| {
-                x.entry_ref(entity.into()).unwrap().into_component().unwrap()
-            }))
-        } else {
-            None
-        }*/
-        todo!()
-    }
-
-    pub fn add<T: Component>(&mut self, entity: Entity, com: T) {
-        if let Some(mut entity) = self.0.get_mut().entry(entity.into()) {
-            entity.add_component(com);
-        }
-    }
-
-    pub fn remove<T: Component>(&mut self, entity: Entity) {
-        if let Some(mut entity) = self.0.get_mut().entry(entity.into()) {
-            entity.remove_component::<T>();
-        }
-    }
-
-    pub fn for_each<Q: IntoQuery + Send + Sync>(
+    pub unsafe fn for_each<Q: IntoQuery + Send + Sync>(
         &self, func: impl Fn(<<Q as IntoView>::View as legion::query::View<'_>>::Element),
     ) where
         Q::View: ReadOnly,
     {
-        let world =
-            unsafe { self.0.get().as_ref().expect("This is a bug. World is not initialized.") };
+        let world = self.inner();
+
         unsafe {
             <Q>::query().for_each_unchecked(world, func);
         }
     }
 
-    pub fn query_get<Q: IntoQuery + Send + Sync>(
+    pub unsafe fn query_get<Q: IntoQuery + Send + Sync>(
         &self, entity: Entity,
     ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element>
     where
         Q::View: ReadOnly,
     {
-        let world =
-            unsafe { self.0.get().as_ref().expect("This is a bug. World is not initialized.") };
+        let world = self.inner();
 
         unsafe { <Q>::query().get_unchecked(world, entity.into()).ok() }
-    }
-
-    pub fn query_mut<Q: IntoQuery + Send + Sync>(
-        &mut self, entity: Entity,
-    ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element> {
-        unsafe {
-            let world = self.0.get_mut();
-            <Q>::query().get_unchecked(world, entity.into()).ok()
-        }
-    }
-
-    pub fn for_each_mut<Q: IntoQuery + Send + Sync>(
-        &mut self, func: impl FnMut(<<Q as IntoView>::View as legion::query::View<'_>>::Element),
-    ) {
-        let mut world = self.0.get_mut();
-        unsafe {
-            <Q>::query().for_each_unchecked(world.deref_mut(), func);
-        }
-    }
-
-    pub fn inner_mut(&mut self) -> RefMut<legion::World> {
-        // self.0.get_mut()
-        todo!()
-    }
-
-    pub fn inner(&self) -> Ref<legion::World> {
-        //  self.0.borrow()
-        todo!()
     }
 
     pub fn tick(&mut self, delta: &Timestep, input_state: &Ref<InputState>) {
