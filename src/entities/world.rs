@@ -92,8 +92,8 @@ pub trait Entable {
         unsafe { self.world().for_each::<Q>(func) }
     }
 
-    fn get<'a, Q: IntoQuery + Send + Sync>(
-        &'a self,
+    fn get<Q: IntoQuery + Send + Sync>(
+        &self,
     ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element>
     where
         Q::View: ReadOnly,
@@ -101,8 +101,8 @@ pub trait Entable {
         unsafe { self.world().query_get::<Q>(self.handle()) }
     }
 
-    fn get_by_entity<'a, Q: IntoQuery + Send + Sync>(
-        &'a self, entity: Entity,
+    fn get_by_entity<Q: IntoQuery + Send + Sync>(
+        &self, entity: Entity,
     ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element>
     where
         Q::View: ReadOnly,
@@ -111,14 +111,8 @@ pub trait Entable {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Entity(Option<legion::Entity>);
-
-impl Default for Entity {
-    fn default() -> Self {
-        Self(None)
-    }
-}
 
 impl From<legion::Entity> for Entity {
     fn from(value: legion::Entity) -> Self {
@@ -187,29 +181,38 @@ impl World {
         self.0.get().as_ref().expect("This is a bug. World is not initialized.")
     }
 
+    /// # Safety
+    /// Creates a mutable reference to the world.
+    /// This reference is only allowed to exist while no other reference (mutable or not) is alive.
     pub unsafe fn apply(&self, cmds: &mut CommandBuffer) {
         let world = self.inner_mut();
 
         cmds.0.flush(world, &mut legion::Resources::default());
     }
 
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
     pub unsafe fn is_alive(&self, entity: Entity) -> bool {
         let world = self.inner();
         world.contains(entity.into())
     }
 
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
     pub unsafe fn for_each<Q: IntoQuery + Send + Sync>(
         &self, func: impl Fn(<<Q as IntoView>::View as legion::query::View<'_>>::Element),
     ) where
         Q::View: ReadOnly,
     {
         let world = self.inner();
-
-        unsafe {
-            <Q>::query().for_each_unchecked(world, func);
-        }
+        <Q>::query().for_each_unchecked(world, func);
     }
 
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
     pub unsafe fn query_get<Q: IntoQuery + Send + Sync>(
         &self, entity: Entity,
     ) -> Option<<<Q as IntoView>::View as legion::query::View<'_>>::Element>
@@ -217,8 +220,7 @@ impl World {
         Q::View: ReadOnly,
     {
         let world = self.inner();
-
-        unsafe { <Q>::query().get_unchecked(world, entity.into()).ok() }
+        <Q>::query().get_unchecked(world, entity.into()).ok()
     }
 
     pub fn tick(&mut self, delta: &Timestep, input_state: &Ref<InputState>) {
