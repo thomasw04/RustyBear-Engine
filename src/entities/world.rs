@@ -120,9 +120,9 @@ impl From<legion::Entity> for Entity {
     }
 }
 
-impl Into<legion::Entity> for Entity {
-    fn into(self) -> legion::Entity {
-        match self.0 {
+impl From<Entity> for legion::Entity {
+    fn from(value: Entity) -> Self {
+        match value.0 {
             Some(x) => x,
             None => panic!("Invalid entity identifier."),
         }
