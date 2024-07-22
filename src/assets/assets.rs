@@ -44,6 +44,8 @@ static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
 pub static SPRITE_SHADER: Lazy<Ptr<Shader>> = Lazy::new(|| Ptr::new(Guid::new(0x1)));
 pub static BACKGROUND_SHADER: Lazy<Ptr<Shader>> = Lazy::new(|| Ptr::new(Guid::new(0x2)));
 
+pub static mut STATIC_ASSETS: Lazy<StaticAssets> = Lazy::new(StaticAssets::new);
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct GenPtr {
     guid: Guid,
@@ -104,6 +106,48 @@ impl<T> Ptr<T> {
 
     pub fn dead() -> Self {
         Ptr { guid: Guid::dead(), phantom: std::marker::PhantomData }
+    }
+}
+
+pub struct StaticAssets {
+    assets: HashMap<Guid, AssetType>,
+}
+
+impl StaticAssets {
+    pub fn get<T: 'static>(&self, ptr: &Ptr<T>) -> Option<&T> {
+        self.assets.get(&ptr.guid).and_then(|asset| Assets::to_asset(asset))
+    }
+
+    pub fn new() -> Self {
+        StaticAssets { assets: HashMap::new() }
+    }
+
+    pub fn register(&mut self, ctx: &VisContext) {
+        self.assets.insert(
+            SPRITE_SHADER.guid,
+            AssetType::Shader(
+                Shader::new(
+                    ctx,
+                    SPRITE_SHADER.guid,
+                    wgpu::ShaderSource::Wgsl(include_str!("sprite.wgsl").into()),
+                    what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
+                )
+                .unwrap(),
+            ),
+        );
+
+        self.assets.insert(
+            BACKGROUND_SHADER.guid,
+            AssetType::Shader(
+                Shader::new(
+                    ctx,
+                    BACKGROUND_SHADER.guid,
+                    wgpu::ShaderSource::Wgsl(include_str!("background.wgsl").into()),
+                    what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
+                )
+                .unwrap(),
+            ),
+        );
     }
 }
 

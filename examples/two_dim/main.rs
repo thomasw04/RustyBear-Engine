@@ -175,7 +175,7 @@ impl<'a> TwoDimApp<'a> {
         let default = worlds.add_world(default);
         worlds.start_world(default);
 
-        let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
+        let renderer = RcCell::new(Renderer2D::new(context));
         stack.subscribe(EventType::Layer, renderer.clone());
 
         let camera = RcCell::new(OrthographicCamera::default());

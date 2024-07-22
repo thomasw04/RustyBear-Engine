@@ -100,7 +100,7 @@ impl<'a> LDTKApp<'a> {
 			"Failed to load ldtk file. Make sure you have the test.ldtk file in the examples/ldtk folder",
 		);
 
-        let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
+        let renderer = RcCell::new(Renderer2D::new(context));
         stack.subscribe(EventType::Layer, renderer.clone());
 
         let mut cam = OrthographicCamera::default();

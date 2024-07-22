@@ -81,14 +81,13 @@ impl MyHandler {
     }
 }
 
-pub struct RustyRuntime<'a> {
-    stack: ModuleStack<'a>,
+pub struct RustyRuntime {
     renderer: RcCell<Renderer>,
     camera: RcCell<PerspectiveCamera>,
     demo_window: egui_demo_lib::DemoWindows,
 }
 
-impl<'a> Application<'a> for RustyRuntime<'a> {
+impl<'a> Application<'a> for RustyRuntime {
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool {
         match event {
             event::Event::KeyboardInput { keycode, state } => match keycode {
@@ -177,17 +176,11 @@ impl<'a> Application<'a> for RustyRuntime<'a> {
     }
 
     fn quit(&mut self) {}
-
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
-        &mut self.stack
-    }
 }
 
-impl<'a> RustyRuntime<'a> {
-    pub fn new(context: &Context) -> RustyRuntime<'a> {
+impl<'a> RustyRuntime {
+    pub fn new(context: &Context, stack: &mut ModuleStack<'a>) -> RustyRuntime {
         log::info!("Init Application");
-
-        let mut stack = ModuleStack::new();
 
         let loc = context.config.project_config().location.clone().map(what::Location::File);
 
@@ -214,6 +207,6 @@ impl<'a> RustyRuntime<'a> {
 
         camera.borrow_mut().set_centered(true);
 
-        RustyRuntime { stack, renderer, camera, demo_window: egui_demo_lib::DemoWindows::default() }
+        RustyRuntime { renderer, camera, demo_window: egui_demo_lib::DemoWindows::default() }
     }
 }

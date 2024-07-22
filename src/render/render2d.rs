@@ -3,7 +3,7 @@ use hecs::EntityRef;
 use wgpu::TextureView;
 use winit::window::Window;
 
-use crate::assets::assets::{Assets, BACKGROUND_SHADER};
+use crate::assets::assets::{Assets, BACKGROUND_SHADER, STATIC_ASSETS};
 use crate::assets::buffer::Vertices;
 use crate::assets::shader::ShaderVariant;
 use crate::assets::texture::Texture2D;
@@ -45,7 +45,7 @@ impl EventSubscriber for Renderer2D {
 
 #[profiling::all_functions]
 impl Renderer2D {
-    pub fn new(context: &Context, _assets: &mut Assets) -> Self {
+    pub fn new(context: &Context) -> Self {
         //Renderable setup
         let sample_count = 4;
         let pipelines = PipelineFactory::new();
@@ -91,6 +91,38 @@ impl Renderer2D {
                 animation.update(context, delta, sprite);
             }
         }
+    }
+
+    pub fn render_background(&mut self, ctx: &mut Context, view: &TextureView) {
+        let context = ctx.graphics.as_ref();
+        let fbo = &self.framebuffer;
+
+        let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Renderer2D Render Encoder"),
+        });
+
+        {
+            let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, true);
+
+            if let (Some(bg), Some(shader)) =
+                (&self.background, unsafe { STATIC_ASSETS.get(&BACKGROUND_SHADER) })
+            {
+                let shader: ShaderVariant = shader.into();
+                let config = RenderPipelineConfig::new(&shader, None::<&Vertices>, bg, &[]);
+
+                let pipeline = self.pipelines.get_or_create(context, &config);
+
+                render_pass.set_pipeline(pipeline);
+
+                for (i, bind_group) in bg.groups().iter().enumerate() {
+                    render_pass.set_bind_group(i as u32, bind_group, &[]);
+                }
+
+                render_pass.draw(0..3, 0..1);
+            }
+        }
+
+        context.queue.submit(std::iter::once(encoder.finish()));
     }
 
     pub fn render(

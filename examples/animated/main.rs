@@ -91,10 +91,6 @@ impl<'a> Application<'a> for AnimatedApp<'a> {
     }
 
     fn quit(&mut self) {}
-
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
-        &mut self.stack
-    }
 }
 
 /*struct Player {
@@ -170,7 +166,7 @@ impl<'a> AnimatedApp<'a> {
         let default = worlds.add_world(default);
         worlds.start_world(default);
 
-        let renderer = RcCell::new(Renderer2D::new(context, &mut assets));
+        let renderer = RcCell::new(Renderer2D::new(context));
         stack.subscribe(EventType::Layer, renderer.clone());
 
         let white = assets.request_asset("data/white.fur", 0);

@@ -3,6 +3,7 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 use RustyBear_Engine::context::Context;
+use RustyBear_Engine::core::ModuleStack;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::window::Window;
 use RustyBear_Engine::{logging, RustyRuntime};
@@ -18,9 +19,11 @@ fn main() {
     let window = Window::new("{}".to_string());
     let context = pollster::block_on(Context::new(window.native.clone(), config));
 
+    let mut stack = ModuleStack::new();
+
     //Create and init the application
-    let myapp = RustyRuntime::new(&context);
+    let myapp = RustyRuntime::new(&context, &mut stack);
 
     //Move my app and window into the context. And run the app.
-    context.run(myapp, window);
+    context.run(myapp, window, stack);
 }

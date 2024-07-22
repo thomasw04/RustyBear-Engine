@@ -8,6 +8,7 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoopWindowTarget;
 use winit::keyboard::{Key, NamedKey};
 
+use crate::assets::assets::STATIC_ASSETS;
 use crate::core::{Application, ModuleStack};
 use crate::environment::config::Config;
 use crate::event;
@@ -40,7 +41,7 @@ impl<'a> Context<'a> {
         let sysinfo = System::new_with_specifics(sysinfo::RefreshKind::new().with_memory());
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: wgpu::Backends::VULKAN,
             dx12_shader_compiler: Default::default(),
             ..Default::default()
         });
@@ -135,12 +136,19 @@ impl<'a> Context<'a> {
         activated_features
     }
 
-    pub fn run(mut self, mut app: impl Application<'a> + 'static, window: Window) {
+    pub fn run(
+        mut self, mut app: impl Application<'a> + 'static, window: Window,
+        mut stack: ModuleStack<'a>,
+    ) {
+        unsafe {
+            STATIC_ASSETS.register(&self.graphics);
+        }
+
         let mut gilrs = gilrs::Gilrs::new().unwrap();
 
         //Register an EventSubscriber which maintains a list of current KeyStates.
         let input_state = rccell::RcCell::new(InputState::new());
-        app.get_stack().subscribe(event::EventType::App, input_state.clone());
+        stack.subscribe(event::EventType::App, input_state.clone());
 
         //Time since last frame
         let mut ts = Timestep::default();
@@ -178,7 +186,7 @@ impl<'a> Context<'a> {
                         _ => {}
                     }
 
-                    Context::dispatch_event(app.get_stack(), &window.native, event, window_target, &mut self);
+                    Context::dispatch_event(&mut stack, &window.native, event, window_target, &mut self);
                     app.on_event(&event::to_event(event), &mut self)
                 },
 
@@ -192,7 +200,7 @@ impl<'a> Context<'a> {
             let gilrs_event_option = gilrs.next_event();
 
             if let Some(gilrs_event) = gilrs_event_option {
-                Context::dispatch_gamepad_event(app.get_stack(), &gilrs_event, window_target, &mut self);
+                Context::dispatch_gamepad_event(&mut stack, &gilrs_event, window_target, &mut self);
             }
 
             //Finish the profiling frame.

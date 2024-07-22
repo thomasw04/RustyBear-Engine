@@ -1,12 +1,9 @@
-use std::alloc::LayoutError;
-use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
+use std::ops;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::{alloc, ops};
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use instant::Instant;
 use libc::c_void;
 use refpool::{Pool, PoolRef};
@@ -266,6 +263,28 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
 
     pub fn remove(&mut self, key: &K) -> Option<PoolRef<V>> {
         self.map.remove(key)
+    }
+}
+
+pub struct Transformer {
+    indices: HashMap<u64, u64>,
+    tree: Vec<Option<(glam::Quat, glam::Vec3)>>,
+}
+
+impl Transformer {
+    //The indexing scheme is as follows:
+    // n - root
+    // n * 2 - left child
+    // n * 2 + 1 - right child
+
+    fn new() -> Self {
+        Self { indices: HashMap::new(), tree: Vec::new() }
+    }
+
+    fn grow(&mut self, new_index: u64) {
+        if self.tree.len() <= new_index as usize {
+            self.tree.resize(new_index as usize + 1, None);
+        }
     }
 }
 

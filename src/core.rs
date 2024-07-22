@@ -30,8 +30,6 @@ pub trait Application<'a> {
     fn gui_render(&mut self, view: &wgpu::TextureView, context: &mut Context);
     fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
     fn quit(&mut self);
-
-    fn get_stack(&mut self) -> &mut ModuleStack<'a>;
 }
 
 #[derive(Default)]

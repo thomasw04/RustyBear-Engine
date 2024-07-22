@@ -253,6 +253,26 @@ impl Texture2D {
         Texture2D { texture, view }
     }
 
+    pub fn set_pixels(&self, context: &VisContext, dim: (u32, u32), bytes: &[u8]) {
+        let extend = wgpu::Extent3d { width: dim.0, height: dim.1, depth_or_array_layers: 1 };
+
+        context.queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &self.texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            bytes,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * dim.0),
+                rows_per_image: Some(dim.1),
+            },
+            extend,
+        );
+    }
+
     pub fn error_texture(context: &VisContext) -> &Texture2D {
         static ERROR_TEXTURE: OnceCell<Texture2D> = OnceCell::new();
 
