@@ -8,7 +8,7 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoopWindowTarget;
 use winit::keyboard::{Key, NamedKey};
 
-use crate::assets::assets::STATIC_ASSETS;
+use crate::assets::assets::Assets;
 use crate::core::{Application, ModuleStack};
 use crate::environment::config::Config;
 use crate::event;
@@ -115,15 +115,11 @@ impl<'a> Context<'a> {
             None,
         );
 
-        Context {
-            graphics: Arc::new(VisContext { device, queue, format }),
-            surface,
-            surface_config,
-            features,
-            egui,
-            config,
-            sysinfo,
-        }
+        let graphics = Arc::new(VisContext { device, queue, format });
+
+        Assets::init_static(&graphics);
+
+        Context { graphics, surface, surface_config, features, egui, config, sysinfo }
     }
 
     fn activated_features(supported_features: wgpu::Features) -> wgpu::Features {
@@ -140,10 +136,6 @@ impl<'a> Context<'a> {
         mut self, mut app: impl Application<'a> + 'static, window: Window,
         mut stack: ModuleStack<'a>,
     ) {
-        unsafe {
-            STATIC_ASSETS.register(&self.graphics);
-        }
-
         let mut gilrs = gilrs::Gilrs::new().unwrap();
 
         //Register an EventSubscriber which maintains a list of current KeyStates.

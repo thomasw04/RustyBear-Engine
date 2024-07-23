@@ -1,9 +1,8 @@
 use glam::Vec4;
-use hecs::EntityRef;
 use wgpu::TextureView;
 use winit::window::Window;
 
-use crate::assets::assets::{Assets, BACKGROUND_SHADER, STATIC_ASSETS};
+use crate::assets::assets::Assets;
 use crate::assets::buffer::Vertices;
 use crate::assets::shader::ShaderVariant;
 use crate::assets::texture::Texture2D;
@@ -14,6 +13,7 @@ use crate::entities::transform2d::Transform2D;
 use crate::entities::worlds::Worlds;
 use crate::event::{self, EventSubscriber};
 use crate::render::renderer::Renderer;
+use crate::static_asset;
 use crate::utils::Timestep;
 
 use super::camera::CameraBuffer;
@@ -104,9 +104,7 @@ impl Renderer2D {
         {
             let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, true);
 
-            if let (Some(bg), Some(shader)) =
-                (&self.background, unsafe { STATIC_ASSETS.get(&BACKGROUND_SHADER) })
-            {
+            if let (Some(bg), Some(shader)) = (&self.background, static_asset!(BackgroundShader)) {
                 let shader: ShaderVariant = shader.into();
                 let config = RenderPipelineConfig::new(&shader, None::<&Vertices>, bg, &[]);
 
@@ -145,8 +143,8 @@ impl Renderer2D {
                 let (x, y, w, h) = camera_buffer.viewport();
                 render_pass.set_viewport(x, y, w, h, 0.0, 1.0);
 
-                if let (Some(bg), Ok(shader)) =
-                    (&self.background, assets.try_get(&BACKGROUND_SHADER))
+                if let (Some(bg), Some(shader)) =
+                    (&self.background, static_asset!(BackgroundShader))
                 {
                     let shader: ShaderVariant = shader.into();
                     let config = RenderPipelineConfig::new(&shader, None::<&Vertices>, bg, &[]);

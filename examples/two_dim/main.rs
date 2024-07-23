@@ -96,10 +96,6 @@ impl<'a> Application<'a> for TwoDimApp<'a> {
     }
 
     fn quit(&mut self) {}
-
-    fn get_stack(&mut self) -> &mut ModuleStack<'a> {
-        &mut self.stack
-    }
 }
 
 /*struct Player {}

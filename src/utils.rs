@@ -1,7 +1,9 @@
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::ops;
+use std::ops::{self};
 use std::path::{Path, PathBuf};
+use std::ptr::null_mut;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use hashbrown::{HashMap, HashSet};
 use instant::Instant;
@@ -147,7 +149,7 @@ impl Display for Guid {
 }
 
 impl Guid {
-    pub fn new(id: u64) -> Guid {
+    pub const fn new(id: u64) -> Guid {
         Guid { id }
     }
 
@@ -266,24 +268,41 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
     }
 }
 
-pub struct Transformer {
-    indices: HashMap<u64, u64>,
-    tree: Vec<Option<(glam::Quat, glam::Vec3)>>,
+pub struct Deferred<T> {
+    data: AtomicPtr<T>,
 }
 
-impl Transformer {
-    //The indexing scheme is as follows:
-    // n - root
-    // n * 2 - left child
-    // n * 2 + 1 - right child
-
-    fn new() -> Self {
-        Self { indices: HashMap::new(), tree: Vec::new() }
+impl<T> Deferred<T> {
+    pub const fn new() -> Deferred<T> {
+        Deferred { data: AtomicPtr::new(std::ptr::null_mut()) }
     }
 
-    fn grow(&mut self, new_index: u64) {
-        if self.tree.len() <= new_index as usize {
-            self.tree.resize(new_index as usize + 1, None);
+    pub fn write_once(&self, value: T) -> &T {
+        let ptr = Box::into_raw(Box::new(value));
+        match self.data.compare_exchange(null_mut(), ptr, Ordering::Release, Ordering::Relaxed) {
+            Ok(value) => unsafe { &*value },
+            Err(value) => {
+                unsafe { drop(Box::from_raw(ptr)) };
+                unsafe { &*value }
+            }
+        }
+    }
+
+    pub fn read(&self) -> Option<&T> {
+        let ptr = self.data.load(Ordering::Acquire);
+        if ptr.is_null() {
+            None
+        } else {
+            unsafe { Some(&*ptr) }
+        }
+    }
+}
+
+impl<T> Drop for Deferred<T> {
+    fn drop(&mut self) {
+        let ptr = self.data.load(Ordering::Acquire);
+        if !ptr.is_null() {
+            unsafe { drop(Box::from_raw(ptr)) };
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::assets::assets::{Ptr, SPRITE_SHADER};
+use crate::assets::assets::{Ptr, StaticAssets};
 use crate::assets::buffer::{Indices, UniformBuffer, Vertices};
 use crate::assets::shader::Shader;
 use crate::assets::texture::{Sampler, Texture2D};
@@ -70,7 +70,15 @@ impl<'a> Sprite<'a> {
         context: &VisContext, texture: Ptr<Texture2D>, tint: Vec4, coords: Option<&[f32]>,
         sampler: Option<Sampler>,
     ) -> Self {
-        Self::new_custom(context, *SPRITE_SHADER, *SPRITE_SHADER, texture, tint, coords, sampler)
+        Self::new_custom(
+            context,
+            StaticAssets::SpriteShader,
+            StaticAssets::SpriteShader,
+            texture,
+            tint,
+            coords,
+            sampler,
+        )
     }
 
     pub fn set_coords(&mut self, context: &VisContext, coords: &[f32]) {

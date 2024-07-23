@@ -1,6 +1,6 @@
 use glam::Vec4;
 
-use crate::assets::assets::BACKGROUND_SHADER;
+use crate::assets::assets::StaticAssets;
 use crate::assets::texture::Texture2D;
 use crate::render::types::BindGroupEntry;
 
@@ -195,8 +195,8 @@ impl Background2DMaterial {
         });
 
         Background2DMaterial {
-            vertex: *BACKGROUND_SHADER,
-            fragment: *BACKGROUND_SHADER,
+            vertex: StaticAssets::BackgroundShader,
+            fragment: StaticAssets::BackgroundShader,
             bind_layout: [bind_layout],
             bind_group: [bind_group],
             buffer,
