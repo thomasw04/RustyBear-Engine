@@ -1,8 +1,5 @@
-use std::cell::Ref;
-
 use crate::context::Context;
 use crate::event::{Event, EventStack, EventSubscriber, EventType};
-use crate::input::InputState;
 use crate::utils::Timestep;
 
 use rccell::RcCell;
@@ -28,7 +25,7 @@ pub trait Application<'a> {
         &mut self, view: &wgpu::TextureView, context: &mut Context, window: &winit::window::Window,
     );
     fn gui_render(&mut self, view: &wgpu::TextureView, context: &mut Context);
-    fn update(&mut self, delta: &Timestep, input_state: Ref<InputState>, context: &mut Context);
+    fn update(&mut self, delta: &Timestep, context: &mut Context);
     fn quit(&mut self);
 }
 

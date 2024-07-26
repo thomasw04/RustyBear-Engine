@@ -288,7 +288,7 @@ impl<T> Deferred<T> {
         }
     }
 
-    pub fn read(&self) -> Option<&T> {
+    pub fn read<'a>(&'a self) -> Option<&'a T> {
         let ptr = self.data.load(Ordering::Acquire);
         if ptr.is_null() {
             None

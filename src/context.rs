@@ -11,7 +11,7 @@ use winit::keyboard::{Key, NamedKey};
 use crate::assets::assets::Assets;
 use crate::core::{Application, ModuleStack};
 use crate::environment::config::Config;
-use crate::event;
+use crate::event::{self};
 use crate::input::InputState;
 use crate::utils::Timestep;
 use crate::window::Window;
@@ -163,7 +163,7 @@ impl<'a> Context<'a> {
                             self.resize(**new_inner_size);
                         },*/
                         WindowEvent::RedrawRequested => {
-                            app.update(ts.step_fwd(), input_state.borrow(), &mut self);
+                            app.update(ts.step_fwd(), &mut self);
 
                             match self.render(&window.native, &mut app) {
                                 Ok(_) => {}
@@ -179,7 +179,7 @@ impl<'a> Context<'a> {
                     }
 
                     Context::dispatch_event(&mut stack, &window.native, event, window_target, &mut self);
-                    app.on_event(&event::to_event(event), &mut self)
+                    app.on_event(&event.into(), &mut self)
                 },
 
                 Event::AboutToWait => {
@@ -189,10 +189,9 @@ impl<'a> Context<'a> {
                 _ => {false}
             };
 
-            let gilrs_event_option = gilrs.next_event();
-
-            if let Some(gilrs_event) = gilrs_event_option {
+            if let Some(gilrs_event) = gilrs.next_event() {
                 Context::dispatch_gamepad_event(&mut stack, &gilrs_event, window_target, &mut self);
+                app.on_event(&(&gilrs_event).into(), &mut self);
             }
 
             //Finish the profiling frame.
@@ -254,8 +253,7 @@ impl<'a> Context<'a> {
         apps: &mut ModuleStack, window: &winit::window::Window, event: &WindowEvent,
         window_target: &EventLoopWindowTarget<()>, context: &mut Context,
     ) -> bool {
-        let return_value =
-            apps.dispatch_event(event::EventType::Layer, &event::to_event(event), context);
+        let return_value = apps.dispatch_event(event::EventType::Layer, &event.into(), context);
 
         if *event == WindowEvent::CloseRequested || *event == WindowEvent::Destroyed {
             window_target.exit();
@@ -292,6 +290,6 @@ impl<'a> Context<'a> {
         apps: &mut ModuleStack, event: &gilrs::Event, _window_target: &EventLoopWindowTarget<()>,
         context: &mut Context,
     ) -> bool {
-        apps.dispatch_event(event::EventType::Layer, &event::to_gamepad_event(event), context)
+        apps.dispatch_event(event::EventType::Layer, &event.into(), context)
     }
 }

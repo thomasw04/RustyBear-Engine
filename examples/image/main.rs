@@ -5,19 +5,20 @@ use std::path::Path;
 use glam::Vec4;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
-use RustyBear_Engine::assets::assets::{Assets, STATIC_ASSETS};
 use RustyBear_Engine::assets::texture::Texture2D;
 use RustyBear_Engine::context::Context;
 use RustyBear_Engine::core::{Application, ModuleStack};
-use RustyBear_Engine::entities::worlds::Worlds;
 use RustyBear_Engine::environment::config::Config;
-use RustyBear_Engine::event::Event;
+use RustyBear_Engine::event::{Event, EventSubscriber};
+use RustyBear_Engine::input::{self, InputState};
+use RustyBear_Engine::logging;
 use RustyBear_Engine::render::render2d::Renderer2D;
+use RustyBear_Engine::utils::Timestep;
 use RustyBear_Engine::window::Window;
-use RustyBear_Engine::{logging, render};
 
 struct App {
     renderer: Renderer2D,
+    input_state: InputState,
 }
 
 impl App {
@@ -31,12 +32,16 @@ impl App {
             Vec4::new(1.0, 1.0, 1.0, 1.0),
         );
 
-        Self { renderer }
+        let input_state = InputState::new();
+
+        Self { renderer, input_state }
     }
 }
 
 impl<'a> Application<'a> for App {
     fn on_event(&mut self, event: &Event, context: &mut Context) -> bool {
+        self.renderer.on_event(event, context);
+        self.input_state.on_event(event, context);
         false
     }
 
@@ -51,10 +56,7 @@ impl<'a> Application<'a> for App {
         self.renderer.render_background(context, view);
     }
 
-    fn update(
-        &mut self, delta: &RustyBear_Engine::utils::Timestep,
-        input_state: std::cell::Ref<RustyBear_Engine::input::InputState>, context: &mut Context,
-    ) {
+    fn update(&mut self, delta: &Timestep, context: &mut Context) {
         /*self.texture.set_pixels(
             &context.graphics,
             (2, 2),

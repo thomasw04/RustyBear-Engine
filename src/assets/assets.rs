@@ -9,13 +9,13 @@ use crate::context::VisContext;
 use crate::logging;
 use crate::render::material::GenericMaterial;
 use crate::render::types::BindGroupEntry;
-use crate::utils::{Deferred, Guid, GuidGenerator, TypeDisplay};
+use crate::utils::{Guid, GuidGenerator, TypeDisplay};
 
 use std::any::Any;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, OnceLock};
 
 use super::buffer::UniformBuffer;
 use super::shader::Shader;
@@ -40,6 +40,8 @@ static LOADING_SPINNER_STYLE: Lazy<ProgressStyle> = Lazy::new(|| {
     ProgressStyle::with_template("{elapsed_precise} \u{1b}[32m[INFO]\u{1b}[0m {spinner} {wide_msg}")
         .unwrap()
 });
+
+pub static STATIC: OnceLock<StaticAssets> = OnceLock::new();
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct GenPtr {
@@ -119,31 +121,23 @@ impl StaticAssets {
     pub fn new(ctx: &VisContext) -> Self {
         let mut assets = HashMap::new();
 
-        assets.insert(
+        if let Ok(shader) = Shader::new(
+            ctx,
             StaticAssets::SpriteShader.guid,
-            AssetType::Shader(
-                Shader::new(
-                    ctx,
-                    StaticAssets::SpriteShader.guid,
-                    wgpu::ShaderSource::Wgsl(include_str!("sprite.wgsl").into()),
-                    what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
-                )
-                .unwrap(),
-            ),
-        );
+            wgpu::ShaderSource::Wgsl(include_str!("sprite.wgsl").into()),
+            what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
+        ) {
+            assets.insert(StaticAssets::SpriteShader.guid, AssetType::Shader(shader));
+        }
 
-        assets.insert(
+        if let Ok(shader) = Shader::new(
+            ctx,
             StaticAssets::BackgroundShader.guid,
-            AssetType::Shader(
-                Shader::new(
-                    ctx,
-                    StaticAssets::BackgroundShader.guid,
-                    wgpu::ShaderSource::Wgsl(include_str!("background.wgsl").into()),
-                    what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
-                )
-                .unwrap(),
-            ),
-        );
+            wgpu::ShaderSource::Wgsl(include_str!("background.wgsl").into()),
+            what::ShaderStages::FRAGMENT | what::ShaderStages::VERTEX,
+        ) {
+            assets.insert(StaticAssets::BackgroundShader.guid, AssetType::Shader(shader));
+        }
 
         StaticAssets { assets: HashMap::new() }
     }
@@ -162,24 +156,16 @@ pub struct Assets {
 #[macro_export]
 macro_rules! static_asset {
     ($name:ident) => {
-        Assets::get_static(&crate::assets::assets::StaticAssets::$name)
+        $crate::assets::assets::STATIC
+            .get()
+            .map_or(None, |x| x.get(&$crate::assets::assets::StaticAssets::$name))
     };
 }
 
 #[profiling::all_functions]
 impl Assets {
-    const static_assets: Deferred<StaticAssets> = Deferred::new();
-
     pub fn init_static(ctx: &VisContext) {
-        Self::static_assets.write_once(StaticAssets::new(ctx));
-    }
-
-    pub fn get_static<T: 'static>(ptr: &Ptr<T>) -> Option<&T> {
-        if let Some(assets) = Self::static_assets.read() {
-            assets.get(ptr)
-        } else {
-            None
-        }
+        let _ = STATIC.set(StaticAssets::new(ctx));
     }
 
     pub fn new(context: Arc<VisContext>, loc: Option<what::Location>, max_size: usize) -> Self {
@@ -196,7 +182,7 @@ impl Assets {
         let (in_sender, in_receiver): InChannel = mpsc::channel();
         let (out_sender, out_receiver): OutChannel = mpsc::channel();
 
-        let mut assets = Assets {
+        let assets = Assets {
             gpu_cache,
             path_cache,
             generator,
