@@ -135,14 +135,6 @@ impl PipelineFactory {
         self.cache.get_raw(&config.key)
     }
 
-    pub fn get_key<'b>(&self, key: &PipelineConfigKey) -> Option<&'b wgpu::RenderPipeline> {
-        self.cache.get_raw(key)
-    }
-
-    pub fn prepare(&mut self, context: &VisContext, config: &RenderPipelineConfig) {
-        let _ = self.get_or_create(context, config);
-    }
-
     pub fn get_or_create<'b>(
         &mut self, context: &VisContext, config: &RenderPipelineConfig,
     ) -> &'b wgpu::RenderPipeline {

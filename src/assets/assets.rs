@@ -139,7 +139,7 @@ impl StaticAssets {
             assets.insert(StaticAssets::BackgroundShader.guid, AssetType::Shader(shader));
         }
 
-        StaticAssets { assets: HashMap::new() }
+        StaticAssets { assets }
     }
 }
 

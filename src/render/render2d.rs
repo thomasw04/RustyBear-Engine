@@ -1,4 +1,5 @@
 use glam::Vec4;
+use libc::stat;
 use wgpu::TextureView;
 use winit::window::Window;
 
@@ -19,16 +20,25 @@ use crate::utils::Timestep;
 use super::camera::CameraBuffer;
 use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
-use super::material::Background2DMaterial;
+use super::material::BackgroundMaterial;
 use super::types::{BindGroup, IndexBuffer, VertexBuffer};
 use super::utils::create_color_renderpass;
+
+pub enum ImmType<'a> {
+    /// A sprite to be rendered immediately, at some position at the screen.
+    Sprite,
+    /// A texture to be renderer immediately, at the whole screen.
+    Background(&'a BackgroundMaterial),
+    /// A text to be rendered immediately, at some position at the screen.
+    Text,
+}
 
 pub struct Renderer2D {
     framebuffer: Framebuffer,
     pipelines: PipelineFactory,
     camera_buffer: Option<CameraBuffer>,
     egui_renderer: egui_wgpu::Renderer,
-    background: Option<Background2DMaterial>,
+    background: Option<BackgroundMaterial>,
 }
 
 impl EventSubscriber for Renderer2D {
@@ -63,27 +73,25 @@ impl Renderer2D {
                 background.update_tint(context, tint);
             }
             None => {
-                let background = Background2DMaterial::new(context, texture, tint);
+                let background = BackgroundMaterial::new(context, texture, tint);
                 self.background = Some(background);
             }
         }
     }
 
-    pub fn update_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
+    pub fn set_camera_buffer(&mut self, context: &VisContext, camera: [[f32; 4]; 4]) {
         if let Some(camera_buffer) = &mut self.camera_buffer {
             camera_buffer.update_buffer(context, camera);
         }
     }
 
-    pub fn update_viewport(&mut self, viewport: (f32, f32, f32, f32)) {
+    pub fn set_viewport(&mut self, viewport: (f32, f32, f32, f32)) {
         if let Some(camera_buffer) = &mut self.camera_buffer {
             camera_buffer.update_viewport(viewport);
         }
     }
 
-    pub fn update_animations(
-        &mut self, context: &VisContext, delta: &Timestep, worlds: &mut Worlds,
-    ) {
+    pub fn update(&mut self, context: &VisContext, delta: &Timestep, worlds: &mut Worlds) {
         if let Some(world) = worlds.get_mut() {
             for (_entity, (sprite, animation)) in
                 world.query_mut::<(&mut Sprite, &mut Animation2D)>()
@@ -93,37 +101,96 @@ impl Renderer2D {
         }
     }
 
-    pub fn render_background(&mut self, ctx: &mut Context, view: &TextureView) {
+    /// Render an immediate object to the screen. Immediate in this context means not part of a scene. Or not part of a bigger state.
+    /// Although this function caches the created pipeline in the pipeline factory and thus needs a mut ref.
+    pub fn draw_imm(&mut self, ctx: &mut Context, view: &TextureView, obj: ImmType) {
         let context = ctx.graphics.as_ref();
         let fbo = &self.framebuffer;
 
         let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Renderer2D Render Encoder"),
+            label: Some("Renderer2D: Immediate Draw Encoder"),
         });
 
         {
             let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, true);
 
-            if let (Some(bg), Some(shader)) = (&self.background, static_asset!(BackgroundShader)) {
-                let shader: ShaderVariant = shader.into();
-                let config = RenderPipelineConfig::new(&shader, None::<&Vertices>, bg, &[]);
+            match obj {
+                ImmType::Background(material) => {
+                    if let Some(shader) = static_asset!(BackgroundShader) {
+                        let shader = ShaderVariant::Single(shader);
 
-                let pipeline = self.pipelines.get_or_create(context, &config);
+                        let config =
+                            RenderPipelineConfig::new(&shader, None::<&Vertices>, material, &[]);
 
-                render_pass.set_pipeline(pipeline);
+                        let pipeline = self.pipelines.get_or_create(context, &config);
 
-                for (i, bind_group) in bg.groups().iter().enumerate() {
-                    render_pass.set_bind_group(i as u32, bind_group, &[]);
+                        render_pass.set_pipeline(pipeline);
+
+                        for (i, bind_group) in material.groups().iter().enumerate() {
+                            render_pass.set_bind_group(i as u32, bind_group, &[]);
+                        }
+
+                        render_pass.draw(0..3, 0..1);
+                    }
                 }
-
-                render_pass.draw(0..3, 0..1);
+                _ => {
+                    log::warn!("Immediate draw type not supported yet.");
+                }
             }
         }
 
         context.queue.submit(std::iter::once(encoder.finish()));
     }
 
-    pub fn render(
+    pub fn draw_egui(&mut self, ctx: &mut Context, view: &TextureView, window: &Window) {
+        let context = ctx.graphics.as_ref();
+        let fbo = &self.framebuffer;
+
+        let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Renderer2D: GUI Draw Encoder"),
+        });
+
+        //------------------------------------------------------------------------------------------
+        {
+            let egui_ctx = ctx.egui.egui_ctx();
+            let output = egui_ctx.end_frame();
+            let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
+            let texture_delta = output.textures_delta;
+
+            let screen_descriptor = egui_wgpu::ScreenDescriptor {
+                size_in_pixels: [ctx.surface_config.width, ctx.surface_config.height],
+                pixels_per_point: window.scale_factor() as f32,
+            };
+
+            let device = &ctx.graphics.device;
+
+            let queue = &ctx.graphics.queue;
+            self.egui_renderer.update_buffers(
+                device,
+                queue,
+                &mut encoder,
+                &paint_jobs,
+                &screen_descriptor,
+            );
+
+            for (id, delta) in texture_delta.set {
+                self.egui_renderer.update_texture(device, queue, id, &delta);
+            }
+
+            {
+                let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, false);
+                self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
+            }
+
+            for id in texture_delta.free {
+                self.egui_renderer.free_texture(&id);
+            }
+        }
+
+        context.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    pub fn draw(
         &mut self, assets: &mut Assets, worlds: &mut Worlds, ctx: &mut Context, view: &TextureView,
         window: &Window,
     ) {
@@ -235,42 +302,8 @@ impl Renderer2D {
             }
         }
 
-        //------------------------------------------------------------------------------------------
-        {
-            let egui_ctx = ctx.egui.egui_ctx();
-            let output = egui_ctx.end_frame();
-            let paint_jobs = egui_ctx.tessellate(output.shapes, egui_ctx.pixels_per_point());
-            let texture_delta = output.textures_delta;
-
-            let screen_descriptor = egui_wgpu::ScreenDescriptor {
-                size_in_pixels: [ctx.surface_config.width, ctx.surface_config.height],
-                pixels_per_point: window.scale_factor() as f32,
-            };
-
-            let device = &ctx.graphics.device;
-
-            let queue = &ctx.graphics.queue;
-            self.egui_renderer.update_buffers(
-                device,
-                queue,
-                &mut encoder,
-                &paint_jobs,
-                &screen_descriptor,
-            );
-
-            for (id, delta) in texture_delta.set {
-                self.egui_renderer.update_texture(device, queue, id, &delta);
-            }
-
-            {
-                let mut render_pass = create_color_renderpass(&mut encoder, view, fbo, false);
-                self.egui_renderer.render(&mut render_pass, &paint_jobs, &screen_descriptor);
-            }
-
-            for id in texture_delta.free {
-                self.egui_renderer.free_texture(&id);
-            }
-        }
         context.queue.submit(std::iter::once(encoder.finish()));
+
+        self.draw_egui(ctx, view, window);
     }
 }

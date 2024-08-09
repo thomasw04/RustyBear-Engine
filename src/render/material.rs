@@ -156,11 +156,7 @@ impl MaterialLayout for GenericMaterialLayout {
     }
 }
 
-pub struct Background2DMaterial {
-    //Shader
-    vertex: Ptr<Shader>,
-    fragment: Ptr<Shader>,
-
+pub struct BackgroundMaterial {
     //Bind group layout and bind group
     bind_layout: [wgpu::BindGroupLayout; 1],
     bind_group: [wgpu::BindGroup; 1],
@@ -169,7 +165,7 @@ pub struct Background2DMaterial {
     buffer: UniformBuffer,
 }
 
-impl Background2DMaterial {
+impl BackgroundMaterial {
     pub fn new(context: &VisContext, texture: &Texture2D, tint: Vec4) -> Self {
         let mut buffer = UniformBuffer::new(context, std::mem::size_of::<[f32; 4]>());
         buffer.update_buffer(context, bytemuck::cast_slice(&tint.to_array()));
@@ -194,13 +190,7 @@ impl Background2DMaterial {
             ],
         });
 
-        Background2DMaterial {
-            vertex: StaticAssets::BackgroundShader,
-            fragment: StaticAssets::BackgroundShader,
-            bind_layout: [bind_layout],
-            bind_group: [bind_group],
-            buffer,
-        }
+        BackgroundMaterial { bind_layout: [bind_layout], bind_group: [bind_group], buffer }
     }
 
     pub fn update_texture(&mut self, context: &VisContext, texture: &Texture2D) {
@@ -220,35 +210,35 @@ impl Background2DMaterial {
     }
 }
 
-impl MaterialLayout for Background2DMaterial {
+impl MaterialLayout for BackgroundMaterial {
     fn base_config(&self) -> Option<PipelineBaseConfig> {
         None
     }
 }
 
-impl Material for Background2DMaterial {}
+impl Material for BackgroundMaterial {}
 
-impl BindLayout for Background2DMaterial {
+impl BindLayout for BackgroundMaterial {
     fn layouts(&self) -> &[wgpu::BindGroupLayout] {
         &self.bind_layout
     }
 }
 
-impl BindGroup for Background2DMaterial {
+impl BindGroup for BackgroundMaterial {
     fn groups(&self) -> &[wgpu::BindGroup] {
         &self.bind_group
     }
 }
 
-impl FragmentShader for Background2DMaterial {
+impl FragmentShader for BackgroundMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        &self.fragment
+        &StaticAssets::BackgroundShader
     }
 }
 
-impl VertexShader for Background2DMaterial {
+impl VertexShader for BackgroundMaterial {
     fn ptr(&self) -> &Ptr<Shader> {
-        &self.vertex
+        &StaticAssets::BackgroundShader
     }
 }
 
