@@ -1,12 +1,13 @@
 use std::cell::Ref;
 use std::ops::Deref;
 
+use crate::entities::world::Entity;
 use crate::input::InputState;
 use crate::utils::Timestep;
 use derive::Entity;
 use legion::IntoQuery;
 
-use super::world::{Script, World};
+use super::world::{Script, Scriptable, World};
 
 use crate::entities::world::Entable;
 
@@ -16,17 +17,27 @@ pub struct Player {
     y: f32,
 }
 
+impl Scriptable for Player<'_> {
+    fn on_spawn(&mut self, entity: Entity) {
+        println!("Player spawned: {:?}", entity);
+    }
+
+    fn tick(&mut self, _delta: &Timestep, _input_state: &Ref<InputState>) {
+        self.iter::<()>().for_each(|(entity, player)| {
+            println!("Player: {:?}", entity);
+        });
+    }
+
+    fn on_destroy(&mut self, entity: Entity) {}
+}
+
 fn test() {
-    let world = World::new();
-    let handle = unsafe { world.inner_mut().push(()) };
-
-    let player = Player::instantiate(handle.into(), &world);
-
-    player.for_each::<&Script>(|_| println!("AMOGUS!"));
+    let mut world = World::new();
+    world.instantiate::<Player>(());
 }
 
 pub fn tick_scripts(world: &mut World, delta: &Timestep, input_state: &Ref<InputState>) {
-    <&mut Script>::query().for_each_mut(unsafe { world.inner_mut() }, |script| {
+    for (entity, mut script) in world.iter::<&mut Script>() {
         script.tick(delta, input_state);
-    });
+    }
 }

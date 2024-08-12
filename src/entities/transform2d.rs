@@ -5,7 +5,6 @@ use glam::{Mat4, Vec2, Vec3};
 use crate::assets::buffer::UniformBuffer;
 use crate::context::VisContext;
 use crate::render::types::BindGroupEntry;
-use hecs_hierarchy::Hierarchy;
 
 #[derive(Debug)]
 pub struct Transform2D {

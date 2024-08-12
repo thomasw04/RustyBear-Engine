@@ -17,7 +17,7 @@ use RustyBear_Engine::core::{Application, ModuleStack};
 use RustyBear_Engine::entities::animation2d::Animation2D;
 use RustyBear_Engine::entities::sprite::Sprite;
 use RustyBear_Engine::entities::transform2d::Transform2D;
-use RustyBear_Engine::entities::worlds::Worlds;
+use RustyBear_Engine::entities::omniverse::Worlds;
 use RustyBear_Engine::environment::config::Config;
 use RustyBear_Engine::event::{Event, EventType};
 use RustyBear_Engine::input::InputState;

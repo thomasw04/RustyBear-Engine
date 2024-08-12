@@ -18,8 +18,6 @@ pub mod window;
 //Re-exports
 pub use egui;
 pub use glam;
-pub use hecs;
-pub use hecs_hierarchy;
 pub use log;
 pub use pollster;
 pub use rccell;

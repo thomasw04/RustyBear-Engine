@@ -1,5 +1,4 @@
 use glam::Vec4;
-use libc::stat;
 use wgpu::TextureView;
 use winit::window::Window;
 
@@ -9,9 +8,9 @@ use crate::assets::shader::ShaderVariant;
 use crate::assets::texture::Texture2D;
 use crate::context::{Context, VisContext};
 use crate::entities::animation2d::Animation2D;
+use crate::entities::omniverse::Omniverse;
 use crate::entities::sprite::Sprite;
 use crate::entities::transform2d::Transform2D;
-use crate::entities::worlds::Worlds;
 use crate::event::{self, EventSubscriber};
 use crate::render::renderer::Renderer;
 use crate::static_asset;
@@ -91,8 +90,8 @@ impl Renderer2D {
         }
     }
 
-    pub fn update(&mut self, context: &VisContext, delta: &Timestep, worlds: &mut Worlds) {
-        if let Some(world) = worlds.get_mut() {
+    pub fn update(&mut self, context: &VisContext, delta: &Timestep, omni: &mut Omniverse) {
+        if let Some(world) = omni.get_mut() {
             for (_entity, (sprite, animation)) in
                 world.query_mut::<(&mut Sprite, &mut Animation2D)>()
             {
@@ -233,9 +232,6 @@ impl Renderer2D {
             if let Some(world) = worlds.get_mut() {
                 {
                     let mut renderables = world.query::<(&mut Transform2D, &mut Sprite)>();
-
-                    let mut entities: Vec<(hecs::Entity, (&mut Transform2D, &mut Sprite<'_>))> =
-                        renderables.into_iter().collect();
 
                     entities.sort_by(|(_, (a, _)), (_, (b, _))| {
                         a.position().z.total_cmp(&b.position().z)

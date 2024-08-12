@@ -41,10 +41,17 @@ pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     //Create a function instantiate.
     let instantiate = quote::quote! {
-        impl<'a> #name<'a> {
-            pub fn instantiate(handle: crate::entities::world::Entity, world: &'a crate::entities::world::World) -> Self {
-                let cmds = crate::entities::world::CommandBuffer::new(unsafe { world.inner().deref() });
-                Self { _gen_handle: handle, _gen_cmds: cmds, _gen_world: Some(world), ..Default::default() }
+        impl<'a> crate::entities::world::Instantiable for #name<'a> {
+            fn instantiate<T: hecs::DynamicBundle>(world: &crate::entities::world::World, components: T) {
+                let handle = world.reserve_entity();
+                let cmds = crate::entities::world::CommandBuffer::new();
+
+                world.insert_one(handle, std::boxed::Box::new(Self { _gen_handle: handle.into(), _gen_cmds: cmds, _gen_world: Some(world), ..Default::default() }));
+                world.insert(handle, components);
+
+                if let Some(mut component) = world.get::<&mut Script>(handle) {
+                    component.on_spawn(handle.into());
+                }
             }
         }
     };
@@ -57,7 +64,7 @@ pub fn Entity(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             fn world(&self) -> &'a crate::entities::world::World {
-                &self._gen_world.expect("THIS IS A BUG! World is not initialized.")
+                &self._gen_world.expect("This is a bug. Please report it.")
             }
 
             fn cmds(&self) -> &crate::entities::world::CommandBuffer {

@@ -148,6 +148,30 @@ impl Display for Guid {
     }
 }
 
+impl From<u64> for Guid {
+    fn from(id: u64) -> Guid {
+        Guid { id }
+    }
+}
+
+impl From<usize> for Guid {
+    fn from(id: usize) -> Guid {
+        Guid { id: id as u64 }
+    }
+}
+
+impl From<Guid> for u64 {
+    fn from(guid: Guid) -> u64 {
+        guid.id
+    }
+}
+
+impl From<Guid> for usize {
+    fn from(guid: Guid) -> usize {
+        guid.id as usize
+    }
+}
+
 impl Guid {
     pub const fn new(id: u64) -> Guid {
         Guid { id }
@@ -265,45 +289,6 @@ impl<K: Eq + Hash + Clone, V> StableMap<K, V> {
 
     pub fn remove(&mut self, key: &K) -> Option<PoolRef<V>> {
         self.map.remove(key)
-    }
-}
-
-pub struct Deferred<T> {
-    data: AtomicPtr<T>,
-}
-
-impl<T> Deferred<T> {
-    pub const fn new() -> Deferred<T> {
-        Deferred { data: AtomicPtr::new(std::ptr::null_mut()) }
-    }
-
-    pub fn write_once(&self, value: T) -> &T {
-        let ptr = Box::into_raw(Box::new(value));
-        match self.data.compare_exchange(null_mut(), ptr, Ordering::Release, Ordering::Relaxed) {
-            Ok(value) => unsafe { &*value },
-            Err(value) => {
-                unsafe { drop(Box::from_raw(ptr)) };
-                unsafe { &*value }
-            }
-        }
-    }
-
-    pub fn read<'a>(&'a self) -> Option<&'a T> {
-        let ptr = self.data.load(Ordering::Acquire);
-        if ptr.is_null() {
-            None
-        } else {
-            unsafe { Some(&*ptr) }
-        }
-    }
-}
-
-impl<T> Drop for Deferred<T> {
-    fn drop(&mut self) {
-        let ptr = self.data.load(Ordering::Acquire);
-        if !ptr.is_null() {
-            unsafe { drop(Box::from_raw(ptr)) };
-        }
     }
 }
 

@@ -11,9 +11,11 @@ use crate::entities::sprite::Sprite;
 use crate::entities::transform2d::Transform2D;
 use crate::utils::{Guid, GuidGenerator};
 
+use super::world::World;
+
 //A collection of entities that represents a set of worlds.
-pub struct Worlds {
-    worlds: HashMap<Guid, hecs::World>,
+/*pub struct Worlds {
+    worlds: HashMap<Guid, World>,
     generator: GuidGenerator,
     current_world: Option<Guid>,
 }
@@ -171,4 +173,38 @@ fn tileset_filepath<P1: AsRef<Path>, P2: AsRef<Path>>(
     let tileset_relative_path = tileset_relative_path.with_extension("fur");
 
     Ok(parent.join(tileset_relative_path))
+}*/
+
+pub struct Omniverse {
+    worlds: Vec<World>,
+    current: Option<Guid>,
+}
+
+impl Omniverse {
+    pub fn new() -> Self {
+        Self { worlds: Vec::new(), current: None }
+    }
+
+    pub fn summon(&mut self) -> Guid {
+        self.worlds.push(World::new());
+        (self.worlds.len() - 1).into()
+    }
+
+    pub fn get(&self, handle: Guid) -> Option<&World> {
+        let handle: usize = handle.into();
+        self.worlds.get(handle)
+    }
+
+    pub fn get_mut(&mut self, handle: Guid) -> Option<&mut World> {
+        let handle: usize = handle.into();
+        self.worlds.get_mut(handle)
+    }
+
+    pub fn transfer(&mut self, handle: Guid) {
+        self.current = Some(handle);
+    }
+
+    pub fn current(&self) -> Option<&World> {
+        self.current.and_then(|handle| self.get(handle))
+    }
 }
