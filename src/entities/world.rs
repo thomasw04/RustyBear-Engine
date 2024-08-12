@@ -1,10 +1,13 @@
-use hecs::{Component, ComponentRef, DynamicBundle};
+use hecs::{Component, ComponentRef, DynamicBundle, Without};
 use smallvec::SmallVec;
 // -------------------------------------
 // World System.
 // Abstraction layer for managing state.
 // -------------------------------------
-use std::cell::{Ref, UnsafeCell};
+use std::{
+    cell::{Ref, UnsafeCell},
+    slice::Iter,
+};
 
 use crate::{input::InputState, utils::Timestep};
 
@@ -232,6 +235,15 @@ impl From<Entity> for hecs::Entity {
 }
 
 // --------------------------------------------------------------
+
+struct Children {
+    children: SmallVec<[Entity; 8]>,
+}
+
+struct Parent {
+    parent: Entity,
+}
+
 pub struct World(UnsafeCell<hecs::World>);
 
 impl Default for World {
@@ -243,6 +255,71 @@ impl Default for World {
 impl World {
     pub fn new() -> Self {
         Self(UnsafeCell::new(hecs::World::new()))
+    }
+
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
+    pub unsafe fn root(&self) -> Vec<Entity> {
+        let world = unsafe { &mut *self.0.get() };
+        world
+            .query::<Without<&Children, &Parent>>()
+            .iter()
+            .map(|(entity, _)| entity.into())
+            .collect()
+    }
+
+    /// # Safety
+    /// Creates a reference to the world.
+    /// This reference is only allowed to exist while no other mutable reference is alive.
+    pub unsafe fn children<'a>(&'a self, entity: Entity) -> Iter<'a, Entity> {
+        let world = unsafe { &mut *self.0.get() };
+        world
+            .get::<&Children>(entity.into())
+            .map(|x| x.children.iter())
+            .unwrap_or_else(|_| [].iter())
+    }
+
+    /// # Safety
+    /// Creates a mutable reference to the world.
+    /// This reference is only allowed to exist while no other reference (mutable or not) is alive.
+    pub unsafe fn set_parent(&self, entity: Entity, parent: Entity) {
+        let world = self.inner_mut();
+        if let Some(mut child) = world.entry(entity.into()) {
+            if let Some(mut par) = world.entry(parent.into()) {
+                if let Ok(mut com) = par.get_component_mut::<Children>() {
+                    com.children.push(entity);
+                } else {
+                    par.add_component(Children { children: SmallVec::from_elem(entity, 1) });
+                }
+
+                if let Ok(mut com) = child.get_component_mut::<Parent>() {
+                    if let Some(index) = com.parent.0 {
+                        if let Some(mut parent) = world.entry(index) {
+                            if let Ok(mut com) = parent.get_component_mut::<Children>() {
+                                com.children.retain(|x| *x != entity);
+                            }
+                        }
+                    }
+                    com.parent = parent;
+                } else {
+                    child.add_component(Parent { parent });
+                }
+            } else {
+                if let Ok(mut com) = child.get_component_mut::<Parent>() {
+                    if let Some(index) = com.parent.0 {
+                        if let Some(mut parent) = world.entry(index) {
+                            if let Ok(mut com) = parent.get_component_mut::<Children>() {
+                                com.children.retain(|x| *x != entity);
+                            }
+                        }
+                    }
+                }
+                child.remove_component::<Parent>();
+            }
+        } else {
+            log::warn!("Warining: Entity not found.");
+        }
     }
 
     pub fn instantiate<T: Instantiable>(&self, components: impl DynamicBundle) {
