@@ -56,6 +56,7 @@ derive = { path = "derive" }
 noise = "0.9.0"
 shipyard = "0.7.1"
 hecs = "0.10.5"
+hecs-hierarchy = "0.12.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.6"

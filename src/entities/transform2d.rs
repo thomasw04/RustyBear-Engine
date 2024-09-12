@@ -6,6 +6,8 @@ use crate::assets::buffer::UniformBuffer;
 use crate::context::VisContext;
 use crate::render::types::BindGroupEntry;
 
+use super::world::{Entity, World};
+
 #[derive(Debug)]
 pub struct Transform2D {
     position: Vec3,
@@ -47,7 +49,7 @@ impl Transform2D {
         Self { position, rotation, scale, parent, global, uniform, group, layout, dirty: true }
     }
 
-    pub fn update(&mut self, context: &VisContext, entity: hecs::Entity, world: &hecs::World) {
+    pub fn update(&mut self, context: &VisContext, entity: Entity, world: World) {
         self.parent = if let Ok(parent) = world.parent::<Transform2D>(entity) {
             world.get::<&Transform2D>(parent).unwrap().global
         } else {

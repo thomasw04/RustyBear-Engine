@@ -1,13 +1,14 @@
 use hecs::{Component, ComponentRef, DynamicBundle, Without};
+use hecs_hierarchy::{
+    BreadthFirstIterator, Child, ChildrenIter, DepthFirstIterator, Hierarchy, HierarchyMut, Parent,
+};
 use smallvec::SmallVec;
 // -------------------------------------
 // World System.
 // Abstraction layer for managing state.
 // -------------------------------------
-use std::{
-    cell::{Ref, UnsafeCell},
-    slice::Iter,
-};
+use std::cell::{Ref, UnsafeCell};
+use std::slice::Iter;
 
 use crate::{input::InputState, utils::Timestep};
 
@@ -197,7 +198,7 @@ impl CommandBuffer {
     pub fn apply(&mut self, world: &mut World) {
         world.apply(&mut self.buffer);
 
-        let world = unsafe { &mut *world.0.get() };
+        let world = unsafe { &mut *world.inner.get() };
 
         for entity in self.despawn.iter() {
             if let Ok(mut component) = world.get::<&mut Script>(*entity) {
@@ -236,15 +237,10 @@ impl From<Entity> for hecs::Entity {
 
 // --------------------------------------------------------------
 
-struct Children {
-    children: SmallVec<[Entity; 8]>,
+pub struct World {
+    inner: UnsafeCell<hecs::World>,
+    dirty: UnsafeCell<Vec<Entity>>,
 }
-
-struct Parent {
-    parent: Entity,
-}
-
-pub struct World(UnsafeCell<hecs::World>);
 
 impl Default for World {
     fn default() -> Self {
@@ -254,72 +250,54 @@ impl Default for World {
 
 impl World {
     pub fn new() -> Self {
-        Self(UnsafeCell::new(hecs::World::new()))
+        Self { inner: UnsafeCell::new(hecs::World::new()), dirty: UnsafeCell::new(Vec::new()) }
     }
 
-    /// # Safety
-    /// Creates a reference to the world.
-    /// This reference is only allowed to exist while no other mutable reference is alive.
-    pub unsafe fn root(&self) -> Vec<Entity> {
-        let world = unsafe { &mut *self.0.get() };
-        world
-            .query::<Without<&Children, &Parent>>()
-            .iter()
-            .map(|(entity, _)| entity.into())
-            .collect()
+    pub fn root<T: Component>(&self) -> hecs::QueryIter<'_, Without<&Parent<T>, &Child<T>>> {
+        let world = unsafe { &*self.inner.get() };
+        world.query::<&Parent<T>>().without::<&Child<T>>().iter()
     }
 
-    /// # Safety
-    /// Creates a reference to the world.
-    /// This reference is only allowed to exist while no other mutable reference is alive.
-    pub unsafe fn children<'a>(&'a self, entity: Entity) -> Iter<'a, Entity> {
-        let world = unsafe { &mut *self.0.get() };
-        world
-            .get::<&Children>(entity.into())
-            .map(|x| x.children.iter())
-            .unwrap_or_else(|_| [].iter())
+    pub fn dirties(&self) -> Iter<Entity> {
+        let dirty = unsafe { &*self.dirty.get() };
+        dirty.iter()
     }
 
-    /// # Safety
-    /// Creates a mutable reference to the world.
-    /// This reference is only allowed to exist while no other reference (mutable or not) is alive.
-    pub unsafe fn set_parent(&self, entity: Entity, parent: Entity) {
-        let world = self.inner_mut();
-        if let Some(mut child) = world.entry(entity.into()) {
-            if let Some(mut par) = world.entry(parent.into()) {
-                if let Ok(mut com) = par.get_component_mut::<Children>() {
-                    com.children.push(entity);
-                } else {
-                    par.add_component(Children { children: SmallVec::from_elem(entity, 1) });
-                }
+    pub fn reset_dirties(&self) {
+        let dirty = unsafe { &mut *self.dirty.get() };
+        dirty.clear();
+    }
 
-                if let Ok(mut com) = child.get_component_mut::<Parent>() {
-                    if let Some(index) = com.parent.0 {
-                        if let Some(mut parent) = world.entry(index) {
-                            if let Ok(mut com) = parent.get_component_mut::<Children>() {
-                                com.children.retain(|x| *x != entity);
-                            }
-                        }
-                    }
-                    com.parent = parent;
-                } else {
-                    child.add_component(Parent { parent });
-                }
-            } else {
-                if let Ok(mut com) = child.get_component_mut::<Parent>() {
-                    if let Some(index) = com.parent.0 {
-                        if let Some(mut parent) = world.entry(index) {
-                            if let Ok(mut com) = parent.get_component_mut::<Children>() {
-                                com.children.retain(|x| *x != entity);
-                            }
-                        }
-                    }
-                }
-                child.remove_component::<Parent>();
+    pub fn add_dirty(&self, entity: Entity) {
+        let dirty = unsafe { &mut *self.dirty.get() };
+        dirty.push(entity);
+    }
+
+    pub fn children<T: Component>(&self, entity: Entity) -> ChildrenIter<T> {
+        let world = unsafe { &*self.inner.get() };
+        world.children(entity.into())
+    }
+
+    pub fn set_parent<T: Component>(&self, child: Entity, parent: Entity) {
+        let world = unsafe { &*self.inner.get() };
+        if let Ok(old) = world.parent::<T>(child.into()) {
+            if old == parent.into() {
+                return;
             }
-        } else {
-            log::warn!("Warining: Entity not found.");
         }
+
+        let _ = world.detach::<T>(child.into());
+        world.attach::<T>(child.into(), parent.into());
+    }
+
+    pub fn bfs<T: Component>(&self, entity: Entity) -> BreadthFirstIterator<'_, hecs::World, T> {
+        let world = unsafe { &*self.inner.get() };
+        world.descendants_breadth_first(entity.into())
+    }
+
+    pub fn dfs<T: Component>(&self, entity: Entity) -> DepthFirstIterator<'_, T> {
+        let world = unsafe { &*self.inner.get() };
+        world.descendants_depth_first(entity.into())
     }
 
     pub fn instantiate<T: Instantiable>(&self, components: impl DynamicBundle) {
@@ -327,7 +305,7 @@ impl World {
     }
 
     pub fn spawn(&self, components: impl DynamicBundle) -> Entity {
-        let world = unsafe { &mut *self.0.get() };
+        let world = unsafe { &mut *self.inner.get() };
         let entity = world.spawn(components);
 
         if let Ok(mut component) = world.get::<&mut Script>(entity) {
@@ -338,17 +316,17 @@ impl World {
     }
 
     pub fn insert(&self, entity: Entity, components: impl DynamicBundle) {
-        let world = unsafe { &mut *self.0.get() };
+        let world = unsafe { &mut *self.inner.get() };
         world.insert(entity.into(), components);
     }
 
     pub fn insert_one<T: Component>(&self, entity: Entity, component: T) {
-        let world = unsafe { &mut *self.0.get() };
+        let world = unsafe { &mut *self.inner.get() };
         world.insert_one(entity.into(), component);
     }
 
     pub fn despawn(&self, entity: Entity) {
-        let world = unsafe { &mut *self.0.get() };
+        let world = unsafe { &mut *self.inner.get() };
 
         if let Ok(mut component) = world.get::<&mut Script>(entity.into()) {
             component.on_destroy(entity);
@@ -358,32 +336,32 @@ impl World {
     }
 
     pub fn iter<Q: hecs::Query>(&self) -> hecs::QueryIter<Q> {
-        let world = unsafe { &*self.0.get() };
+        let world = unsafe { &*self.inner.get() };
         world.query::<Q>().iter()
     }
 
     pub fn reserve_entity(&self) -> Entity {
-        let world = unsafe { &*self.0.get() };
+        let world = unsafe { &*self.inner.get() };
         world.reserve_entity().into()
     }
 
     pub fn get<'a, T: ComponentRef<'a>>(&self, entity: Entity) -> Option<T::Ref> {
-        let world = unsafe { &*self.0.get() };
+        let world = unsafe { &*self.inner.get() };
         world.get::<T>(entity.into()).ok()
     }
 
     pub fn apply(&self, cmds: &mut hecs::CommandBuffer) {
-        let world = unsafe { &mut *self.0.get() };
+        let world = unsafe { &mut *self.inner.get() };
         cmds.run_on(world);
     }
 
     pub fn query<Q: hecs::Query>(&self) -> hecs::QueryIter<Q> {
-        let world = unsafe { &*self.0.get() };
+        let world = unsafe { &*self.inner.get() };
         world.query::<Q>().iter()
     }
 
     pub fn view<Q: hecs::Query>(&self) -> hecs::View<Q> {
-        let world = unsafe { &*self.0.get() };
+        let world = unsafe { &*self.inner.get() };
         world.query::<Q>().view()
     }
 }
