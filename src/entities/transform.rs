@@ -1,16 +1,11 @@
-use std::mem::size_of;
+use std::ops::Mul;
 
-use glam::{Mat4, Quat, Vec3, Vec4};
+use glam::{Mat4, Quat, Vec3};
+use once_cell::sync::OnceCell;
 
-use crate::{assets::buffer::UniformBuffer, context::VisContext, render::types::BindGroupEntry};
+use crate::{assets::buffer::UniformBuffer, context::VisContext};
 
 use super::world::World;
-
-#[derive(Debug)]
-struct WorldTransform {
-    translation: Mat4,
-    rotation: Quat,
-}
 
 #[derive(Debug)]
 struct LocalTransform {
@@ -23,72 +18,67 @@ struct LocalTransform {
 pub struct Transform {
     local: LocalTransform,
     parent: WorldTransform,
+}
 
-    //GPU
-    uniform: UniformBuffer,
-    group: wgpu::BindGroup,
-    layout: wgpu::BindGroupLayout,
+#[derive(Debug)]
+struct WorldTransform {
+    translation: Mat4,
+    rotation: Quat,
+}
+
+impl Mul<LocalTransform> for WorldTransform {
+    type Output = WorldTransform;
+
+    fn mul(self, rhs: LocalTransform) -> Self::Output {
+        let translation = self.translation * Mat4::from_translation(rhs.position);
+        let rotation = self.rotation * rhs.rotation;
+
+        Self { translation, rotation }
+    }
+}
+
+impl Default for WorldTransform {
+    fn default() -> Self {
+        Self { translation: Mat4::IDENTITY, rotation: Quat::IDENTITY }
+    }
 }
 
 impl Transform {
     pub fn new(context: &VisContext, position: Vec3, rotation: Vec3, scale: Vec3) -> Self {
-        let mut uniform = UniformBuffer::new(context, size_of::<[[f32; 4]; 4]>());
-
         let translation = glam::Mat4::from_scale(scale) * glam::Mat4::from_translation(position);
 
         let rotation = Quat::from_scaled_axis(rotation);
-        let world = WorldTransform { translation, rotation };
-        let global = translation * Mat4::from_quat(rotation);
+        let local = LocalTransform { position, rotation, scale };
 
-        uniform.update_buffer(context, bytemuck::cast_slice(&global.to_cols_array_2d()));
-
-        let layout = context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            entries: &[UniformBuffer::layout_entry(0)],
-        });
-
-        let group = context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &layout,
-            entries: &[uniform.group_entry(0)],
-        });
-
-        Self { position, rotation, scale, world, uniform, group, layout, dirty: false }
+        Self { local, parent: WorldTransform::default() }
     }
 
-    fn update_buffer(&self, context: &VisContext) {
-        let global = self.world.translation * Mat4::from_quat(self.world.rotation);
-        self.uniform.update_buffer(context, bytemuck::cast_slice(&global.to_cols_array_2d()));
-    }
+    pub fn layout(context: &VisContext) -> &'static wgpu::BindGroupLayout {
+        static LAYOUT: OnceCell<wgpu::BindGroupLayout> = OnceCell::new();
 
-    fn diff(&self) -> (Mat4, Quat) {
-        let local = glam::Mat4::from_scale(self.local.scale)
-            * glam::Mat4::from_translation(self.local.position);
-
-        let trans_diff = local - self.world.translation;
-        let rot_diff = self.local.rotation * self.world.rotation.conjugate();
-
-        (trans_diff, rot_diff)
-    }
-
-    fn apply_local(&mut self) {
-        self.world.translation =
-            glam::Mat4::from_scale(self.scale) * glam::Mat4::from_translation(self.position);
-        self.world.rotation = self.rotation;
+        LAYOUT.get_or_init(|| {
+            context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Transform Layout"),
+                entries: &[UniformBuffer::layout_entry(0)],
+            })
+        })
     }
 
     pub fn update(context: &VisContext, world: &World) {
+        // TODO: Optimize this. This is a very naive implementation.
+
         for entity in world.dirties() {
-            loop {
-                if let Some(parent) = world.get::<&mut Transform>(*entity) {
-                    let (mut transcale, mut rot) = parent.diff();
+            let mut stack = vec![*entity];
 
-                    for entity in world.children::<Transform>((*entity).into()) {
+            while let Some(entity) = stack.pop() {
+                if let Some(parent) = world.get::<&mut Transform>(entity) {
+                    let new_parent = parent.parent * parent.local;
+                    for entity in world.children::<Transform>((entity).into()) {
                         if let Some(mut transform) = world.get::<&mut Transform>(entity.into()) {
-                            if transform.dirty {}
-
-                            transform.global = parent.global * transform.local;
+                            transform.parent = new_parent;
                         }
+
+                        stack.push(entity.into());
                     }
                 }
             }
@@ -97,44 +87,24 @@ impl Transform {
 }
 
 impl Transform {
-    pub fn group(&self) -> &wgpu::BindGroup {
-        &self.group
-    }
-
-    pub fn layout(&self) -> &wgpu::BindGroupLayout {
-        &self.layout
-    }
-
     pub fn position(&self) -> Vec3 {
         self.local.position
     }
 
     pub fn move_by(&mut self, change: Vec3) {
-        // Add to local
         self.local.position += change;
-
-        //Add to global translation
-        *self.world.translation.col_mut(3) += Vec4::new(change.x, change.y, change.z, 1.0);
     }
 
     pub fn scale_by(&mut self, change: Vec3) {
-        //Add to local
         self.local.scale += change;
-
-        //Add to global
-        self.world.translation = self.world.translation.add_mat4(&Mat4::from_scale(change));
     }
 
     pub fn rotate_by(&mut self, change: Quat) {
-        //Add to local
         self.local.rotation = self.local.rotation.mul_quat(change);
-
-        //Add to global
-        self.local.rotation = self.world.rotation.mul_quat(change);
     }
 
     pub fn set_position(&mut self, position: Vec3) {
-        self.move_by(position - self.position());
+        self.local.position = position;
     }
 
     pub fn rotation(&self) -> Vec3 {
@@ -142,8 +112,7 @@ impl Transform {
     }
 
     pub fn set_rotation(&mut self, rotation: Vec3) {
-        let diff = Quat::from_scaled_axis(rotation) * self.local.rotation.conjugate();
-        self.rotate_by(diff);
+        self.local.rotation = Quat::from_scaled_axis(rotation);
     }
 
     pub fn scale(&self) -> Vec3 {
@@ -151,6 +120,6 @@ impl Transform {
     }
 
     pub fn set_scale(&mut self, scale: Vec3) {
-        self.scale_by(scale - self.scale());
+        self.local.scale = scale;
     }
 }

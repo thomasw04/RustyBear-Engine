@@ -10,7 +10,7 @@ use crate::context::{Context, VisContext};
 use crate::entities::animation2d::Animation2D;
 use crate::entities::omniverse::Omniverse;
 use crate::entities::sprite::Sprite;
-use crate::entities::transform2d::Transform2D;
+use crate::entities::transform::Transform;
 use crate::event::{self, EventSubscriber};
 use crate::render::renderer::Renderer;
 use crate::static_asset;
@@ -92,9 +92,7 @@ impl Renderer2D {
 
     pub fn update(&mut self, context: &VisContext, delta: &Timestep, omni: &mut Omniverse) {
         if let Some(world) = omni.get_mut() {
-            for (_entity, (sprite, animation)) in
-                world.query_mut::<(&mut Sprite, &mut Animation2D)>()
-            {
+            for (_entity, (sprite, animation)) in world.query::<(&mut Sprite, &mut Animation2D)>() {
                 animation.update(context, delta, sprite);
             }
         }
@@ -231,7 +229,7 @@ impl Renderer2D {
             //Prepare World Render Pass--------------------------------------------------------------------------
             if let Some(world) = worlds.get_mut() {
                 {
-                    let mut renderables = world.query::<(&mut Transform2D, &mut Sprite)>();
+                    let mut renderables = world.query::<(&mut Transform, &mut Sprite)>();
 
                     entities.sort_by(|(_, (a, _)), (_, (b, _))| {
                         a.position().z.total_cmp(&b.position().z)
