@@ -10,17 +10,18 @@ use crate::render::types::{BindGroupEntry, Vertex2D};
 use glam::{Vec2, Vec4};
 use std::mem::size_of;
 
-pub struct Sprite<'a> {
+pub struct Sprite {
     texture: Ptr<Texture2D>,
+    coords: [f32; 8],
     tint: Vec4,
     sampler: Sampler,
     buffer: UniformBuffer,
     material: GenericMaterial,
-    mesh: GenericMesh<'a>,
+    index: u64,
     waiting: bool,
 }
 
-impl<'a> Sprite<'a> {
+impl Sprite {
     pub fn new_custom(
         context: &VisContext, vertex: Ptr<Shader>, fragment: Ptr<Shader>, texture: Ptr<Texture2D>,
         tint: Vec4, coords: Option<&[f32]>, sampler: Option<Sampler>,
@@ -46,9 +47,9 @@ impl<'a> Sprite<'a> {
         };
 
         const INDICES: &[u16] = &[0, 1, 2, 0, 3, 1];
-        let vertices = Vertices::new(context, bytemuck::cast_slice(&vertices), Vertex2D::LAYOUT);
+        let vertices = Vertices::from(context, bytemuck::cast_slice(&vertices), Vertex2D::LAYOUT);
         let indices =
-            Indices::new(context, bytemuck::cast_slice(INDICES), wgpu::IndexFormat::Uint16);
+            Indices::from(context, bytemuck::cast_slice(INDICES), wgpu::IndexFormat::Uint16);
         let mesh = GenericMesh::new(vertices, indices, 6);
 
         let material = GenericMaterial::new(
@@ -63,7 +64,7 @@ impl<'a> Sprite<'a> {
             ],
         );
 
-        Self { texture, sampler, tint, buffer, material, mesh, waiting: true }
+        Self { texture, sampler, tint, buffer, material, waiting: true }
     }
 
     pub fn new(
@@ -81,26 +82,12 @@ impl<'a> Sprite<'a> {
         )
     }
 
-    pub fn set_coords(&mut self, context: &VisContext, coords: &[f32]) {
-        let vertices = vec![
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [coords[0], coords[1]] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [coords[2], coords[3]] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [coords[4], coords[5]] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [coords[6], coords[7]] },
-        ];
-
-        self.mesh.update_vertices(context, bytemuck::cast_slice(&vertices));
+    pub fn set_coords_raw(&mut self, context: &VisContext, coords: &[f32; 8]) {
+        self.coords = *coords;
     }
 
-    pub fn set_coords_quad(&mut self, context: &VisContext, min: Vec2, max: Vec2) {
-        let vertices = vec![
-            Vertex2D { position: [-1.0, -1.0, -0.0], texture_coords: [min.x, max.y] },
-            Vertex2D { position: [1.0, 1.0, -0.0], texture_coords: [max.x, min.y] },
-            Vertex2D { position: [-1.0, 1.0, -0.0], texture_coords: [min.x, min.y] },
-            Vertex2D { position: [1.0, -1.0, -0.0], texture_coords: [max.x, max.y] },
-        ];
-
-        self.mesh.update_vertices(context, bytemuck::cast_slice(&vertices));
+    pub fn set_coords(&mut self, context: &VisContext, min: Vec2, max: Vec2) {
+        self.coords = [min.x, max.y, max.x, min.y, min.x, min.y, max.x, max.y];
     }
 
     pub fn set_texture(&mut self, texture: Ptr<Texture2D>) {
@@ -139,7 +126,7 @@ impl<'a> Sprite<'a> {
         &self.material
     }
 
-    pub fn mesh(&self) -> &GenericMesh<'a> {
-        &self.mesh
+    pub fn index(&self) -> u64 {
+        self.index
     }
 }

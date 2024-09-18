@@ -1,15 +1,4 @@
-use std::f32::consts::PI;
-use std::path::{Path, PathBuf};
-
-use glam::{Vec2, Vec3, Vec4};
-use hashbrown::HashMap;
-
-use crate::assets::texture::{Sampler, Texture2D};
-use crate::assets::{assets, ldtk};
-use crate::context::VisContext;
-use crate::entities::sprite::Sprite;
-use crate::entities::transform2d::Transform2D;
-use crate::utils::{Guid, GuidGenerator};
+use crate::utils::Guid;
 
 use super::world::World;
 
@@ -206,5 +195,9 @@ impl Omniverse {
 
     pub fn current(&self) -> Option<&World> {
         self.current.and_then(|handle| self.get(handle))
+    }
+
+    pub fn current_mut(&mut self) -> Option<&mut World> {
+        self.current.and_then(move |handle| self.get_mut(handle))
     }
 }

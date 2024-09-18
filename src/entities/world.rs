@@ -239,7 +239,7 @@ impl From<Entity> for hecs::Entity {
 
 pub struct World {
     inner: UnsafeCell<hecs::World>,
-    dirty: UnsafeCell<Vec<Entity>>,
+    global: hecs::Entity,
 }
 
 impl Default for World {
@@ -250,7 +250,12 @@ impl Default for World {
 
 impl World {
     pub fn new() -> Self {
-        Self { inner: UnsafeCell::new(hecs::World::new()), dirty: UnsafeCell::new(Vec::new()) }
+        let mut world = hecs::World::new();
+
+        //We spawn a global entity where systems can store state.
+        let global = world.spawn(());
+
+        Self { inner: UnsafeCell::new(world), global }
     }
 
     pub fn root<T: Component>(&self) -> hecs::QueryIter<'_, Without<&Parent<T>, &Child<T>>> {
@@ -258,19 +263,8 @@ impl World {
         world.query::<&Parent<T>>().without::<&Child<T>>().iter()
     }
 
-    pub fn dirties(&self) -> Iter<Entity> {
-        let dirty = unsafe { &*self.dirty.get() };
-        dirty.iter()
-    }
-
-    pub fn reset_dirties(&self) {
-        let dirty = unsafe { &mut *self.dirty.get() };
-        dirty.clear();
-    }
-
-    pub fn add_dirty(&self, entity: Entity) {
-        let dirty = unsafe { &mut *self.dirty.get() };
-        dirty.push(entity);
+    pub fn global(&self) -> Entity {
+        self.global.into()
     }
 
     pub fn children<T: Component>(&self, entity: Entity) -> ChildrenIter<T> {

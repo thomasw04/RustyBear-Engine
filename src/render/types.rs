@@ -8,6 +8,12 @@ pub struct Vertex2D {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Rect {
+    pub vertices: [Vertex2D; 4],
+}
+
+#[repr(C)]
 #[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct SpriteUniform {
     pub transform: [[f32; 4]; 4],

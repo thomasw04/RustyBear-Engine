@@ -1,7 +1,7 @@
 use std::num::NonZeroU64;
 
 use crate::context::VisContext;
-use crate::render::types::{BindGroupEntry, IndexBuffer, VertexBuffer, VertexLayout};
+use crate::render::types::{BindGroupEntry, IndexBuffer, Vertex2D, VertexBuffer, VertexLayout};
 use crate::utils::TypeDisplay;
 
 use wgpu::util::DeviceExt;
@@ -82,7 +82,7 @@ pub struct Vertices<'a> {
 
 #[profiling::all_functions]
 impl<'a> Vertices<'a> {
-    pub fn new(
+    pub fn from(
         context: &VisContext, contents: &[u8], layout: wgpu::VertexBufferLayout<'a>,
     ) -> Self {
         let buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -94,8 +94,18 @@ impl<'a> Vertices<'a> {
         Self { buffer, layout: [layout] }
     }
 
-    pub fn update_buffer(&mut self, context: &VisContext, contents: &[u8]) {
-        context.queue.write_buffer(&self.buffer, 0, contents);
+    pub fn update(&mut self, context: &VisContext, offset: u64, contents: &[u8]) {
+        context.queue.write_buffer(&self.buffer, offset, contents);
+    }
+
+    pub fn update_with(
+        &mut self, context: &VisContext, offset: u64, size: NonZeroU64,
+    ) -> Option<wgpu::QueueWriteBufferView<'_>> {
+        context.queue.write_buffer_with(&self.buffer, offset, size)
+    }
+
+    pub fn size(&self) -> u64 {
+        self.buffer.size() / std::mem::size_of::<Vertex2D>() as u64
     }
 }
 
@@ -118,10 +128,32 @@ pub struct Indices {
 
 #[profiling::all_functions]
 impl Indices {
-    pub fn new(context: &VisContext, contents: &[u8], format: wgpu::IndexFormat) -> Self {
+    pub fn from(context: &VisContext, contents: &[u8], format: wgpu::IndexFormat) -> Self {
         let buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents,
+            usage: wgpu::BufferUsages::INDEX,
+        });
+
+        Self { buffer, format }
+    }
+
+    pub fn for_rect_array(context: &VisContext, cnt: u64, format: wgpu::IndexFormat) -> Self {
+        let mut indices = Vec::with_capacity(6 * cnt as usize);
+
+        for i in 0..cnt * 6 {
+            let i = i + 6;
+            indices.push(0 + i);
+            indices.push(2 + i);
+            indices.push(1 + i);
+            indices.push(2 + i);
+            indices.push(3 + i);
+            indices.push(0 + i);
+        }
+
+        let buffer = context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
 

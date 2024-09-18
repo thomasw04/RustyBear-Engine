@@ -1,4 +1,5 @@
 use glam::Vec4;
+use hecs::Entity;
 use wgpu::TextureView;
 use winit::window::Window;
 
@@ -20,6 +21,7 @@ use super::camera::CameraBuffer;
 use super::factory::{PipelineFactory, RenderPipelineConfig};
 use super::framebuffer::Framebuffer;
 use super::material::BackgroundMaterial;
+use super::mesh::Batch2D;
 use super::types::{BindGroup, IndexBuffer, VertexBuffer};
 use super::utils::create_color_renderpass;
 
@@ -30,6 +32,20 @@ pub enum ImmType<'a> {
     Background(&'a BackgroundMaterial),
     /// A text to be rendered immediately, at some position at the screen.
     Text,
+}
+
+struct WorldState {
+    /// This signals that all batches need to be rebuilt and the sprites need to be resorted.
+    /// This happens when a sprite changes its depth.
+    /// Note: This is a heavy weight operation. As we need to rebuild all opaque or transparent batches or both.
+    needs_rebuild: bool,
+    /// The cached vertex/index buffers for all opaque sprites in the world.
+    /// These will be rebuild when the needs_rebuild flag is set to true.
+    opaque: Vec<Batch2D>,
+
+    /// The cached vertex/index buffers for all transparent sprites in the world.
+    /// These will be rebuild when the needs_rebuild flag is set to true.
+    transparent: Vec<Batch2D>,
 }
 
 pub struct Renderer2D {
@@ -65,6 +81,19 @@ impl Renderer2D {
         Renderer2D { framebuffer, pipelines, camera_buffer, egui_renderer, background: None }
     }
 
+    fn init_state(omni: &mut Omniverse) {
+        if let Some(world) = omni.current_mut() {
+            let global = world.global();
+
+            if world.get::<&WorldState>(global).is_none() {
+                world.insert_one(
+                    global,
+                    WorldState { needs_rebuild: true, opaque: vec![], transparent: vec![] },
+                );
+            }
+        }
+    }
+
     pub fn set_background(&mut self, context: &VisContext, texture: &Texture2D, tint: Vec4) {
         match self.background {
             Some(ref mut background) => {
@@ -91,7 +120,7 @@ impl Renderer2D {
     }
 
     pub fn update(&mut self, context: &VisContext, delta: &Timestep, omni: &mut Omniverse) {
-        if let Some(world) = omni.get_mut() {
+        if let Some(world) = omni.current_mut() {
             for (_entity, (sprite, animation)) in world.query::<(&mut Sprite, &mut Animation2D)>() {
                 animation.update(context, delta, sprite);
             }
@@ -188,9 +217,11 @@ impl Renderer2D {
     }
 
     pub fn draw(
-        &mut self, assets: &mut Assets, worlds: &mut Worlds, ctx: &mut Context, view: &TextureView,
-        window: &Window,
+        &mut self, assets: &mut Assets, worlds: &mut Omniverse, ctx: &mut Context,
+        view: &TextureView, window: &Window,
     ) {
+        Self::init_state(worlds);
+
         let context = ctx.graphics.as_ref();
         let fbo = &self.framebuffer;
         let _ = assets.update();
@@ -227,11 +258,14 @@ impl Renderer2D {
 
             //------------------------------------------------------------------------------------------
             //Prepare World Render Pass--------------------------------------------------------------------------
-            if let Some(world) = worlds.get_mut() {
+            if let Some(world) = worlds.current_mut() {
                 {
-                    let mut renderables = world.query::<(&mut Transform, &mut Sprite)>();
+                    let mut renderables =
+                        world
+                            .query::<(&Transform, &Sprite)>()
+                            .collect::<Vec<(Entity, (&Transform, &Sprite))>>();
 
-                    entities.sort_by(|(_, (a, _)), (_, (b, _))| {
+                    renderables.sort_by(|(_, (a, _)), (_, (b, _))| {
                         a.position().z.total_cmp(&b.position().z)
                     });
 
@@ -242,7 +276,7 @@ impl Renderer2D {
                     let (x, y, w, h) = camera_buffer.viewport();
                     render_pass.set_viewport(x, y, w, h, 0.0, 1.0);
 
-                    for (entity, renderable) in entities.iter_mut() {
+                    for (entity, renderable) in renderables.iter_mut() {
                         let (transform, sprite) = renderable;
 
                         //Update components

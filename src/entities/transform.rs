@@ -64,11 +64,11 @@ impl Transform {
         })
     }
 
+    /// Transform System: Updates the world transform of all entities.
+    /// Note: This should be optimized sometime.
     pub fn update(context: &VisContext, world: &World) {
-        // TODO: Optimize this. This is a very naive implementation.
-
-        for entity in world.dirties() {
-            let mut stack = vec![*entity];
+        for (entity, _) in world.root::<Transform>() {
+            let mut stack = vec![entity.into()];
 
             while let Some(entity) = stack.pop() {
                 if let Some(parent) = world.get::<&mut Transform>(entity) {
